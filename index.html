@@ -6688,12 +6688,12 @@
           controls.update();
           cameraTargetPos.copy(overviewPos);
           controlsTargetPos.copy(defaultTarget);
-          scene.fog.density = 0.026;
+          scene.fog.density = 0.025;
           fogDensityTarget = 0.0115;
           renderer.domElement.style.transition = 'none';
-          renderer.domElement.style.filter = 'blur(8px)';
+          renderer.domElement.style.filter = 'blur(6px)';
           controls.enabled = false;
-          flightAnim = { active: true, elapsed: 0, frameCount: 0, duration: 2.25, camCurve, targetCurve, isExit: false };
+          flightAnim = { active: true, elapsed: 0, frameCount: 0, startDelay: 0.16, blurTriggered: false, duration: 2.65, camCurve, targetCurve, isExit: false };
         }
 
         const raycaster = new THREE.Raycaster();
@@ -7391,12 +7391,16 @@
 
           if (flightAnim && flightAnim.active) {
             flightAnim.frameCount += 1;
-            if (!flightAnim.isExit && flightAnim.frameCount === 2) {
-              renderer.domElement.style.transition = 'filter 1.2s ease-out';
-              renderer.domElement.style.filter = 'blur(0px)';
-            }
-            if (flightAnim.frameCount > 1) {
-              flightAnim.elapsed += Math.min(0.033, dt);
+            const stepDt = flightAnim.frameCount > 1 ? Math.min(0.033, dt) : 0;
+            if (flightAnim.startDelay > 0) {
+              flightAnim.startDelay = Math.max(0, flightAnim.startDelay - stepDt);
+            } else {
+              if (!flightAnim.isExit && !flightAnim.blurTriggered) {
+                flightAnim.blurTriggered = true;
+                renderer.domElement.style.transition = 'filter 1.35s ease-out';
+                renderer.domElement.style.filter = 'blur(0px)';
+              }
+              flightAnim.elapsed += stepDt;
             }
             const rawP = Math.min(1, flightAnim.elapsed / flightAnim.duration);
             const p = flightAnim.isExit ? rawP * rawP : 1 - Math.pow(1 - rawP, 3);
@@ -8012,7 +8016,8 @@
         icon: '',
         title: '',
         sub: '',
-        durationMs: 780
+        durationMs: 780,
+        holdMs: 0
       });
       const [shrineTab, setShrineTab] = useState(1);
       const mapCtrlRef = useRef(null);
@@ -8026,25 +8031,26 @@
         const mode = opts.mode || (opts.isMist ? 'mist-in' : 'fade');
         const inMs = opts.inMs || 150;
         const durationMs = opts.durationMs || 280;
+        const holdMs = opts.holdMs || 0;
+        const settleMs = mode === 'mist-in' ? 180 : 30;
         setCurtainState({
           phase: 'in',
           mode,
           icon: opts.icon || '',
           title: opts.title || '',
           sub: opts.sub || '',
-          durationMs
+          durationMs,
+          holdMs
         });
         curtainTimerRef.current = setTimeout(() => {
           if (beforeSwitch) beforeSwitch();
           setCurrentStage(nextStage);
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              setCurtainState(prev => ({ ...prev, phase: 'out' }));
-              curtainTimerRef.current = setTimeout(() => {
-                setCurtainState(prev => ({ ...prev, phase: 'hidden' }));
-              }, durationMs + 60);
-            });
-          });
+          curtainTimerRef.current = setTimeout(() => {
+            setCurtainState(prev => ({ ...prev, phase: 'out' }));
+            curtainTimerRef.current = setTimeout(() => {
+              setCurtainState(prev => ({ ...prev, phase: 'hidden' }));
+            }, durationMs + 60);
+          }, settleMs);
         }, inMs);
       }, []);
 
@@ -8220,7 +8226,8 @@
         const mistOpts = isFirstIntro
           ? {
               isMist: true,
-              durationMs: 2150,
+              durationMs: 2500,
+              holdMs: 900,
               icon: '🕯️',
               title: '序章 • 光之階梯',
               sub: '星芒沉睡於黑夜，提燈旅人艾達踏上光之階梯…'
@@ -8228,7 +8235,8 @@
           : cardMode === 'free'
           ? {
               isMist: true,
-              durationMs: 1150,
+              durationMs: 1500,
+              holdMs: 350,
               icon: '⚡',
               title: '自由挑戰 • 全聖域開放',
               sub: slotData.name || `冒險者 ${slotId}`
@@ -8236,7 +8244,8 @@
           : advStars >= 17
           ? {
               isMist: true,
-              durationMs: 1150,
+              durationMs: 1500,
+              holdMs: 350,
               icon: '👑',
               title: '第三聖域 • 幻夜尖塔',
               sub: slotData.name || `冒險者 ${slotId}`
@@ -8244,14 +8253,16 @@
           : advStars >= 8
           ? {
               isMist: true,
-              durationMs: 1150,
+              durationMs: 1500,
+              holdMs: 350,
               icon: '💠',
               title: '第二聖域 • 星象迴廊',
               sub: slotData.name || `冒險者 ${slotId}`
             }
           : {
               isMist: true,
-              durationMs: 1150,
+              durationMs: 1500,
+              holdMs: 350,
               icon: '🏛️',
               title: '第一聖域 • 月光花園',
               sub: slotData.name || `冒險者 ${slotId}`
@@ -8303,7 +8314,8 @@
           mapViewSnapshotRef.current = null;
         }, {
           isMist: true,
-          durationMs: 1900,
+          durationMs: 2500,
+          holdMs: 900,
           icon: '🕯️',
           title: '序章 • 光之階梯',
           sub: '星芒沉睡於黑夜，提燈旅人艾達踏上光之階梯…'
@@ -9244,23 +9256,28 @@
             </div>
           )}
 
-          {/* 主畫面 ↔ 地圖 滑翔穿雲（細緻 2D 碎形雲絮＋輪廓漸清）/ 關卡輕轉場 */}
+          {/* 主畫面 ↔ 地圖 景深對焦切換（聖域由模糊漸清、故事文字由清晰轉模糊消失）/ 關卡輕轉場 */}
           {curtainState.phase !== 'hidden' && (() => {
-            const { phase, mode, durationMs } = curtainState;
+            const { phase, mode, durationMs, holdMs } = curtainState;
             const isOut = phase === 'out';
             const isPrep = phase === 'prep';
             const isMistIn = mode === 'mist-in';
             const isMistOut = mode === 'mist-out';
 
             const bgDurStyle = isMistOut
-              ? { transitionDuration: isOut ? '320ms' : '560ms' }
+              ? { transitionDuration: isOut ? '320ms' : '600ms' }
               : isMistIn
-              ? { transitionDuration: isOut ? `${Math.round(durationMs * 0.72)}ms` : '200ms' }
-              : { transitionDuration: isOut ? `${durationMs}ms` : '160ms' };
-            const cloudDurStyle = isMistOut
-              ? { transitionDuration: isOut ? '320ms' : '640ms' }
-              : { transitionDuration: isOut ? `${durationMs}ms` : '220ms' };
-            const textDurStyle = { transitionDuration: isOut ? `${durationMs}ms` : '220ms' };
+              ? { transitionDuration: isOut ? '900ms' : '160ms' }
+              : { transitionDuration: isOut ? `${durationMs}ms` : '150ms' };
+
+            const textFadeMs = Math.max(450, durationMs - (holdMs || 0));
+            const textStyle = {
+              transitionDuration: isOut ? `${textFadeMs}ms` : '200ms',
+              transitionDelay: isOut && holdMs ? `${holdMs}ms` : '0ms',
+              filter: isOut ? 'blur(8px)' : 'blur(0px)',
+              opacity: isOut ? 0 : 1,
+              transform: isOut ? 'scale(1.04)' : 'scale(1)'
+            };
 
             const bgOpacityClass = isMistOut
               ? (isPrep || isOut ? 'opacity-0' : 'opacity-100')
@@ -9272,79 +9289,20 @@
                   isOut ? 'pointer-events-none' : 'pointer-events-auto'
                 }`}
               >
-                {/* 底層夜空薄霧（mist-in 較早變透明，讓模糊聖域輪廓從雲霧後透出） */}
+                {/* 底層極簡夜空帷幕（mist-in 柔和淡出，透出由模糊漸清晰的 3D 聖域） */}
                 <div
                   style={bgDurStyle}
-                  className={`absolute inset-0 bg-gradient-to-b from-slate-950/90 via-indigo-950/85 to-slate-950/90 transition-opacity ease-out ${bgOpacityClass}`}
+                  className={`absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-950 transition-opacity ease-out ${bgOpacityClass}`}
                 />
 
-                {/* 細緻 2D SVG 碎形雲絮層（mist-in 輕柔飄散；mist-out 柔和聚攏） */}
-                {(isMistIn || isMistOut) && (
-                  <>
-                    {/* 遠景與中景捲雲（SVG turbulence 碎形雲緣） */}
-                    <svg
-                      viewBox="0 0 400 700"
-                      preserveAspectRatio="xMidYMid slice"
-                      style={{ ...cloudDurStyle, willChange: 'transform, opacity' }}
-                      className={`absolute inset-0 w-full h-full transition-all ease-out ${
-                        isMistIn
-                          ? (isOut ? 'scale-[1.45] opacity-0' : 'scale-100 opacity-95')
-                          : (isPrep ? 'scale-[1.4] opacity-0' : isOut ? 'scale-100 opacity-0' : 'scale-100 opacity-95')
-                      }`}
-                    >
-                      <defs>
-                        <filter id="cirrusMist" x="-25%" y="-25%" width="150%" height="150%">
-                          <feTurbulence type="fractalNoise" baseFrequency="0.018 0.028" numOctaves="2" seed="7" result="noise" />
-                          <feDisplacementMap in="SourceGraphic" in2="noise" scale="52" xChannelSelector="R" yChannelSelector="G" result="wispy" />
-                          <feGaussianBlur in="wispy" stdDeviation="9" />
-                        </filter>
-                      </defs>
-                      <g filter="url(#cirrusMist)">
-                        <ellipse cx="90" cy="140" rx="185" ry="95" fill="rgba(224,242,254,0.58)" />
-                        <ellipse cx="320" cy="190" rx="195" ry="105" fill="rgba(199,210,254,0.54)" />
-                        <ellipse cx="200" cy="340" rx="230" ry="125" fill="rgba(240,249,255,0.62)" />
-                        <ellipse cx="75" cy="510" rx="190" ry="105" fill="rgba(186,230,253,0.52)" />
-                        <ellipse cx="315" cy="560" rx="205" ry="110" fill="rgba(224,231,255,0.56)" />
-                      </g>
-                    </svg>
-
-                    {/* 前景絲狀輕煙（略快飄散，增加層次感） */}
-                    <svg
-                      viewBox="0 0 400 700"
-                      preserveAspectRatio="xMidYMid slice"
-                      style={{ ...cloudDurStyle, willChange: 'transform, opacity' }}
-                      className={`absolute inset-0 w-full h-full transition-all ease-out ${
-                        isMistIn
-                          ? (isOut ? 'scale-[1.75] -translate-x-6 opacity-0' : 'scale-105 translate-x-0 opacity-85')
-                          : (isPrep ? 'scale-[1.65] translate-x-6 opacity-0' : isOut ? 'scale-105 opacity-0' : 'scale-105 translate-x-0 opacity-85')
-                      }`}
-                    >
-                      <defs>
-                        <filter id="fgMist" x="-25%" y="-25%" width="150%" height="150%">
-                          <feTurbulence type="fractalNoise" baseFrequency="0.025 0.04" numOctaves="2" seed="19" result="fgNoise" />
-                          <feDisplacementMap in="SourceGraphic" in2="fgNoise" scale="38" xChannelSelector="R" yChannelSelector="G" result="fgWispy" />
-                          <feGaussianBlur in="fgWispy" stdDeviation="6" />
-                        </filter>
-                      </defs>
-                      <g filter="url(#fgMist)">
-                        <ellipse cx="60" cy="250" rx="150" ry="62" fill="rgba(255,255,255,0.45)" />
-                        <ellipse cx="340" cy="420" rx="160" ry="68" fill="rgba(224,242,254,0.42)" />
-                        <ellipse cx="195" cy="630" rx="180" ry="70" fill="rgba(255,255,255,0.38)" />
-                      </g>
-                    </svg>
-                  </>
-                )}
-
-                {/* 進地圖時的故事字幕（懸浮於細緻雲霧與聖域之上） */}
+                {/* 進地圖時的故事字幕（清晰停留後，隨轉場由清晰轉模糊淡出） */}
                 {!isMistOut && (curtainState.title || curtainState.sub) && (
                   <div
-                    style={textDurStyle}
-                    className={`relative z-10 flex flex-col items-center text-center px-6 max-w-xs transition-all ease-out ${
-                      isOut ? 'scale-105 opacity-0' : 'scale-100 opacity-100'
-                    }`}
+                    style={textStyle}
+                    className="relative z-10 flex flex-col items-center text-center px-6 max-w-xs transition-all ease-out"
                   >
                     {curtainState.title && (
-                      <div className="flex items-center gap-1.5 text-xs font-black tracking-widest text-amber-300 bg-slate-950/70 backdrop-blur-sm px-3.5 py-1 rounded-full border border-amber-400/45 mb-2 shadow-lg">
+                      <div className="flex items-center gap-1.5 text-xs font-black tracking-widest text-amber-300 bg-slate-950/75 px-3.5 py-1 rounded-full border border-amber-400/45 mb-2.5 shadow-lg">
                         <span>{curtainState.icon}</span>
                         <span>{curtainState.title}</span>
                       </div>
