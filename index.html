@@ -1087,6 +1087,34 @@
           });
         } catch (e) {}
       }
+
+      sfxIdaChirp() {
+        if (!this.ctx || !this.sfxEnabled) return;
+        try {
+          const t = this.ctx.currentTime;
+          const pitchVar = 0.94 + Math.random() * 0.14;
+          const chirps = [
+            { delay: 0,    f0: 540 * pitchVar,  f1: 820 * pitchVar,  dur: 0.075, type: 'sine',     vol: 0.14 },
+            { delay: 0.06, f0: 880 * pitchVar,  f1: 1320 * pitchVar, dur: 0.095, type: 'sine',     vol: 0.15 },
+            { delay: 0.13, f0: 1568 * pitchVar, f1: 1760 * pitchVar, dur: 0.11,  type: 'triangle', vol: 0.09 }
+          ];
+          chirps.forEach((c) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            const st = t + c.delay;
+            osc.type = c.type;
+            osc.frequency.setValueAtTime(c.f0, st);
+            osc.frequency.exponentialRampToValueAtTime(c.f1, st + c.dur * 0.85);
+            gain.gain.setValueAtTime(0.001, st);
+            gain.gain.linearRampToValueAtTime(c.vol, st + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.001, st + c.dur);
+            osc.connect(gain);
+            gain.connect(this.getSfxDest());
+            osc.start(st);
+            osc.stop(st + c.dur + 0.01);
+          });
+        } catch (e) {}
+      }
     }
     const audio = new AudioEngine();
 
@@ -1245,18 +1273,28 @@
       };
     };
 
-    // ==================== 第 2 關隨機題目生成器 ====================
-    const generateLevel2Question = (phase, prevFunc = '') => {
+    // ==================== 第 2 關隨機題目生成器：逆向破譯（給比值猜函數） ====================
+    const generateLevel2Question = (phase, prevKey = '') => {
       const triplePool = [
         { adj: 4, opp: 3, hyp: 5 }, { adj: 3, opp: 4, hyp: 5 },
         { adj: 12, opp: 5, hyp: 13 }, { adj: 5, opp: 12, hyp: 13 },
-        { adj: 8, opp: 6, hyp: 10 }, { adj: 6, opp: 8, hyp: 10 }
+        { adj: 15, opp: 8, hyp: 17 }, { adj: 8, opp: 15, hyp: 17 }
       ];
-      const triple = triplePool[Math.floor(Math.random() * triplePool.length)];
+      const funcPool = ['sin', 'cos', 'tan'];
+
+      let triple, targetIsP1, targetFunc, questionKey;
+      for (let attempt = 0; attempt < 8; attempt++) {
+        triple = triplePool[Math.floor(Math.random() * triplePool.length)];
+        targetIsP1 = phase === 0 ? true : Math.random() > 0.5;
+        targetFunc = funcPool[Math.floor(Math.random() * funcPool.length)];
+        questionKey = `${triple.adj}_${triple.opp}_${triple.hyp}_${targetIsP1}_${targetFunc}`;
+        if (questionKey !== prevKey) break;
+      }
+
       const flip = Math.random() > 0.5 ? 1 : -1;
       const rotDeg = phase === 2 ? Math.floor(Math.random() * 360) : 0;
       const rotRad = (rotDeg * Math.PI) / 180;
-      const scale = 355 / triple.hyp;
+      const scale = 320 / triple.hyp;
       const adjLen = triple.adj * scale;
       const oppLen = triple.opp * scale;
 
@@ -1272,54 +1310,41 @@
       const { P1: wP1, P2: wP2, P3: wP3 } = centerTriangleBoundingBox(
         rotatePt(localPts.P1), rotatePt(localPts.P2), rotatePt(localPts.P3)
       );
+      const centroid = {
+        x: (wP1.x + wP2.x + wP3.x) / 3,
+        y: (wP1.y + wP2.y + wP3.y) / 3
+      };
 
-      const targetIsP1 = phase === 0 ? true : Math.random() > 0.5;
       const targetPt = targetIsP1 ? wP1 : wP3;
       const otherPt = targetIsP1 ? wP3 : wP1;
       const rightPt = wP2;
 
-      const edgeHyp = { id: 'hyp', p1: targetPt, p2: otherPt, numVal: triple.hyp, segName: 'AB' };
-      const edgeOpp = { id: 'opp', p1: otherPt, p2: rightPt, numVal: targetIsP1 ? triple.opp : triple.adj, segName: targetIsP1 ? 'BC' : 'AC' };
-      const edgeAdj = { id: 'adj', p1: targetPt, p2: rightPt, numVal: targetIsP1 ? triple.adj : triple.opp, segName: targetIsP1 ? 'AC' : 'BC' };
+      const edgeHyp = { id: 'hyp', labelCn: '斜邊', p1: targetPt, p2: otherPt, numVal: triple.hyp, segName: 'AB' };
+      const edgeOpp = { id: 'opp', labelCn: '對邊', p1: otherPt, p2: rightPt, numVal: targetIsP1 ? triple.opp : triple.adj, segName: targetIsP1 ? 'BC' : 'AC' };
+      const edgeAdj = { id: 'adj', labelCn: '鄰邊', p1: targetPt, p2: rightPt, numVal: targetIsP1 ? triple.adj : triple.opp, segName: targetIsP1 ? 'AC' : 'BC' };
       const sides = [edgeHyp, edgeOpp, edgeAdj];
 
-      const colorPalettes = [
-        { bg: '#3b82f6', border: '#1d4ed8', name: '藍邊', id: 'blue' },
-        { bg: '#ef4444', border: '#b91c1c', name: '紅邊', id: 'red' },
-        { bg: '#10b981', border: '#047857', name: '綠邊', id: 'green' }
-      ].sort(() => Math.random() - 0.5);
+      const useGreek = phase === 0 ? true : phase === 1 ? false : (Math.random() < 0.4);
+      const edgesWithStyles = sides.map((side) => ({
+        ...side,
+        displayText: useGreek ? String(side.numVal) : side.segName,
+        midPt: computeOutwardMidPt(side.p1, side.p2, centroid, 24)
+      }));
 
-      const useGreek = phase === 0 ? true : phase === 1 ? false : (Math.random() < 0.3);
-      const edgesWithStyles = sides.map((side, idx) => {
-        const displayText = useGreek ? String(side.numVal) : side.segName;
-        return {
-          ...side, color: colorPalettes[idx], colorId: colorPalettes[idx].id,
-          displayText, midPt: { x: (side.p1.x + side.p2.x) / 2, y: (side.p1.y + side.p2.y) / 2 }
-        };
-      });
-
-      const funcList = ['sin', 'cos', 'tan'].filter(f => f !== prevFunc);
-      const targetFunc = funcList[Math.floor(Math.random() * funcList.length)];
-      const defTipMap = {
-        sin: 'sin = 對邊 ÷ 斜邊（先點對邊當分子，再點斜邊當分母）',
-        cos: 'cos = 鄰邊 ÷ 斜邊（先點鄰邊當分子，再點斜邊當分母）',
-        tan: 'tan = 對邊 ÷ 鄰邊（先點對邊當分子，再點鄰邊當分母）'
+      const ratioDefMap = {
+        sin: { num: 'opp', den: 'hyp', formula: '對邊 ÷ 斜邊' },
+        cos: { num: 'adj', den: 'hyp', formula: '鄰邊 ÷ 斜邊' },
+        tan: { num: 'opp', den: 'adj', formula: '對邊 ÷ 鄰邊' }
       };
-
-      let correctNumeratorType = 'opp';
-      let correctDenominatorType = 'hyp';
-      if (targetFunc === 'sin') { correctNumeratorType = 'opp'; correctDenominatorType = 'hyp'; }
-      else if (targetFunc === 'cos') { correctNumeratorType = 'adj'; correctDenominatorType = 'hyp'; }
-      else if (targetFunc === 'tan') { correctNumeratorType = 'opp'; correctDenominatorType = 'adj'; }
-
-      const correctNumEdge = edgesWithStyles.find(e => e.id === correctNumeratorType);
-      const correctDenEdge = edgesWithStyles.find(e => e.id === correctDenominatorType);
+      const def = ratioDefMap[targetFunc];
+      const numEdge = edgesWithStyles.find(e => e.id === def.num);
+      const denEdge = edgesWithStyles.find(e => e.id === def.den);
 
       const v21 = { x: wP1.x - wP2.x, y: wP1.y - wP2.y };
-      const l21 = Math.hypot(v21.x, v21.y);
+      const l21 = Math.hypot(v21.x, v21.y) || 1;
       const u21 = { x: v21.x / l21, y: v21.y / l21 };
       const v23 = { x: wP3.x - wP2.x, y: wP3.y - wP2.y };
-      const l23 = Math.hypot(v23.x, v23.y);
+      const l23 = Math.hypot(v23.x, v23.y) || 1;
       const u23 = { x: v23.x / l23, y: v23.y / l23 };
 
       const sqSize = 24;
@@ -1328,12 +1353,12 @@
       const pC3 = { x: wP2.x + u23.x * sqSize, y: wP2.y + u23.y * sqSize };
       const rightAngleSquare = `${wP2.x},${wP2.y} ${pC1.x},${pC1.y} ${pC2.x},${pC2.y} ${pC3.x},${pC3.y}`;
 
-      const arcRad = 55;
+      const arcRad = Math.max(32, Math.min(52, Math.min(adjLen, oppLen) * 0.42));
       const vT_Other = { x: otherPt.x - targetPt.x, y: otherPt.y - targetPt.y };
-      const lT_Other = Math.hypot(vT_Other.x, vT_Other.y);
+      const lT_Other = Math.hypot(vT_Other.x, vT_Other.y) || 1;
       const uT_Other = { x: vT_Other.x / lT_Other, y: vT_Other.y / lT_Other };
       const vT_Right = { x: rightPt.x - targetPt.x, y: rightPt.y - targetPt.y };
-      const lT_Right = Math.hypot(vT_Right.x, vT_Right.y);
+      const lT_Right = Math.hypot(vT_Right.x, vT_Right.y) || 1;
       const uT_Right = { x: vT_Right.x / lT_Right, y: vT_Right.y / lT_Right };
 
       const arcP1 = { x: targetPt.x + uT_Right.x * arcRad, y: targetPt.y + uT_Right.y * arcRad };
@@ -1342,48 +1367,52 @@
       const sweep = cross > 0 ? 1 : 0;
       const arcPath = `M ${targetPt.x} ${targetPt.y} L ${arcP1.x} ${arcP1.y} A ${arcRad} ${arcRad} 0 0 ${sweep} ${arcP2.x} ${arcP2.y} Z`;
       const bisect = {
-        x: targetPt.x + (uT_Right.x + uT_Other.x) * 0.5 * (arcRad + 26),
-        y: targetPt.y + (uT_Right.y + uT_Other.y) * 0.5 * (arcRad + 26)
+        x: targetPt.x + (uT_Right.x + uT_Other.x) * 0.5 * (arcRad + 24),
+        y: targetPt.y + (uT_Right.y + uT_Other.y) * 0.5 * (arcRad + 24)
       };
 
-      let questionTitle = "";
+      let angleName = 'θ';
       let labels = [];
-      let showArc = false;
+      let showArc = true;
       if (useGreek) {
-        showArc = true;
-        const greek = ['θ', 'α', 'β'][Math.floor(Math.random() * 3)];
-        labels.push({ text: greek, x: bisect.x, y: bisect.y + 6, color: '#b45309', isAngle: true });
-        questionTitle = `${targetFunc}(${greek})`;
+        angleName = ['θ', 'α', 'β'][Math.floor(Math.random() * 3)];
+        labels.push({ text: angleName, x: bisect.x, y: bisect.y + 6, color: '#b45309', isAngle: true });
       } else {
         const targetLetter = targetIsP1 ? 'A' : 'B';
+        angleName = `∠${targetLetter}`;
         const offsetPt = (pt, u1, u2, dist) => {
           const out = { x: -(u1.x + u2.x), y: -(u1.y + u2.y) };
           const l = Math.hypot(out.x, out.y);
           if (l < 0.001) return { x: pt.x, y: pt.y - dist };
           return {
-            x: Math.max(22, Math.min(478, pt.x + (out.x/l)*dist)),
-            y: Math.max(22, Math.min(478, pt.y + (out.y/l)*dist))
+            x: Math.max(22, Math.min(478, pt.x + (out.x / l) * dist)),
+            y: Math.max(22, Math.min(478, pt.y + (out.y / l) * dist))
           };
         };
-        const outP1 = offsetPt(wP1, u21, {x: (wP3.x-wP1.x)/355, y:(wP3.y-wP1.y)/355}, 36);
-        const outP3 = offsetPt(wP3, u23, {x: (wP1.x-wP3.x)/355, y:(wP1.y-wP3.y)/355}, 36);
+        const hypLen = Math.hypot(wP3.x - wP1.x, wP3.y - wP1.y) || 1;
+        const outP1 = offsetPt(wP1, u21, { x: (wP3.x - wP1.x) / hypLen, y: (wP3.y - wP1.y) / hypLen }, 34);
+        const outP3 = offsetPt(wP3, u23, { x: (wP1.x - wP3.x) / hypLen, y: (wP1.y - wP3.y) / hypLen }, 34);
         const outP2 = {
-          x: Math.max(22, Math.min(478, wP2.x - (u21.x + u23.x)*28)),
-          y: Math.max(22, Math.min(478, wP2.y - (u21.y + u23.y)*28))
+          x: Math.max(22, Math.min(478, wP2.x - (u21.x + u23.x) * 26)),
+          y: Math.max(22, Math.min(478, wP2.y - (u21.y + u23.y) * 26))
         };
-        labels.push({ text: 'A', x: outP1.x, y: outP1.y + 8, color: targetLetter === 'A' ? '#d97706' : '#1e293b', isTargetVertex: targetLetter === 'A' });
-        labels.push({ text: 'B', x: outP3.x, y: outP3.y + 8, color: targetLetter === 'B' ? '#d97706' : '#1e293b', isTargetVertex: targetLetter === 'B' });
-        labels.push({ text: 'C', x: outP2.x, y: outP2.y + 8, color: '#1e293b' });
-        questionTitle = `${targetFunc}(∠${targetLetter})`;
+        labels.push({ text: 'A', x: outP1.x, y: outP1.y + 6, color: targetLetter === 'A' ? '#d97706' : '#1e293b', isTargetVertex: targetLetter === 'A' });
+        labels.push({ text: 'B', x: outP3.x, y: outP3.y + 6, color: targetLetter === 'B' ? '#d97706' : '#1e293b', isTargetVertex: targetLetter === 'B' });
+        labels.push({ text: 'C', x: outP2.x, y: outP2.y + 6, color: '#1e293b' });
       }
 
       return {
+        questionKey,
         pts: { P1: wP1, P2: wP2, P3: wP3 },
         rightAngleSquare, arcPath, showArc, labels,
-        edges: edgesWithStyles, targetFunc, questionTitle,
-        correctNumeratorEdgeId: correctNumEdge.colorId,
-        correctDenominatorEdgeId: correctDenEdge.colorId,
-        conceptTip: defTipMap[targetFunc]
+        edges: edgesWithStyles,
+        targetFunc,
+        angleName,
+        numText: numEdge.displayText,
+        denText: denEdge.displayText,
+        numEdgeId: numEdge.id,
+        denEdgeId: denEdge.id,
+        conceptTip: `${numEdge.displayText}(${numEdge.labelCn}) ÷ ${denEdge.displayText}(${denEdge.labelCn}) ＝ ${targetFunc}(${angleName})`
       };
     };
 
@@ -2063,10 +2092,9 @@
       );
     };
 
-    // ==================== 第 2 關組件：比值之密碼 ====================
+    // ==================== 第 2 關組件：比值之密碼（逆向破譯） ====================
     const Level2RatioMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const [gameState, setGameState] = useState('idle');
-      const [pickOrder, setPickOrder] = useState('num');
       const [timeLeft, setTimeLeft] = useState(45);
       const [score, setScore] = useState(0);
       const [baseScore, setBaseScore] = useState(0);
@@ -2075,37 +2103,31 @@
       const [correctCount, setCorrectCount] = useState(0);
       const [wrongCount, setWrongCount] = useState(0);
       const [question, setQuestion] = useState(null);
-      const [selectedNumEdge, setSelectedNumEdge] = useState(null);
-      const [selectedDenEdge, setSelectedDenEdge] = useState(null);
-      const [isLockedSuccess, setIsLockedSuccess] = useState(false);
+      const [solvedFunc, setSolvedFunc] = useState(null);
       const [feedbackAnim, setFeedbackAnim] = useState('');
       const [wrongBtnKey, setWrongBtnKey] = useState(null);
       const [conceptTip, setConceptTip] = useState(null);
 
       const timerRef = useRef(null);
-      const prevFuncRef = useRef('');
+      const prevKeyRef = useRef('');
       const maxTime = 45;
       const starsThreshold = [600, 1200, 1800];
 
       const nextQuestion = (currentScore) => {
         const phase = currentScore >= starsThreshold[1] ? 2 : currentScore >= starsThreshold[0] ? 1 : 0;
-        const q = generateLevel2Question(phase, prevFuncRef.current);
-        prevFuncRef.current = q.targetFunc;
+        const q = generateLevel2Question(phase, prevKeyRef.current);
+        prevKeyRef.current = q.questionKey;
         setQuestion(q);
-        setSelectedNumEdge(null);
-        setSelectedDenEdge(null);
-        setIsLockedSuccess(false);
+        setSolvedFunc(null);
         setConceptTip(null);
       };
 
-      const startGame = (order = pickOrder) => {
-        prevFuncRef.current = '';
-        setPickOrder(order);
+      const startGame = () => {
+        prevKeyRef.current = '';
         setScore(0); setBaseScore(0); setCombo(0); setMaxCombo(0);
         setCorrectCount(0); setWrongCount(0);
         setTimeLeft(maxTime); setFeedbackAnim('');
-        setSelectedNumEdge(null); setSelectedDenEdge(null);
-        setIsLockedSuccess(false);
+        setSolvedFunc(null);
         setWrongBtnKey(null); setConceptTip(null);
         setGameState('playing');
         nextQuestion(0);
@@ -2113,7 +2135,7 @@
       };
 
       useEffect(() => {
-        if (gameState === 'playing' && !isLockedSuccess) {
+        if (gameState === 'playing' && !solvedFunc) {
           timerRef.current = setInterval(() => {
             setTimeLeft(prev => {
               if (prev <= 0.1) {
@@ -2127,7 +2149,7 @@
           }, 100);
         } else clearInterval(timerRef.current);
         return () => clearInterval(timerRef.current);
-      }, [gameState, isLockedSuccess]);
+      }, [gameState, solvedFunc]);
 
       const earnedStars = useMemo(() => {
         if (score >= starsThreshold[2]) return 3;
@@ -2140,61 +2162,44 @@
         if (gameState === 'ended' && earnedStars > currentStars) onUpdateStars(earnedStars, score);
       }, [gameState, earnedStars]);
 
-      const handleSelectEdge = (edge) => {
-        if (gameState !== 'playing' || !question || isLockedSuccess) return;
-        const firstEdge = pickOrder === 'num' ? selectedNumEdge : selectedDenEdge;
-        if (!firstEdge) {
-          audio.sfxSelect();
-          if (pickOrder === 'num') setSelectedNumEdge(edge);
-          else setSelectedDenEdge(edge);
-        } else if (firstEdge.colorId === edge.colorId) {
-          audio.sfxClick();
-          setSelectedNumEdge(null);
-          setSelectedDenEdge(null);
+      const handleSelectFunc = (funcId) => {
+        if (gameState !== 'playing' || !question || solvedFunc || wrongBtnKey) return;
+        if (funcId === question.targetFunc) {
+          audio.sfxMatch();
+          setSolvedFunc(funcId);
+          const mult = combo >= 6 ? 1.5 : combo >= 3 ? 1.2 : 1.0;
+          const earned = Math.floor(100 * mult);
+          const newScore = score + earned;
+          setScore(newScore);
+          setBaseScore(b => b + 100);
+          setCorrectCount(c => c + 1);
+          const newCombo = combo + 1;
+          setCombo(newCombo);
+          if (newCombo > maxCombo) setMaxCombo(newCombo);
+          setConceptTip(null);
+          setFeedbackAnim('animate-correct');
+          setTimeout(() => { setFeedbackAnim(''); nextQuestion(newScore); }, 460);
         } else {
-          const numEdge = pickOrder === 'num' ? firstEdge : edge;
-          const denEdge = pickOrder === 'num' ? edge : firstEdge;
-          if (numEdge.colorId === question.correctNumeratorEdgeId && denEdge.colorId === question.correctDenominatorEdgeId) {
-            audio.sfxMatch();
-            setSelectedNumEdge(numEdge);
-            setSelectedDenEdge(denEdge);
-            setIsLockedSuccess(true);
-            const mult = combo >= 6 ? 1.5 : combo >= 3 ? 1.2 : 1.0;
-            const earned = Math.floor(120 * mult);
-            const newScore = score + earned;
-            setScore(newScore);
-            setBaseScore(b => b + 120);
-            setCorrectCount(c => c + 1);
-            const newCombo = combo + 1;
-            setCombo(newCombo);
-            if (newCombo > maxCombo) setMaxCombo(newCombo);
-            setConceptTip(null);
-            setFeedbackAnim('animate-correct');
-            setTimeout(() => { setFeedbackAnim(''); nextQuestion(newScore); }, 520);
-          } else {
-            audio.sfxError();
-            setCombo(0);
-            setWrongCount(w => w + 1);
-            const timePenalty = +(maxTime * 0.03).toFixed(2);
-            setTimeLeft(prev => {
-              const nextT = Math.max(0, +(prev - timePenalty).toFixed(2));
-              if (nextT <= 0) {
-                clearInterval(timerRef.current);
-                audio.sfxTimeUp();
-                setGameState('ended');
-              }
-              return nextT;
-            });
-            setWrongBtnKey(edge.colorId);
-            setConceptTip({ text: question.conceptTip, id: Date.now() });
-            setFeedbackAnim('animate-shake');
-            setTimeout(() => { setFeedbackAnim(''); setSelectedNumEdge(null); setSelectedDenEdge(null); setWrongBtnKey(null); }, 350);
-          }
+          audio.sfxError();
+          setCombo(0);
+          setWrongCount(w => w + 1);
+          setScore(s => Math.max(0, s - 60));
+          const timePenalty = +(maxTime * 0.03).toFixed(2);
+          setTimeLeft(prev => {
+            const nextT = Math.max(0, +(prev - timePenalty).toFixed(2));
+            if (nextT <= 0) {
+              clearInterval(timerRef.current);
+              audio.sfxTimeUp();
+              setGameState('ended');
+            }
+            return nextT;
+          });
+          setWrongBtnKey(funcId);
+          setConceptTip({ text: question.conceptTip, id: Date.now() });
+          setFeedbackAnim('animate-shake');
+          setTimeout(() => { setFeedbackAnim(''); setWrongBtnKey(null); }, 350);
         }
       };
-
-      const isLv2NumTurn = (pickOrder === 'num' && !selectedNumEdge) || (pickOrder === 'den' && selectedDenEdge && !selectedNumEdge);
-      const isLv2DenTurn = (pickOrder === 'den' && !selectedDenEdge) || (pickOrder === 'num' && selectedNumEdge && !selectedDenEdge);
 
       return (
         <div className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
@@ -2204,11 +2209,13 @@
               <div className="w-full space-y-2.5 pt-2">
                 <div className="w-20 h-20 mx-auto rounded-3xl bg-teal-100 border-4 border-teal-500 flex items-center justify-center text-4xl shadow-inner animate-bounce">🧩</div>
                 <h2 className="text-2xl font-black text-indigo-950 tracking-wide">比值之密碼</h2>
-                <div className="text-xs font-black text-teal-700 bg-teal-50 border border-teal-200 rounded-full px-3 py-1 inline-block">sin · cos · tan</div>
+                <p className="text-xs text-slate-500 font-bold leading-relaxed max-w-xs mx-auto">
+                  觀察神殿給出的比值密碼，在 45 秒內快速破譯它是 <span className="text-blue-600 font-black">sin</span>、<span className="text-emerald-600 font-black">cos</span> 還是 <span className="text-purple-600 font-black">tan</span>！
+                </p>
               </div>
               <CompactStarPills starsThreshold={starsThreshold} maxTime={maxTime} />
               <div className="w-full space-y-2">
-                <FractionOrderButtons onStartWithOrder={startGame} />
+                <button onClick={startGame} className="w-full py-4 btn-3d-blue text-white font-black text-lg rounded-2xl shadow-xl tracking-wider active:scale-95">🚀 開始 45 秒破譯！</button>
                 <button onClick={onBackToMap} className="w-full py-2 text-xs font-bold text-slate-400 hover:text-slate-600">返回聖域地圖</button>
               </div>
             </div>
@@ -2218,37 +2225,26 @@
             <div className={`flex-1 min-h-0 flex flex-col justify-between gap-2 overflow-hidden pb-0.5 ${feedbackAnim}`}>
               <GameHUD score={score} combo={combo} timeLeft={timeLeft} maxTime={maxTime} starsThreshold={starsThreshold} />
 
-              <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${isLockedSuccess ? 'ring-4 ring-emerald-400/75' : ''}`}>
+              <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${solvedFunc ? 'ring-4 ring-emerald-400/75' : ''}`}>
                 <div className="bg-slate-800 py-2 px-3 flex items-center justify-center gap-3 text-white border-b-2 border-slate-700 shrink-0">
-                  <span className="text-lg font-serif font-black">{question.questionTitle} =</span>
+                  <div className={`px-3 py-1 rounded-xl border-2 font-serif font-black text-base transition-all ${
+                    solvedFunc
+                      ? 'bg-emerald-500 border-emerald-300 text-white scale-105'
+                      : 'border-amber-300/70 bg-amber-400/15 text-amber-200 animate-pulse'
+                  }`}>
+                    {solvedFunc ? `${solvedFunc}(${question.angleName})` : `? (${question.angleName})`}
+                  </div>
+                  <span className="text-lg font-serif font-black text-slate-300">=</span>
                   <div className="flex flex-col items-center">
-                    <div
-                      onClick={() => { if (selectedNumEdge) { audio.sfxClick(); setSelectedNumEdge(null); } }}
-                      className={`w-20 h-6 rounded-lg border-2 flex items-center justify-center font-bold text-xs transition-all ${
-                        selectedNumEdge
-                          ? 'bg-emerald-500 border-emerald-300 text-white cursor-pointer active:scale-95 shadow-[0_0_10px_rgba(16,185,129,0.5)]'
-                          : isLv2NumTurn
-                          ? 'border-amber-300 bg-amber-400/20 text-amber-200 animate-pulse shadow-[0_0_12px_rgba(251,191,36,0.55)]'
-                          : 'border-dashed border-slate-500 text-slate-500'
-                      }`}
-                    >
-                      <span>{selectedNumEdge ? selectedNumEdge.displayText : '分子'}</span>
+                    <div className="min-w-[64px] px-2.5 h-6 rounded-lg bg-emerald-500/20 border border-emerald-400/60 flex items-center justify-center font-serif font-black text-sm text-emerald-200">
+                      {question.numText}
                     </div>
-                    <div className="w-20 h-0.5 bg-slate-400 my-1"></div>
-                    <div
-                      onClick={() => { if (selectedDenEdge) { audio.sfxClick(); setSelectedDenEdge(null); } }}
-                      className={`w-20 h-6 rounded-lg border-2 flex items-center justify-center font-bold text-xs transition-all ${
-                        selectedDenEdge
-                          ? 'bg-cyan-500 border-cyan-300 text-white cursor-pointer active:scale-95 shadow-[0_0_10px_rgba(6,182,212,0.5)]'
-                          : isLv2DenTurn
-                          ? 'border-amber-300 bg-amber-400/20 text-amber-200 animate-pulse shadow-[0_0_12px_rgba(251,191,36,0.55)]'
-                          : 'border-dashed border-slate-500 text-slate-500'
-                      }`}
-                    >
-                      <span>{selectedDenEdge ? selectedDenEdge.displayText : '分母'}</span>
+                    <div className="w-16 h-0.5 bg-slate-400 my-1"></div>
+                    <div className="min-w-[64px] px-2.5 h-6 rounded-lg bg-cyan-500/20 border border-cyan-400/60 flex items-center justify-center font-serif font-black text-sm text-cyan-200">
+                      {question.denText}
                     </div>
                   </div>
-                  <SuccessBadge show={isLockedSuccess} />
+                  <SuccessBadge show={Boolean(solvedFunc)} />
                 </div>
 
                 <div className="relative w-full flex-1 min-h-0 bg-white flex items-center justify-center overflow-hidden">
@@ -2258,14 +2254,17 @@
                     <polygon points={question.rightAngleSquare} fill="#f1f5f9" stroke="#94a3b8" strokeWidth="2.5" />
                     {question.showArc && <path d={question.arcPath} fill="#fef08a" stroke="#ca8a04" strokeWidth="2.5" />}
                     {question.edges.map((edge, idx) => {
-                      const isEdgeSelected = selectedNumEdge?.colorId === edge.colorId || selectedDenEdge?.colorId === edge.colorId;
+                      const isNum = solvedFunc && edge.id === question.numEdgeId;
+                      const isDen = solvedFunc && edge.id === question.denEdgeId;
+                      const strokeColor = isNum ? '#10b981' : isDen ? '#06b6d4' : '#334155';
                       return (
-                        <g key={idx} className="cursor-pointer group" onClick={() => handleSelectEdge(edge)}>
-                          {isEdgeSelected && <line x1={edge.p1.x} y1={edge.p1.y} x2={edge.p2.x} y2={edge.p2.y} stroke="#facc15" strokeWidth="24" strokeLinecap="round" opacity="0.7" />}
-                          <line x1={edge.p1.x} y1={edge.p1.y} x2={edge.p2.x} y2={edge.p2.y} stroke={edge.color.bg} strokeWidth="14" strokeLinecap="round" className="transition-opacity group-hover:opacity-85" />
-                          <line x1={edge.p1.x} y1={edge.p1.y} x2={edge.p2.x} y2={edge.p2.y} stroke="transparent" strokeWidth="44" strokeLinecap="round" />
-                          <circle cx={edge.midPt.x} cy={edge.midPt.y} r="21" fill="#ffffff" stroke={isEdgeSelected ? "#eab308" : edge.color.border} strokeWidth={isEdgeSelected ? "4" : "3"} />
-                          <text x={edge.midPt.x} y={edge.midPt.y + 1} fill={edge.color.border} fontSize="18" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-serif pointer-events-none">{edge.displayText}</text>
+                        <g key={idx}>
+                          {(isNum || isDen) && (
+                            <line x1={edge.p1.x} y1={edge.p1.y} x2={edge.p2.x} y2={edge.p2.y} stroke={isNum ? '#6ee7b7' : '#67e8f9'} strokeWidth="24" strokeLinecap="round" opacity="0.85" />
+                          )}
+                          <line x1={edge.p1.x} y1={edge.p1.y} x2={edge.p2.x} y2={edge.p2.y} stroke={strokeColor} strokeWidth={isNum || isDen ? '14' : '11'} strokeLinecap="round" />
+                          <circle cx={edge.midPt.x} cy={edge.midPt.y} r="21" fill="#ffffff" stroke={strokeColor} strokeWidth="3" />
+                          <text x={edge.midPt.x} y={edge.midPt.y + 1} fill={strokeColor} fontSize="18" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-serif pointer-events-none">{edge.displayText}</text>
                         </g>
                       );
                     })}
@@ -2281,19 +2280,19 @@
                 </div>
 
                 <div className="bg-slate-50 border-t-2 border-slate-200 p-2 grid grid-cols-3 gap-2 shrink-0">
-                  {question.edges.map((edge) => {
-                    const isEdgeSelected = selectedNumEdge?.colorId === edge.colorId || selectedDenEdge?.colorId === edge.colorId;
-                    return (
-                      <button
-                        key={edge.colorId}
-                        onClick={() => handleSelectEdge(edge)}
-                        style={{ backgroundColor: edge.color.bg, borderColor: edge.color.border }}
-                        className={`py-3 text-white font-black text-base rounded-2xl shadow-md border-b-4 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center font-serif ${isEdgeSelected ? 'ring-4 ring-amber-300 scale-[1.02]' : ''} ${wrongBtnKey === edge.colorId ? 'btn-wrong-flash' : ''}`}
-                      >
-                        {edge.displayText} ({edge.color.name})
-                      </button>
-                    );
-                  })}
+                  {[
+                    { id: 'sin', btnClass: 'btn-3d-blue text-white' },
+                    { id: 'cos', btnClass: 'btn-3d-green text-white' },
+                    { id: 'tan', btnClass: 'btn-3d-purple text-white' }
+                  ].map((fn) => (
+                    <button
+                      key={fn.id}
+                      onClick={() => handleSelectFunc(fn.id)}
+                      className={`py-3.5 font-serif font-black text-xl rounded-2xl shadow-md active:scale-95 transition-all flex items-center justify-center ${fn.btnClass} ${solvedFunc === fn.id ? 'ring-4 ring-amber-300 scale-[1.03]' : ''} ${wrongBtnKey === fn.id ? 'btn-wrong-flash' : ''}`}
+                    >
+                      {fn.id}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -2310,7 +2309,7 @@
               maxTime={maxTime}
               accentClass="text-cyan-600"
               onCompleteLevel={onCompleteLevel}
-              onRestart={() => startGame(pickOrder)}
+              onRestart={startGame}
               onBackToMap={onBackToMap}
             />
           )}
@@ -6899,7 +6898,7 @@
           raycaster.setFromCamera(mouse, camera);
           const idaHits = raycaster.intersectObjects(idaInteractMeshes);
           if (idaHits.length > 0) {
-            audio.sfxClick();
+            audio.sfxIdaChirp();
             celebrateSpinTimer = 0.75;
             return;
           }
