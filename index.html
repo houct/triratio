@@ -172,6 +172,16 @@
     .animate-fly-in { animation: flyIn 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
     .animate-pop-out { animation: popOut 0.28s cubic-bezier(0.4, 0, 0.2, 1) forwards; pointer-events: none; }
 
+    /* 實機引導手勢輕點與波紋動畫 */
+    @keyframes coachTapBob {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      45% { transform: translate(-2px, -6px) scale(1.05); }
+      72% { transform: translate(0, 3px) scale(0.92); }
+    }
+    .animate-coach-tap {
+      animation: coachTapBob 1.15s ease-in-out infinite;
+    }
+
     /* Lv.7 星光泡泡爆破與背景閃爍動畫 */
     @keyframes starBurstRing {
       0% { transform: translate(-50%, -50%) scale(0.35); opacity: 0.95; }
@@ -239,11 +249,63 @@
       );
     };
 
+    // ==================== 課本標準帶頂線根式渲染元件 ====================
+    const RadicalBox = ({ children }) => (
+      <span className="inline-flex items-stretch leading-none align-baseline mx-[0.04em]">
+        <svg
+          viewBox="0 0 11 20"
+          preserveAspectRatio="none"
+          className="w-[0.62em] shrink-0 overflow-visible self-stretch"
+          aria-hidden="true"
+        >
+          <path
+            d="M 0.8 11.8 L 3.1 10.3 L 5.8 18.2 L 10.6 0.9 L 11.5 0.9"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.65"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <span className="border-t-[1.5px] border-current pt-[0.08em] px-[0.1em] leading-[1.06] inline-flex items-center">
+          {children}
+        </span>
+      </span>
+    );
+
+    const SqrtText = ({ text, className = '' }) => {
+      const str = String(text ?? '');
+      if (!str.includes('√')) {
+        return className ? <span className={className}>{str}</span> : <>{str}</>;
+      }
+      const parts = [];
+      const regex = /√\(([^)]+)\)|√([0-9a-zA-Zθ]+)/g;
+      let lastIndex = 0;
+      let match;
+      let keyIdx = 0;
+      while ((match = regex.exec(str)) !== null) {
+        if (match.index > lastIndex) {
+          parts.push(<React.Fragment key={`t-${keyIdx++}`}>{str.slice(lastIndex, match.index)}</React.Fragment>);
+        }
+        const radicand = match[1] !== undefined ? match[1] : match[2];
+        parts.push(<RadicalBox key={`r-${keyIdx++}`}>{radicand}</RadicalBox>);
+        lastIndex = regex.lastIndex;
+      }
+      if (lastIndex < str.length) {
+        parts.push(<React.Fragment key={`t-${keyIdx++}`}>{str.slice(lastIndex)}</React.Fragment>);
+      }
+      return <span className={`inline-flex items-center flex-wrap gap-0 ${className}`}>{parts}</span>;
+    };
+
     // ==================== 共用直式分數渲染元件 ====================
     const FracText = ({ value, size = 'md', barClass = 'bg-current', className = '' }) => {
       const str = String(value ?? '');
       if (!str.includes('/')) {
-        return <span className={`inline-flex items-center justify-center font-serif ${className}`}>{str}</span>;
+        return (
+          <span className={`inline-flex items-center justify-center font-serif ${className}`}>
+            <SqrtText text={str} />
+          </span>
+        );
       }
       const isNeg = str.startsWith('-');
       const clean = isNeg ? str.slice(1) : str;
@@ -260,23 +322,27 @@
         <span className={`inline-flex items-center justify-center gap-0.5 font-serif ${className}`}>
           {isNeg && <span className={size === 'lg' ? 'text-lg font-black' : 'text-xs font-black'}>−</span>}
           <span className={`inline-flex flex-col items-center justify-center ${textCls}`}>
-            <span className="px-0.5">{num}</span>
+            <span className="px-0.5"><SqrtText text={num} /></span>
             <span className={`w-full rounded-full ${barCls} ${barClass}`} />
-            <span className="px-0.5">{den}</span>
+            <span className="px-0.5"><SqrtText text={den} /></span>
           </span>
         </span>
       );
     };
 
     // ==================== 全域遊戲模式 Context（闖關 vs 休閒） ====================
-    const GameModeContext = React.createContext({ isRelaxMode: false });
+    const GameModeContext = React.createContext({
+      isRelaxMode: false,
+      hasSeenHudLifeGuide: false,
+      markHudLifeGuideSeen: () => {}
+    });
 
     // ==================== 共用遊戲頂部 HUD（支援新版餘命制與舊版計時制） ====================
     const GameHUD = ({
       score, combo, timeLeft, maxTime, starsThreshold, isDojo = false, extraRight = null, timeStatusLabel = null, onManualEnd = null,
-      lives, maxLives = 4, healStreak = 0, healTarget = 4, progress = 0, unitLabel = '題'
+      lives, maxLives = 4, healStreak = 0, healTarget = 4, progress = 0, unitLabel = '題', onOpenGuide = null
     }) => {
-      const { isRelaxMode } = React.useContext(GameModeContext);
+      const { isRelaxMode, hasSeenHudLifeGuide, markHudLifeGuideSeen } = React.useContext(GameModeContext);
       const relaxActive = isRelaxMode && !isDojo;
       const isLivesMode = lives !== undefined;
       const [scorePop, setScorePop] = useState(null);
@@ -284,6 +350,9 @@
       const [barFlash, setBarFlash] = useState(false);
       const [comboBurstId, setComboBurstId] = useState(0);
       const [lifeDeltaAnim, setLifeDeltaAnim] = useState(''); // 'lose' | 'heal' | ''
+      const [showHudLifeTip, setShowHudLifeTip] = useState(false);
+      const [hudLifeRect, setHudLifeRect] = useState(null);
+      const lifeGroupRef = useRef(null);
       const prevScoreRef = useRef(score);
       const prevTimeRef = useRef(timeLeft);
       const prevComboRef = useRef(combo);
@@ -295,11 +364,50 @@
           const anim = lives < prevLivesRef.current ? 'lose' : 'heal';
           setLifeDeltaAnim(anim);
           const t = setTimeout(() => setLifeDeltaAnim(''), 420);
+          let tipTimer = null;
+          if (anim === 'lose' && !relaxActive && !hasSeenHudLifeGuide) {
+            tipTimer = setTimeout(() => {
+              setShowHudLifeTip(true);
+              if (markHudLifeGuideSeen) markHudLifeGuideSeen();
+            }, 440);
+          }
           prevLivesRef.current = lives;
-          return () => clearTimeout(t);
+          return () => {
+            clearTimeout(t);
+            if (tipTimer) clearTimeout(tipTimer);
+          };
         }
         prevLivesRef.current = lives;
-      }, [lives, isLivesMode]);
+      }, [lives, isLivesMode, relaxActive, hasSeenHudLifeGuide, markHudLifeGuideSeen]);
+
+      useEffect(() => {
+        if (!showHudLifeTip) {
+          setHudLifeRect(null);
+          return;
+        }
+        const updateRect = () => {
+          const el = lifeGroupRef.current;
+          if (!el) return;
+          const r = el.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) return;
+          setHudLifeRect({
+            left: r.left,
+            top: r.top,
+            right: r.right,
+            bottom: r.bottom,
+            width: r.width,
+            height: r.height,
+            vw: window.innerWidth,
+            vh: window.innerHeight
+          });
+        };
+        const raf = requestAnimationFrame(updateRect);
+        window.addEventListener('resize', updateRect);
+        return () => {
+          cancelAnimationFrame(raf);
+          window.removeEventListener('resize', updateRect);
+        };
+      }, [showHudLifeTip]);
 
       useEffect(() => {
         if (isLivesMode) return;
@@ -349,7 +457,7 @@
           { start: s2, end: s3, litCls: 'bg-amber-400 border-amber-500 shadow-[0_0_6px_rgba(251,191,36,0.65)]' }
         ];
         return (
-          <div className={`bg-white/95 backdrop-blur border-2 sm:border-3 rounded-2xl p-2 shadow-md shrink-0 flex flex-col gap-1.5 transition-colors ${
+          <div data-coach="hud-stars" className={`relative bg-white/95 backdrop-blur border-2 sm:border-3 rounded-2xl p-2 shadow-md shrink-0 flex flex-col gap-1.5 transition-colors ${
             lifeDeltaAnim === 'lose' ? 'border-rose-500 ring-2 ring-rose-300' :
             lifeDeltaAnim === 'heal' ? 'border-emerald-500 ring-2 ring-emerald-300' :
             'border-indigo-950'
@@ -383,7 +491,7 @@
                     )}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 shrink-0 relative">
+                  <div ref={lifeGroupRef} className="flex items-center gap-2 shrink-0 relative">
                     <div className={`flex items-center gap-1 ${lifeDeltaAnim === 'lose' ? 'animate-shake' : ''}`} aria-label={`剩餘愛心 ${lives}`}>
                       {Array.from({ length: maxLives }).map((_, idx) => {
                         const justLost = lifeDeltaAnim === 'lose' && idx === lives;
@@ -445,7 +553,70 @@
                         );
                       })}
                     </div>
+                    {showHudLifeTip && hudLifeRect && ReactDOM.createPortal(
+                      <div
+                        onClick={() => { audio.sfxClick(); setShowHudLifeTip(false); }}
+                        className="fixed inset-0 z-[100] cursor-pointer"
+                      >
+                        <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox={`0 0 ${hudLifeRect.vw} ${hudLifeRect.vh}`} preserveAspectRatio="none">
+                          <defs>
+                            <filter id="hudLifeFeather" x="-45%" y="-45%" width="190%" height="190%">
+                              <feGaussianBlur stdDeviation="8" />
+                            </filter>
+                            <mask id="hudLifeSpotMask">
+                              <rect x="0" y="0" width={hudLifeRect.vw} height={hudLifeRect.vh} fill="white" />
+                              <rect
+                                x={Math.max(4, hudLifeRect.left - 10)}
+                                y={Math.max(4, hudLifeRect.top - 8)}
+                                width={hudLifeRect.width + 20}
+                                height={hudLifeRect.height + 16}
+                                rx={(hudLifeRect.height + 16) / 2}
+                                fill="black"
+                                filter="url(#hudLifeFeather)"
+                              />
+                            </mask>
+                          </defs>
+                          <rect
+                            x="0"
+                            y="0"
+                            width={hudLifeRect.vw}
+                            height={hudLifeRect.vh}
+                            fill="rgba(15, 23, 42, 0.72)"
+                            mask="url(#hudLifeSpotMask)"
+                          />
+                        </svg>
+                        <div
+                          style={{
+                            top: `${Math.min(hudLifeRect.vh - 96, hudLifeRect.bottom + 14)}px`,
+                            right: `${Math.max(12, hudLifeRect.vw - hudLifeRect.right - 6)}px`
+                          }}
+                          className="fixed max-w-[270px] bg-slate-900/95 backdrop-blur-md border border-white/20 text-white rounded-2xl px-3.5 py-2.5 shadow-2xl animate-jelly"
+                        >
+                          <div className="absolute -top-1.5 right-8 w-3 h-3 rotate-45 bg-slate-900 border-l border-t border-white/20" />
+                          <div className="flex items-center justify-between gap-2.5">
+                            <span className="text-[12.5px] font-bold leading-snug">💔 答錯扣 1 心；連對可集氣補回愛心</span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); audio.sfxClick(); setShowHudLifeTip(false); }}
+                              className="text-[11px] font-black text-sky-300 bg-sky-400/20 hover:bg-sky-400/30 px-2.5 py-1 rounded-lg shrink-0"
+                            >
+                              知道了 ✓
+                            </button>
+                          </div>
+                        </div>
+                      </div>,
+                      document.body
+                    )}
                   </div>
+                )}
+                {onOpenGuide && (
+                  <button
+                    onClick={() => { audio.sfxClick(); onOpenGuide(); }}
+                    className="w-6 h-6 rounded-full bg-slate-100 hover:bg-sky-100 border border-slate-300 text-slate-600 hover:text-sky-700 text-[11px] font-black flex items-center justify-center shrink-0 active:scale-90 transition-all"
+                    title="重看操作引導"
+                    aria-label="重看操作引導"
+                  >
+                    ?
+                  </button>
                 )}
               </div>
             </div>
@@ -585,7 +756,7 @@
     };
 
     // ==================== 共用進關：精簡星等列 & 餘命制 Session Hook ====================
-    const CompactStarPills = ({ starsThreshold, maxTime, livesMode = false, maxLives = 4, unitLabel = '題' }) => {
+    const CompactStarPills = ({ starsThreshold = [3, 7, 12], maxTime, livesMode = false, maxLives = 4, unitLabel = '題' }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
       return (
       <div className="w-full space-y-1.5">
@@ -941,6 +1112,239 @@
       );
     };
 
+    // ==================== 極簡手遊風：SVG 羽化多點聚光燈 + 精煉氣泡 + 向量手勢 ====================
+    const CoachOverlay = ({ containerRef, active, steps = [], onDismiss }) => {
+      const [stepIdx, setStepIdx] = useState(0);
+      const [ready, setReady] = useState(false);
+      const [secondaryReady, setSecondaryReady] = useState(false);
+      const [layout, setLayout] = useState(null);
+
+      useEffect(() => {
+        if (!active) {
+          setStepIdx(0);
+          setReady(false);
+          setSecondaryReady(false);
+          setLayout(null);
+          return;
+        }
+        // 等待外層 animate-jelly (0.4s) 結束後再量測顯示，避免一開始微移
+        const t = setTimeout(() => setReady(true), 410);
+        return () => clearTimeout(t);
+      }, [active]);
+
+      useEffect(() => {
+        if (!ready) {
+          setSecondaryReady(false);
+          return;
+        }
+        setSecondaryReady(false);
+        const t = setTimeout(() => setSecondaryReady(true), 450);
+        return () => clearTimeout(t);
+      }, [ready, stepIdx]);
+
+      useEffect(() => {
+        if (!active || !ready || !containerRef?.current || steps.length === 0) return;
+        const measure = () => {
+          const root = containerRef.current;
+          const step = steps[stepIdx % steps.length];
+          if (!root || !step) return;
+          const rr = root.getBoundingClientRect();
+          if (rr.width === 0 || rr.height === 0) return;
+
+          const targetDefs = step.targets || [step];
+          const boxes = [];
+          for (const def of targetDefs) {
+            const targetId = def.target || def.id;
+            const targetEl = targetId ? root.querySelector(`[data-coach="${targetId}"]`) : null;
+            if (!targetEl) continue;
+            const tr = targetEl.getBoundingClientRect();
+            const pad = def.pad ?? 6;
+            const cx = tr.left - rr.left + tr.width * (def.anchorX ?? 0.5);
+            const cy = tr.top - rr.top + tr.height * (def.anchorY ?? 0.5);
+
+            let left, top, width, height;
+            if (def.minW || def.minH) {
+              width = Math.min(Math.max(def.minW ?? 0, tr.width + pad * 2), rr.width - 12);
+              height = Math.min(Math.max(def.minH ?? 0, tr.height + pad * 2), rr.height - 12);
+              left = Math.max(6, Math.min(rr.width - width - 6, cx - width / 2));
+              top = Math.max(6, Math.min(rr.height - height - 6, cy - height / 2));
+            } else {
+              left = Math.max(4, tr.left - rr.left - pad);
+              top = Math.max(4, tr.top - rr.top - pad);
+              width = Math.min(rr.width - left - 4, tr.width + pad * 2);
+              height = Math.min(rr.height - top - 4, tr.height + pad * 2);
+            }
+            boxes.push({ left, top, width, height, cx, cy, shape: def.shape || step.shape || 'pill' });
+          }
+
+          if (boxes.length > 0) {
+            setLayout({ boxes, rootW: rr.width, rootH: rr.height });
+          }
+        };
+
+        const raf = requestAnimationFrame(measure);
+        const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+        if (ro && containerRef.current) ro.observe(containerRef.current);
+        window.addEventListener('resize', measure);
+        return () => {
+          cancelAnimationFrame(raf);
+          if (ro) ro.disconnect();
+          window.removeEventListener('resize', measure);
+        };
+      }, [active, ready, stepIdx, steps, containerRef]);
+
+      if (!active || !ready || steps.length === 0) return null;
+      const curIdx = stepIdx % steps.length;
+      const curStep = steps[curIdx];
+      const isLast = curIdx === steps.length - 1;
+      const boxes = layout?.boxes || [];
+      const primary = boxes[0];
+      const secondary = boxes[1];
+      const showBelow = primary ? (primary.top + primary.height / 2) < layout.rootH * 0.48 : true;
+      const caretX = primary ? Math.max(24, Math.min(layout.rootW - 44, primary.cx - 10)) : 120;
+
+      let bubbleStyle = {};
+      let showCaret = true;
+      if (layout && primary) {
+        if (showBelow) {
+          let targetTop = Math.min(layout.rootH - 96, primary.top + primary.height + 12);
+          if (secondary && secondary.top < targetTop + 88 && (secondary.top + secondary.height) > targetTop - 6) {
+            targetTop = Math.min(layout.rootH - 96, secondary.top + secondary.height + 12);
+            showCaret = false;
+          }
+          bubbleStyle = { top: `${targetTop}px` };
+        } else {
+          bubbleStyle = { bottom: `${Math.min(layout.rootH - 96, layout.rootH - primary.top + 12)}px` };
+        }
+      }
+
+      return (
+        <div className="pointer-events-none absolute inset-0 z-40 overflow-hidden rounded-3xl">
+          {/* SVG 羽化聚光燈遮罩（第 2 道追光從主聚光位置柔和滑向目標角） */}
+          {layout && (
+            <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${layout.rootW} ${layout.rootH}`} preserveAspectRatio="none">
+              <defs>
+                <filter id="coachFeather" x="-45%" y="-45%" width="190%" height="190%">
+                  <feGaussianBlur stdDeviation="8" />
+                </filter>
+                <mask id="coachSpotlightMask">
+                  <rect x="0" y="0" width={layout.rootW} height={layout.rootH} fill="white" />
+                  {boxes.map((b, i) => {
+                    const useStart = i > 0 && !secondaryReady && primary;
+                    const drawBox = useStart
+                      ? { left: primary.cx - 24, top: primary.cy - 24, width: 48, height: 48, shape: b.shape }
+                      : b;
+                    const transStyle = {
+                      transition: i > 0
+                        ? 'all 1.25s cubic-bezier(0.22, 1, 0.36, 1)'
+                        : 'all 0.9s cubic-bezier(0.22, 1, 0.36, 1)'
+                    };
+                    return (drawBox.shape === 'circle' || drawBox.shape === 'ellipse') ? (
+                      <ellipse
+                        key={i}
+                        cx={drawBox.left + drawBox.width / 2}
+                        cy={drawBox.top + drawBox.height / 2}
+                        rx={drawBox.shape === 'circle' ? Math.max(drawBox.width, drawBox.height) / 2 : drawBox.width / 2}
+                        ry={drawBox.shape === 'circle' ? Math.max(drawBox.width, drawBox.height) / 2 : drawBox.height / 2}
+                        fill="black"
+                        filter="url(#coachFeather)"
+                        style={transStyle}
+                      />
+                    ) : (
+                      <rect
+                        key={i}
+                        x={drawBox.left}
+                        y={drawBox.top}
+                        width={drawBox.width}
+                        height={drawBox.height}
+                        rx={drawBox.shape === 'pill' ? Math.min(drawBox.height / 2, 26) : 14}
+                        fill="black"
+                        filter="url(#coachFeather)"
+                        style={transStyle}
+                      />
+                    );
+                  })}
+                </mask>
+              </defs>
+              <rect
+                x="0"
+                y="0"
+                width={layout.rootW}
+                height={layout.rootH}
+                fill="rgba(15, 23, 42, 0.72)"
+                mask="url(#coachSpotlightMask)"
+              />
+            </svg>
+          )}
+
+          {/* 質感向量手套指標 */}
+          {primary && curStep.tap !== false && (
+            <div
+              className="absolute top-0 left-0 will-change-transform"
+              style={{
+                transform: `translate3d(${primary.cx}px, ${primary.cy}px, 0)`,
+                transition: 'transform 0.85s cubic-bezier(0.22, 1, 0.36, 1)'
+              }}
+            >
+              <div className="-translate-x-[16px] -translate-y-[6px] relative flex items-center justify-center">
+                <span className="absolute -top-1 left-[8px] w-7 h-7 rounded-full border-2 border-white/80 animate-ping opacity-80" />
+                <svg viewBox="0 0 48 56" className="w-10 h-11 drop-shadow-[0_5px_10px_rgba(0,0,0,0.65)] animate-coach-tap">
+                  <path
+                    d="M15 24V8.5C15 6 17 4 19.5 4C22 4 24 6 24 8.5V21.5C24.8 20.6 26.2 20 27.6 20C29.8 20 31.6 21.4 32.1 23.3C33 22.6 34.2 22.2 35.4 22.2C38.1 22.2 40.2 24.3 40.2 27V36.2C40.2 44.3 33.8 50.5 25.5 50.5H22.2C16.2 50.5 12 46.5 9.8 40.5L6.5 31.8C5.6 29.4 6.8 26.7 9.2 25.8C11.4 25 13.8 25.9 14.9 28L15 24Z"
+                    fill="#ffffff"
+                    stroke="#0f172a"
+                    strokeWidth="2.8"
+                    strokeLinejoin="round"
+                  />
+                  <path d="M24 21.5V29M32.1 23.3V29.5" stroke="#cbd5e1" strokeWidth="2.2" strokeLinecap="round" />
+                  <circle cx="19.5" cy="9" r="2.2" fill="#38bdf8" />
+                </svg>
+              </div>
+            </div>
+          )}
+
+          {/* 精煉極簡氣泡 */}
+          {layout && (
+            <div
+              className="pointer-events-auto absolute left-3 right-3 transition-all duration-300 ease-out"
+              style={bubbleStyle}
+            >
+              {showCaret && (
+                <div
+                  className={`absolute w-3 h-3 rotate-45 bg-slate-900 border-white/15 ${
+                    showBelow ? '-top-[6px] border-l border-t' : '-bottom-[6px] border-r border-b'
+                  }`}
+                  style={{ left: `${caretX}px` }}
+                />
+              )}
+              <div className="max-w-[310px] mx-auto bg-slate-900/90 backdrop-blur-md border border-white/15 rounded-2xl px-3.5 py-2 shadow-xl flex flex-col gap-1.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-[10px] font-mono font-black text-sky-300 bg-sky-400/15 px-1.5 py-0.5 rounded-md shrink-0">
+                    {curIdx + 1}/{steps.length}
+                  </span>
+                  <span className="text-[13px] font-bold text-white leading-snug">{curStep.desc || curStep.text}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    onClick={onDismiss}
+                    className="text-[11px] font-bold text-slate-400 hover:text-white transition-colors"
+                  >
+                    跳過
+                  </button>
+                  <button
+                    onClick={() => isLast ? onDismiss() : setStepIdx(i => i + 1)}
+                    className="px-3 py-1 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-white text-[11px] font-black active:scale-95 transition-all"
+                  >
+                    {isLast ? '開始 ✓' : '下一步 ▶'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
     // ==================== 關卡清單與三大聖域＋獨立魔王關配置（6 + 6 + 6 + 1，共 19 關） ====================
     const LEVELS = [
       { id: 1, title: "三邊神之眼", subtitle: "直角三角形三邊辨識", island: "微風丘陵", sea: 1, icon: "👁️", color: "from-emerald-400 to-green-600", borderColor: "border-green-800" },
@@ -1071,14 +1475,14 @@
         if (!this.ctx) return;
         const now = this.ctx.currentTime;
         if (this.sfxGain) {
-          const targetSfx = this.sfxEnabled ? this.sfxVolume : 0;
+          const targetSfx = this.sfxEnabled ? this.sfxVolume * 1.35 : 0;
           this.sfxGain.gain.cancelScheduledValues(now);
           this.sfxGain.gain.setValueAtTime(this.sfxGain.gain.value, now);
           this.sfxGain.gain.linearRampToValueAtTime(targetSfx, now + rampSec);
         }
         if (this.bgmGain && this.bgmFilter) {
           const duckMult = this.isDucked ? 0.58 : 1.0;
-          const targetBgm = this.bgmEnabled ? this.bgmVolume * 0.24 * duckMult : 0;
+          const targetBgm = this.bgmEnabled ? this.bgmVolume * 0.13 * duckMult : 0;
           const targetFreq = this.isDucked ? 640 : (this.bgmScene === 'playing' ? 1550 : 1120);
           this.bgmGain.gain.cancelScheduledValues(now);
           this.bgmGain.gain.setValueAtTime(this.bgmGain.gain.value, now);
@@ -2332,7 +2736,7 @@
     };
 
     // ==================== 第 1 關組件：直角三角神之眼（餘命進度制） ====================
-    const Level1EdgeMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap }) => {
+    const Level1EdgeMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
       const starsThreshold = [3, 7, 12];
       const maxLives = 4;
@@ -2348,9 +2752,16 @@
       const [correctEdgeId, setCorrectEdgeId] = useState(null);
       const [wrongBtnKey, setWrongBtnKey] = useState(null);
       const [conceptTip, setConceptTip] = useState(null);
+      const [showGuide, setShowGuide] = useState(() => !hasSeenGuide && currentStars === 0);
 
+      const containerRef = useRef(null);
       const prevTypeRef = useRef('');
       const questionMissedRef = useRef(false);
+
+      const dismissGuide = useCallback(() => {
+        setShowGuide(false);
+        if (onMarkGuideSeen) onMarkGuideSeen();
+      }, [onMarkGuideSeen]);
 
       const nextQuestion = (curProg) => {
         const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
@@ -2372,10 +2783,15 @@
         audio.init();
       };
 
+      useEffect(() => {
+        startGame();
+      }, []);
+
       const handleSelectColor = (colorId) => {
         if (gameState !== 'playing' || !question || correctEdgeId || (!isRelaxMode && lives <= 0)) return;
         if (colorId === question.correctEdgeColorId) {
           audio.sfxMatch();
+          if (showGuide) dismissGuide();
           setCorrectEdgeId(colorId);
           setConceptTip(null);
           setFeedbackAnim('animate-correct');
@@ -2398,8 +2814,52 @@
         }
       };
 
+      const targetEdgeName = useMemo(() => {
+        if (!question) return '對應邊';
+        return question.edges.find(e => e.colorId === question.correctEdgeColorId)?.color?.name || '對應邊';
+      }, [question]);
+
+      const lv1CoachSteps = useMemo(() => ([
+        {
+          tap: false,
+          desc: '依題目找對應邊，並對照圖中目標角',
+          targets: [
+            { target: 'lv1-prompt', anchorX: 0.5, anchorY: 0.5, pad: 8, shape: 'ellipse' },
+            { target: 'lv1-angle', anchorX: 0.5, anchorY: 0.5, minW: 76, minH: 76, shape: 'circle' }
+          ]
+        },
+        {
+          target: 'lv1-canvas-edge',
+          anchorX: 0.5,
+          anchorY: 0.5,
+          minW: 78,
+          minH: 78,
+          shape: 'circle',
+          tap: true,
+          desc: `可直接點擊圖上的「${targetEdgeName}」色線`
+        },
+        {
+          target: 'lv1-btn',
+          anchorX: 0.5,
+          anchorY: 0.5,
+          pad: 8,
+          shape: 'pill',
+          tap: true,
+          desc: `或點擊下方「${targetEdgeName}」按鈕作答`
+        },
+        {
+          target: 'hud-stars',
+          anchorX: 0.5,
+          anchorY: 0.5,
+          pad: 6,
+          shape: 'pill',
+          tap: false,
+          desc: '答對亮格，集滿三顆星即可通關'
+        }
+      ]), [targetEdgeName]);
+
       return (
-        <div className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
+        <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
 
           {gameState === 'idle' && (
             <div className="flex-1 my-3 bg-white/95 rounded-3xl border-4 border-indigo-950 p-5 shadow-2xl flex flex-col justify-between text-center items-center">
@@ -2428,10 +2888,11 @@
                 healStreak={healStreak}
                 healTarget={healTarget}
                 onManualEnd={finishNow}
+                onOpenGuide={() => setShowGuide(true)}
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${correctEdgeId ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                <div className="bg-gradient-to-r from-emerald-500 to-green-600 py-2.5 px-3 flex items-center justify-center gap-2 text-white text-center shrink-0 border-b-2 border-emerald-700">
+                <div data-coach="lv1-prompt" className="bg-gradient-to-r from-emerald-500 to-green-600 py-2.5 px-3 flex items-center justify-center gap-2 text-white text-center shrink-0 border-b-2 border-emerald-700">
                   <span className="text-base sm:text-lg font-black tracking-wide drop-shadow">{question.questionText}</span>
                   <SuccessBadge show={Boolean(correctEdgeId)} />
                 </div>
@@ -2442,14 +2903,22 @@
                     <TriangleBlueprintBg id="triGridLv1" />
                     <polygon points={`${question.pts.P1.x},${question.pts.P1.y} ${question.pts.P2.x},${question.pts.P2.y} ${question.pts.P3.x},${question.pts.P3.y}`} fill="#f0fdf4" stroke="none" />
                     <polygon points={question.rightAngleSquare} fill="#f1f5f9" stroke="#94a3b8" strokeWidth="2.5" />
-                    {question.showArc && <TriangleAngleArc d={question.arcPath} />}
+                    {question.showArc && (
+                      <g data-coach="lv1-angle">
+                        <TriangleAngleArc d={question.arcPath} />
+                      </g>
+                    )}
                     {question.edges.map((edge, idx) => {
                       const isHit = correctEdgeId === edge.colorId;
+                      const isCoachEdge = edge.colorId === question.correctEdgeColorId;
+                      const midX = (edge.p1.x + edge.p2.x) / 2;
+                      const midY = (edge.p1.y + edge.p2.y) / 2;
                       return (
                         <g key={idx} className="cursor-pointer group" opacity={correctEdgeId && !isHit ? 0.3 : 1} onClick={() => handleSelectColor(edge.colorId)}>
                           {isHit && <line x1={edge.p1.x} y1={edge.p1.y} x2={edge.p2.x} y2={edge.p2.y} stroke="#34d399" strokeWidth="28" strokeLinecap="round" opacity="0.85" />}
                           <line x1={edge.p1.x} y1={edge.p1.y} x2={edge.p2.x} y2={edge.p2.y} stroke={edge.color.bg} strokeWidth="14" strokeLinecap="round" className="transition-opacity group-hover:opacity-80" />
                           <line x1={edge.p1.x} y1={edge.p1.y} x2={edge.p2.x} y2={edge.p2.y} stroke="transparent" strokeWidth="44" strokeLinecap="round" />
+                          {isCoachEdge && <circle cx={midX} cy={midY} r="2" fill="transparent" data-coach="lv1-canvas-edge" className="pointer-events-none" />}
                         </g>
                       );
                     })}
@@ -2457,7 +2926,7 @@
                     {question.labels.map((lbl, idx) => (
                       <g key={idx} className="pointer-events-none">
                         {lbl.isTargetVertex && (
-                          <circle cx={lbl.x} cy={lbl.y - 2} r="20" fill="#fef3c7" stroke="#f59e0b" strokeWidth="2.5" opacity="0.95" />
+                          <circle data-coach="lv1-vertex" cx={lbl.x} cy={lbl.y - 2} r="20" fill="#fef3c7" stroke="#f59e0b" strokeWidth="2.5" opacity="0.95" />
                         )}
                         <text x={lbl.x} y={lbl.y} fill={lbl.color} fontSize={lbl.isTargetVertex ? "32" : "30"} fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-serif drop-shadow">{lbl.text}</text>
                       </g>
@@ -2466,18 +2935,28 @@
                 </div>
 
                 <div className="bg-slate-50 border-t-2 border-slate-200 p-2 grid grid-cols-3 gap-2 shrink-0">
-                  {question.edges.map((edge) => (
-                    <button
-                      key={edge.colorId}
-                      onClick={() => handleSelectColor(edge.colorId)}
-                      style={{ backgroundColor: edge.color.bg, borderColor: edge.color.border }}
-                      className={`py-3 text-white font-black text-base rounded-2xl shadow-md border-b-4 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center ${correctEdgeId === edge.colorId ? 'ring-4 ring-emerald-300 scale-[1.03]' : ''} ${wrongBtnKey === edge.colorId ? 'btn-wrong-flash' : ''}`}
-                    >
-                      {edge.color.name}
-                    </button>
-                  ))}
+                  {question.edges.map((edge) => {
+                    const isCoachBtn = showGuide && !correctEdgeId && edge.colorId === question.correctEdgeColorId;
+                    return (
+                      <button
+                        key={edge.colorId}
+                        data-coach={isCoachBtn ? 'lv1-btn' : undefined}
+                        onClick={() => handleSelectColor(edge.colorId)}
+                        style={{ backgroundColor: edge.color.bg, borderColor: edge.color.border }}
+                        className={`relative py-3 text-white font-black text-base rounded-2xl shadow-md border-b-4 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center ${correctEdgeId === edge.colorId ? 'ring-4 ring-emerald-300 scale-[1.03]' : isCoachBtn ? 'ring-4 ring-amber-300/90' : ''} ${wrongBtnKey === edge.colorId ? 'btn-wrong-flash' : ''}`}
+                      >
+                        {edge.color.name}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
+              <CoachOverlay
+                containerRef={containerRef}
+                active={gameState === 'playing' && showGuide && !correctEdgeId}
+                steps={lv1CoachSteps}
+                onDismiss={dismissGuide}
+              />
             </div>
           )}
 
@@ -2507,7 +2986,7 @@
 
 
     // ==================== 第 2 關組件：比值之密碼（餘命進度制） ====================
-    const Level2RatioMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap }) => {
+    const Level2RatioMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
       const starsThreshold = [3, 7, 12];
       const maxLives = 4;
@@ -2523,10 +3002,17 @@
       const [feedbackAnim, setFeedbackAnim] = useState('');
       const [wrongBtnKey, setWrongBtnKey] = useState(null);
       const [conceptTip, setConceptTip] = useState(null);
+      const [showGuide, setShowGuide] = useState(() => !hasSeenGuide && currentStars === 0);
 
+      const containerRef = useRef(null);
       const prevKeyRef = useRef('');
       const usedKeysRef = useRef(new Set());
       const questionMissedRef = useRef(false);
+
+      const dismissGuide = useCallback(() => {
+        setShowGuide(false);
+        if (onMarkGuideSeen) onMarkGuideSeen();
+      }, [onMarkGuideSeen]);
 
       const nextQuestion = (curProg) => {
         const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
@@ -2551,10 +3037,35 @@
         audio.init();
       };
 
+      useEffect(() => {
+        startGame();
+      }, []);
+
+      const lv2CoachSteps = useMemo(() => ([
+        {
+          tap: false,
+          desc: '比對上方比值線索與三角形各邊長',
+          targets: [
+            { target: 'lv2-clue', anchorX: 0.5, anchorY: 0.5, pad: 8, shape: 'ellipse' },
+            { target: 'lv2-tri', anchorX: 0.5, anchorY: 0.5, minW: 170, minH: 150, shape: 'circle' }
+          ]
+        },
+        {
+          target: 'lv2-btn',
+          anchorX: 0.5,
+          anchorY: 0.5,
+          pad: 8,
+          shape: 'pill',
+          tap: true,
+          desc: `選出符合該比值的三角函數（${question?.targetFunc || 'sin'}）`
+        }
+      ]), [question]);
+
       const handleSelectFunc = (funcId) => {
         if (gameState !== 'playing' || !question || solvedFunc || wrongBtnKey || (!isRelaxMode && lives <= 0)) return;
         if (funcId === question.targetFunc) {
           audio.sfxMatch();
+          if (showGuide) dismissGuide();
           setSolvedFunc(funcId);
           setConceptTip(null);
           setFeedbackAnim('animate-correct');
@@ -2578,7 +3089,7 @@
       };
 
       return (
-        <div className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
+        <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
 
           {gameState === 'idle' && (
             <div className="flex-1 my-3 bg-white/95 rounded-3xl border-4 border-indigo-950 p-5 shadow-2xl flex flex-col justify-between text-center items-center">
@@ -2607,10 +3118,11 @@
                 healStreak={healStreak}
                 healTarget={healTarget}
                 onManualEnd={finishNow}
+                onOpenGuide={() => setShowGuide(true)}
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${solvedFunc ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                <div className="bg-slate-800 py-2 px-3 flex items-center justify-center gap-2.5 text-white border-b-2 border-slate-700 shrink-0">
+                <div data-coach="lv2-clue" className="bg-slate-800 py-2 px-3 flex items-center justify-center gap-2.5 text-white border-b-2 border-slate-700 shrink-0">
                   <div className="flex items-center gap-1.5 font-serif font-black text-lg">
                     <span className={`min-w-[44px] px-2.5 py-0.5 rounded-xl border-2 text-center transition-all ${
                       solvedFunc
@@ -2638,9 +3150,13 @@
                   <HintBanner tip={conceptTip} />
                   <svg viewBox="0 0 500 500" className="w-full h-full object-contain drop-shadow-md">
                     <TriangleBlueprintBg id="triGridLv2" />
-                    <polygon points={`${question.pts.P1.x},${question.pts.P1.y} ${question.pts.P2.x},${question.pts.P2.y} ${question.pts.P3.x},${question.pts.P3.y}`} fill="#f0fdfa" stroke="none" />
+                    <polygon data-coach="lv2-tri" points={`${question.pts.P1.x},${question.pts.P1.y} ${question.pts.P2.x},${question.pts.P2.y} ${question.pts.P3.x},${question.pts.P3.y}`} fill="#f0fdfa" stroke="none" />
                     <polygon points={question.rightAngleSquare} fill="#f1f5f9" stroke="#94a3b8" strokeWidth="2.5" />
-                    {question.showArc && <TriangleAngleArc d={question.arcPath} />}
+                    {question.showArc && (
+                      <g data-coach="lv1-angle">
+                        <TriangleAngleArc d={question.arcPath} />
+                      </g>
+                    )}
                     {question.edges.map((edge, idx) => {
                       const isNum = solvedFunc && edge.id === question.numEdgeId;
                       const isDen = solvedFunc && edge.id === question.denEdgeId;
@@ -2660,7 +3176,7 @@
                     {question.labels.map((lbl, idx) => (
                       <g key={idx} className="pointer-events-none">
                         {lbl.isTargetVertex && (
-                          <circle cx={lbl.x} cy={lbl.y - 2} r="20" fill="#fef3c7" stroke="#f59e0b" strokeWidth="2.5" opacity="0.95" />
+                          <circle data-coach="lv1-vertex" cx={lbl.x} cy={lbl.y - 2} r="20" fill="#fef3c7" stroke="#f59e0b" strokeWidth="2.5" opacity="0.95" />
                         )}
                         <text x={lbl.x} y={lbl.y} fill={lbl.color} fontSize={lbl.isTargetVertex ? "32" : "30"} fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-serif drop-shadow">{lbl.text}</text>
                       </g>
@@ -2668,22 +3184,32 @@
                   </svg>
                 </div>
 
-                <div className="bg-slate-50 border-t-2 border-slate-200 p-2 grid grid-cols-3 gap-2 shrink-0">
+                <div data-coach="lv10-btns" className="bg-slate-50 border-t-2 border-slate-200 p-2 grid grid-cols-3 gap-2 shrink-0">
                   {[
                     { id: 'sin', btnClass: 'btn-3d-blue text-white' },
                     { id: 'cos', btnClass: 'btn-3d-green text-white' },
                     { id: 'tan', btnClass: 'btn-3d-purple text-white' }
-                  ].map((fn) => (
-                    <button
-                      key={fn.id}
-                      onClick={() => handleSelectFunc(fn.id)}
-                      className={`py-3.5 font-serif font-black text-xl rounded-2xl shadow-md active:scale-95 transition-all flex items-center justify-center ${fn.btnClass} ${solvedFunc === fn.id ? 'ring-4 ring-amber-300 scale-[1.03]' : ''} ${wrongBtnKey === fn.id ? 'btn-wrong-flash' : ''}`}
-                    >
-                      {fn.id}
-                    </button>
-                  ))}
+                  ].map((fn) => {
+                    const isCoachBtn = showGuide && !solvedFunc && fn.id === question.targetFunc;
+                    return (
+                      <button
+                        key={fn.id}
+                        data-coach={isCoachBtn ? 'lv2-btn' : undefined}
+                        onClick={() => handleSelectFunc(fn.id)}
+                        className={`py-3.5 font-serif font-black text-xl rounded-2xl shadow-md active:scale-95 transition-all flex items-center justify-center ${fn.btnClass} ${solvedFunc === fn.id ? 'ring-4 ring-amber-300 scale-[1.03]' : isCoachBtn ? 'ring-4 ring-amber-300/90' : ''} ${wrongBtnKey === fn.id ? 'btn-wrong-flash' : ''}`}
+                      >
+                        {fn.id}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
+              <CoachOverlay
+                containerRef={containerRef}
+                active={gameState === 'playing' && showGuide && !solvedFunc}
+                steps={lv2CoachSteps}
+                onDismiss={dismissGuide}
+              />
             </div>
           )}
 
@@ -2713,7 +3239,7 @@
 
 
     // ==================== 第 3 關組件：未知邊獵人（比例狙擊｜餘命進度制） ====================
-    const Level3MissingSideMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap }) => {
+    const Level3MissingSideMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
       const starsThreshold = [3, 7, 12];
       const maxLives = 4;
@@ -2729,9 +3255,16 @@
       const [feedbackAnim, setFeedbackAnim] = useState('');
       const [wrongBtnKey, setWrongBtnKey] = useState(null);
       const [conceptTip, setConceptTip] = useState(null);
+      const [showGuide, setShowGuide] = useState(() => !hasSeenGuide && currentStars === 0);
 
+      const containerRef = useRef(null);
       const prevKeyRef = useRef('');
       const questionMissedRef = useRef(false);
+
+      const dismissGuide = useCallback(() => {
+        setShowGuide(false);
+        if (onMarkGuideSeen) onMarkGuideSeen();
+      }, [onMarkGuideSeen]);
 
       const nextQuestion = (curProg) => {
         const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
@@ -2754,10 +3287,35 @@
         audio.init();
       };
 
+      useEffect(() => {
+        startGame();
+      }, []);
+
+      const lv3CoachSteps = useMemo(() => ([
+        {
+          tap: false,
+          desc: '依上方三角比與已知邊，推算紅色 ? 邊長',
+          targets: [
+            { target: 'lv3-clue', anchorX: 0.5, anchorY: 0.5, pad: 8, shape: 'ellipse' },
+            { target: 'lv3-unknown', anchorX: 0.5, anchorY: 0.5, minW: 78, minH: 78, shape: 'circle' }
+          ]
+        },
+        {
+          target: 'lv3-btn',
+          anchorX: 0.5,
+          anchorY: 0.5,
+          pad: 8,
+          shape: 'pill',
+          tap: true,
+          desc: '點擊正確的邊長數值作答'
+        }
+      ]), []);
+
       const handleSelectOption = (opt) => {
         if (gameState !== 'playing' || !question || solvedVal || wrongBtnKey || (!isRelaxMode && lives <= 0)) return;
         if (opt === question.correctSideVal) {
           audio.sfxBonus();
+          if (showGuide) dismissGuide();
           setSolvedVal(opt);
           setConceptTip(null);
           setFeedbackAnim('animate-correct');
@@ -2781,7 +3339,7 @@
       };
 
       return (
-        <div className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
+        <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
 
           {gameState === 'idle' && (
             <div className="flex-1 my-3 bg-white/95 rounded-3xl border-4 border-indigo-950 p-5 shadow-2xl flex flex-col justify-between text-center items-center">
@@ -2810,10 +3368,11 @@
                 healStreak={healStreak}
                 healTarget={healTarget}
                 onManualEnd={finishNow}
+                onOpenGuide={() => setShowGuide(true)}
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${solvedVal ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                <div className="bg-gradient-to-r from-indigo-600 to-blue-700 py-2 px-3.5 flex items-center justify-between gap-2 text-white border-b-2 border-indigo-800 shrink-0">
+                <div data-coach="lv3-clue" className="bg-gradient-to-r from-indigo-600 to-blue-700 py-2 px-3.5 flex items-center justify-between gap-2 text-white border-b-2 border-indigo-800 shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-black bg-white/15 px-2 py-0.5 rounded-lg">線索</span>
                     <span className="inline-flex items-center gap-1.5 text-lg sm:text-xl font-serif font-black tracking-wide">
@@ -2861,7 +3420,7 @@
                             strokeDasharray={isTarget && !solvedVal ? '9 7' : 'none'}
                           />
                           {(isTarget || isKnown) && (
-                            <g className={isTarget && !solvedVal ? 'animate-pulse' : ''}>
+                            <g data-coach={isTarget ? 'lv3-unknown' : undefined} className={isTarget && !solvedVal ? 'animate-pulse' : ''}>
                               <circle cx={edge.midPt.x} cy={edge.midPt.y} r="22" fill={circleFill} stroke={strokeCol} strokeWidth="3.5" />
                               <text x={edge.midPt.x} y={edge.midPt.y + 1} fill={textCol} fontSize="19" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-serif pointer-events-none">
                                 {isTarget ? (solvedVal || '?') : edge.val}
@@ -2882,18 +3441,28 @@
 
                 <div className="bg-slate-50 border-t-2 border-slate-200 p-2 h-[120px] shrink-0">
                   <div className="h-full grid grid-cols-2 grid-rows-2 gap-2">
-                    {question.sideOptions.map((opt, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => handleSelectOption(opt)}
-                        className={`h-full btn-3d-blue text-white font-black text-xl rounded-2xl shadow-md active:scale-95 transition-all flex items-center justify-center font-serif tracking-wider ${solvedVal === opt ? 'ring-4 ring-emerald-300' : ''} ${wrongBtnKey === opt ? 'btn-wrong-flash' : ''}`}
-                      >
-                        {opt}
-                      </button>
-                    ))}
+                    {question.sideOptions.map((opt, idx) => {
+                      const isCoachBtn = showGuide && !solvedVal && opt === question.correctSideVal;
+                      return (
+                        <button
+                          key={idx}
+                          data-coach={isCoachBtn ? 'lv3-btn' : undefined}
+                          onClick={() => handleSelectOption(opt)}
+                          className={`h-full btn-3d-blue text-white font-black text-xl rounded-2xl shadow-md active:scale-95 transition-all flex items-center justify-center font-serif tracking-wider ${solvedVal === opt ? 'ring-4 ring-emerald-300' : isCoachBtn ? 'ring-4 ring-amber-300/90' : ''} ${wrongBtnKey === opt ? 'btn-wrong-flash' : ''}`}
+                        >
+                          {opt}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
+              <CoachOverlay
+                containerRef={containerRef}
+                active={gameState === 'playing' && showGuide && !solvedVal}
+                steps={lv3CoachSteps}
+                onDismiss={dismissGuide}
+              />
             </div>
           )}
 
@@ -3059,7 +3628,7 @@
       );
     };
 
-    const Level4SpecialAnglesMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap }) => {
+    const Level4SpecialAnglesMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
       const starsThreshold = [3, 6, 9];
       const maxLives = 4;
@@ -3078,10 +3647,17 @@
       const [wrongLock, setWrongLock] = useState(false);
       const [feedbackAnim, setFeedbackAnim] = useState('');
       const [conceptTip, setConceptTip] = useState(null);
+      const [showGuide, setShowGuide] = useState(() => !hasSeenGuide && currentStars === 0);
 
+      const containerRef = useRef(null);
       const valBagRef = useRef([]);
       const lastValRef = useRef(null);
       const stepMissedRef = useRef(false);
+
+      const dismissGuide = useCallback(() => {
+        setShowGuide(false);
+        if (onMarkGuideSeen) onMarkGuideSeen();
+      }, [onMarkGuideSeen]);
 
       const nextQuestion = (curProg) => {
         const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
@@ -3115,6 +3691,39 @@
         audio.init();
       };
 
+      useEffect(() => {
+        startGame();
+      }, []);
+
+      const lv4CoachSteps = useMemo(() => ([
+        {
+          tap: false,
+          desc: '看上方目標等式與特殊角三角形比例',
+          targets: [
+            { target: 'lv4-eq', anchorX: 0.5, anchorY: 0.5, pad: 6, shape: 'ellipse' },
+            { target: 'lv4-tri', anchorX: 0.5, anchorY: 0.5, minW: 165, minH: 145, shape: 'circle' }
+          ]
+        },
+        {
+          target: 'lv4-wheel',
+          anchorX: 0.5,
+          anchorY: 0.5,
+          pad: 6,
+          shape: 'pill',
+          tap: true,
+          desc: '上下撥動未鎖定的函數或角度轉輪'
+        },
+        {
+          target: 'lv4-unlock',
+          anchorX: 0.5,
+          anchorY: 0.5,
+          pad: 6,
+          shape: 'pill',
+          tap: true,
+          desc: '調好後點擊右側聖印開鎖！'
+        }
+      ]), []);
+
       const stepWheel = (slot, dir) => {
         if (gameState !== 'playing' || !question || isSolved || wrongLock || (!isRelaxMode && lives <= 0)) return;
         if (slot === 'func' && question.lockType === 'func') return;
@@ -3133,6 +3742,7 @@
         const actualVal = SPECIAL_RATIO_MAP[pairKey];
 
         if (actualVal === question.lockedVal) {
+          if (showGuide) dismissGuide();
           const wasMissed = stepMissedRef.current;
           stepMissedRef.current = false;
           setSolvedKeys([pairKey]);
@@ -3170,7 +3780,7 @@
       const unlockedFunc = solvedKeys.length > 0 ? solvedKeys[0].split('_')[0] : null;
 
       return (
-        <div className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
+        <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
 
           {gameState === 'idle' && (
             <div className="flex-1 my-3 bg-white/95 rounded-3xl border-4 border-amber-900 p-5 shadow-2xl flex flex-col justify-between text-center items-center">
@@ -3199,10 +3809,11 @@
                 healStreak={healStreak}
                 healTarget={healTarget}
                 onManualEnd={finishNow}
+                onOpenGuide={() => setShowGuide(true)}
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-amber-900 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${isSolved ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                <div className="bg-gradient-to-r from-amber-500 to-yellow-600 h-[48px] px-3.5 flex items-center justify-between gap-2 text-amber-950 border-b-2 border-amber-700 shrink-0">
+                <div data-coach="lv4-eq" className="bg-gradient-to-r from-amber-500 to-yellow-600 h-[48px] px-3.5 flex items-center justify-between gap-2 text-amber-950 border-b-2 border-amber-700 shrink-0">
                   <span className="text-xs font-black bg-white/45 px-2.5 py-1 rounded-lg">
                     {phase === 0 ? '邊長實景' : phase === 1 ? '輪廓心算' : '盲鎖熟記'}
                   </span>
@@ -3230,7 +3841,7 @@
                       </div>
                       <svg viewBox="0 0 500 500" className="w-full h-full object-contain drop-shadow-md">
                         <TriangleBlueprintBg id="triGridLv4" />
-                        <polygon points={`${triData.pts.P1.x},${triData.pts.P1.y} ${triData.pts.P2.x},${triData.pts.P2.y} ${triData.pts.P3.x},${triData.pts.P3.y}`} fill="#fffbeb" stroke="none" />
+                        <polygon data-coach="lv4-tri" points={`${triData.pts.P1.x},${triData.pts.P1.y} ${triData.pts.P2.x},${triData.pts.P2.y} ${triData.pts.P3.x},${triData.pts.P3.y}`} fill="#fffbeb" stroke="none" />
                         <polygon points={triData.rightAngleSquare} fill="#fef08a" stroke="#ca8a04" strokeWidth="2.5" />
                         <TriangleAngleArc d={triData.arcPath} />
 
@@ -3277,23 +3888,25 @@
                 {/* 黃金神殿一體式密碼機關盤 */}
                 <div className="bg-gradient-to-b from-amber-900 via-stone-900 to-stone-950 border-t-3 border-amber-600 p-2.5 shrink-0">
                   <div className="grid grid-cols-[1fr_1fr_auto_1.05fr] items-center gap-1.5">
-                    <TempleDrumWheel
-                      label="函數"
-                      options={LV4_FUNCS}
-                      value={selFunc}
-                      locked={question.lockType === 'func'}
-                      disabled={isSolved || wrongLock || question.lockType === 'func'}
-                      onStep={(dir) => stepWheel('func', dir)}
-                    />
-                    <TempleDrumWheel
-                      label="角度"
-                      options={LV4_DEGS}
-                      value={selDeg}
-                      formatOption={(d) => `${d}°`}
-                      locked={question.lockType === 'deg'}
-                      disabled={isSolved || wrongLock || question.lockType === 'deg'}
-                      onStep={(dir) => stepWheel('deg', dir)}
-                    />
+                    <div data-coach="lv4-wheel" className="grid grid-cols-2 gap-1.5 col-span-2">
+                      <TempleDrumWheel
+                        label="函數"
+                        options={LV4_FUNCS}
+                        value={selFunc}
+                        locked={question.lockType === 'func'}
+                        disabled={isSolved || wrongLock || question.lockType === 'func'}
+                        onStep={(dir) => stepWheel('func', dir)}
+                      />
+                      <TempleDrumWheel
+                        label="角度"
+                        options={LV4_DEGS}
+                        value={selDeg}
+                        formatOption={(d) => `${d}°`}
+                        locked={question.lockType === 'deg'}
+                        disabled={isSolved || wrongLock || question.lockType === 'deg'}
+                        onStep={(dir) => stepWheel('deg', dir)}
+                      />
+                    </div>
 
                     <div className="flex items-center justify-center font-serif font-black text-xl text-amber-400 drop-shadow px-0.5 select-none">
                       ＝
@@ -3302,6 +3915,7 @@
                     {/* 右側卡死目標聖印：同時作為物理壓印開鎖栓 */}
                     <button
                       type="button"
+                      data-coach="lv4-unlock"
                       onClick={handleUnlock}
                       disabled={isSolved || wrongLock}
                       className={`relative h-[118px] rounded-2xl border-2 p-1.5 flex flex-col items-center justify-between transition-all select-none cursor-pointer ${
@@ -3336,6 +3950,12 @@
                   </div>
                 </div>
               </div>
+              <CoachOverlay
+                containerRef={containerRef}
+                active={gameState === 'playing' && showGuide && !isSolved}
+                steps={lv4CoachSteps}
+                onDismiss={dismissGuide}
+              />
             </div>
           )}
 
@@ -3445,7 +4065,7 @@
       return { leftCards, rightCards };
     };
 
-    const Level5TrigRelationsMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap }) => {
+    const Level5TrigRelationsMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
       const starsThreshold = [2, 4, 6];
       const maxLives = 4;
@@ -3467,9 +4087,16 @@
       const [isProcessing, setIsProcessing] = useState(false);
       const [conceptTip, setConceptTip] = useState(null);
       const [feedbackAnim, setFeedbackAnim] = useState('');
+      const [showGuide, setShowGuide] = useState(() => !hasSeenGuide && currentStars === 0);
 
+      const containerRef = useRef(null);
       const recentIdsRef = useRef([]);
       const waveErrorsRef = useRef(0);
+
+      const dismissGuide = useCallback(() => {
+        setShowGuide(false);
+        if (onMarkGuideSeen) onMarkGuideSeen();
+      }, [onMarkGuideSeen]);
 
       const spawnNextWave = (curProg) => {
         const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
@@ -3496,11 +4123,37 @@
         audio.init();
       };
 
+      useEffect(() => {
+        startGame();
+      }, []);
+
+      const lv5CoachSteps = useMemo(() => ([
+        {
+          target: 'lv5-left',
+          anchorX: 0.5,
+          anchorY: 0.5,
+          pad: 6,
+          shape: 'pill',
+          tap: true,
+          desc: '先點選左側一張三角比關係式'
+        },
+        {
+          target: 'lv5-right',
+          anchorX: 0.5,
+          anchorY: 0.5,
+          pad: 6,
+          shape: 'pill',
+          tap: true,
+          desc: '再點右側等價結果完成配對！'
+        }
+      ]), []);
+
       const checkPair = (lCard, rCard) => {
         if (!isRelaxMode && lives <= 0) return;
         setIsProcessing(true);
         if (lCard.valKey === rCard.valKey) {
           audio.sfxMatch();
+          if (showGuide) dismissGuide();
           setConceptTip(null);
           const nextMatched = new Set(matchedUids);
           nextMatched.add(lCard.uid);
@@ -3564,7 +4217,7 @@
       const phaseLabel = progress >= starsThreshold[1] ? '綜合化簡' : progress >= starsThreshold[0] ? '移項變形' : '基本關係';
 
       return (
-        <div className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
+        <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
           {gameState === 'idle' && (
             <div className="flex-1 my-3 bg-white/95 rounded-3xl border-4 border-sky-900 p-5 shadow-2xl flex flex-col justify-between text-center items-center">
               <div className="w-full space-y-2.5 pt-2">
@@ -3593,6 +4246,7 @@
                 healTarget={healTarget}
                 unitLabel="波"
                 onManualEnd={finishNow}
+                onOpenGuide={() => setShowGuide(true)}
               />
 
               <div className="flex-1 min-h-0 bg-white rounded-3xl border-3 border-sky-950 shadow-xl flex flex-col overflow-hidden">
@@ -3616,15 +4270,18 @@
                   <div className="bg-white p-1.5 rounded-2xl border-2 border-sky-100 shadow-inner flex flex-col overflow-hidden">
                     <div className="text-[10px] font-black text-sky-500 text-center pb-1 shrink-0">算式</div>
                     <div className="flex flex-col justify-center gap-1.5 flex-1 min-h-0 overflow-y-auto no-scrollbar">
-                      {leftCards.map(card => {
+                      {leftCards.map((card, lIdx) => {
                         const isMatched = matchedUids.has(card.uid);
                         const isOut = animatingOut.includes(card.uid);
                         const isWrong = wrongCardUids.includes(card.uid);
                         const isSelected = selLeft?.uid === card.uid;
                         if (isMatched) return <div key={card.uid} className="h-[48px] shrink-0 rounded-xl border-2 border-dashed border-slate-200 bg-slate-100/60 flex items-center justify-center text-slate-300 font-black text-xs">✓ 已配對</div>;
+                        const firstUnmatchedLeft = leftCards.find(c => !matchedUids.has(c.uid));
+                        const isCoachLeft = showGuide && firstUnmatchedLeft?.uid === card.uid;
                         return (
                           <button
                             key={card.uid}
+                            data-coach={isCoachLeft ? 'lv5-left' : undefined}
                             onClick={() => handlePickLeft(card)}
                             className={`h-[48px] shrink-0 rounded-xl font-serif font-black px-2 transition-all flex items-center justify-center text-center leading-tight ${
                               card.label.length > 18 ? 'text-xs' : card.label.length > 12 ? 'text-sm' : 'text-base'
@@ -3650,9 +4307,12 @@
                         const isWrong = wrongCardUids.includes(card.uid);
                         const isSelected = selRight?.uid === card.uid;
                         if (isMatched) return <div key={card.uid} className="h-[44px] shrink-0 rounded-xl border-2 border-dashed border-slate-200 bg-slate-100/60 flex items-center justify-center text-slate-300 font-black text-xs">✓ 已消去</div>;
+                        const targetLeft = selLeft || leftCards.find(c => !matchedUids.has(c.uid));
+                        const isCoachRight = showGuide && targetLeft && card.valKey === targetLeft.valKey;
                         return (
                           <button
                             key={card.uid}
+                            data-coach={isCoachRight ? 'lv5-right' : undefined}
                             onClick={() => handlePickRight(card)}
                             className={`h-[44px] shrink-0 rounded-xl font-serif font-black text-base px-2 transition-all flex items-center justify-center ${
                               isOut ? 'animate-pop-out' :
@@ -3668,6 +4328,12 @@
                   </div>
                 </div>
               </div>
+              <CoachOverlay
+                containerRef={containerRef}
+                active={gameState === 'playing' && showGuide}
+                steps={lv5CoachSteps}
+                onDismiss={dismissGuide}
+              />
             </div>
           )}
 
@@ -3792,7 +4458,7 @@
       return { key, phase, givenFunc, givenVal, targetFunc, ansVal, options, pts: { P1, P2, P3 }, rightAngleSquare, arcPath, thetaPt, edges, flip, tip };
     };
 
-    const Level6PythagoreanTripleMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap }) => {
+    const Level6PythagoreanTripleMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
       const starsThreshold = [3, 6, 9];
       const maxLives = 4;
@@ -3808,9 +4474,16 @@
       const [wrongOpt, setWrongOpt] = useState(null);
       const [conceptTip, setConceptTip] = useState(null);
       const [feedbackAnim, setFeedbackAnim] = useState('');
+      const [showGuide, setShowGuide] = useState(() => !hasSeenGuide && currentStars === 0);
 
+      const containerRef = useRef(null);
       const prevKeyRef = useRef('');
       const questionMissedRef = useRef(false);
+
+      const dismissGuide = useCallback(() => {
+        setShowGuide(false);
+        if (onMarkGuideSeen) onMarkGuideSeen();
+      }, [onMarkGuideSeen]);
 
       const nextQuestion = (curProg) => {
         const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
@@ -3832,10 +4505,35 @@
         audio.init();
       };
 
+      useEffect(() => {
+        startGame();
+      }, []);
+
+      const lv6CoachSteps = useMemo(() => ([
+        {
+          tap: false,
+          desc: '依已知比值推算 ? 邊，再求目標三角比',
+          targets: [
+            { target: 'lv6-clue', anchorX: 0.5, anchorY: 0.5, pad: 8, shape: 'ellipse' },
+            { target: 'lv6-missing', anchorX: 0.5, anchorY: 0.5, minW: 76, minH: 76, shape: 'circle' }
+          ]
+        },
+        {
+          target: 'lv6-btn',
+          anchorX: 0.5,
+          anchorY: 0.5,
+          pad: 8,
+          shape: 'pill',
+          tap: true,
+          desc: '點擊正確的比值答案'
+        }
+      ]), []);
+
       const handleSelect = (opt) => {
         if (gameState !== 'playing' || !question || solvedOpt || wrongOpt || (!isRelaxMode && lives <= 0)) return;
         if (opt === question.ansVal) {
           audio.sfxBonus();
+          if (showGuide) dismissGuide();
           setSolvedOpt(opt);
           setConceptTip(null);
           setFeedbackAnim('animate-correct');
@@ -3863,7 +4561,7 @@
       const showNumbers = phase === 0 || Boolean(solvedOpt);
 
       return (
-        <div className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
+        <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
           {gameState === 'idle' && (
             <div className="flex-1 my-3 bg-white/95 rounded-3xl border-4 border-teal-900 p-5 shadow-2xl flex flex-col justify-between text-center items-center">
               <div className="w-full space-y-2.5 pt-2">
@@ -3891,10 +4589,11 @@
                 healStreak={healStreak}
                 healTarget={healTarget}
                 onManualEnd={finishNow}
+                onOpenGuide={() => setShowGuide(true)}
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-teal-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${solvedOpt ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                <div className="bg-gradient-to-r from-teal-700 to-emerald-800 h-[52px] px-3.5 flex items-center justify-between gap-2 text-white border-b-2 border-teal-950 shrink-0">
+                <div data-coach="lv6-clue" className="bg-gradient-to-r from-teal-700 to-emerald-800 h-[52px] px-3.5 flex items-center justify-between gap-2 text-white border-b-2 border-teal-950 shrink-0">
                   <div className="flex items-center gap-2 font-serif font-black text-base sm:text-lg">
                     <span className="text-[11px] font-sans bg-white/20 px-2 py-0.5 rounded-lg">已知</span>
                     <span>{question.givenFunc} θ =</span>
@@ -3941,7 +4640,7 @@
                         const fillCol = e.isMissing ? (solvedOpt ? '#ecfdf5' : '#fff1f2') : '#eff6ff';
                         const textCol = e.isMissing ? (solvedOpt ? '#047857' : '#be123c') : '#1e3a8a';
                         return (
-                          <g key={i} className={e.isMissing && !solvedOpt ? 'animate-pulse' : ''}>
+                          <g key={i} data-coach={e.isMissing ? 'lv6-missing' : undefined} className={e.isMissing && !solvedOpt ? 'animate-pulse' : ''}>
                             <circle cx={e.pt.x} cy={e.pt.y} r="21" fill={fillCol} stroke={strokeCol} strokeWidth="3.5" />
                             <text x={e.pt.x} y={e.pt.y + 1} fill={textCol} fontSize="19" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-serif pointer-events-none">
                               {e.isMissing && !solvedOpt ? '?' : e.val}
@@ -3961,18 +4660,28 @@
 
                 <div className="bg-slate-50 border-t-2 border-slate-200 p-2 pb-2.5 h-[126px] shrink-0">
                   <div className="h-full grid grid-cols-2 grid-rows-2 gap-2.5">
-                    {question.options.map((opt, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => handleSelect(opt)}
-                        className={`h-full pb-1 btn-3d-blue text-white font-black rounded-2xl shadow-md active:scale-95 transition-all flex items-center justify-center ${solvedOpt === opt ? 'ring-4 ring-emerald-300' : ''} ${wrongOpt === opt ? 'btn-wrong-flash' : ''}`}
-                      >
-                        <FracText value={opt} size="sm" barClass="bg-white" />
-                      </button>
-                    ))}
+                    {question.options.map((opt, idx) => {
+                      const isCoachBtn = showGuide && !solvedOpt && opt === question.ansVal;
+                      return (
+                        <button
+                          key={idx}
+                          data-coach={isCoachBtn ? 'lv6-btn' : undefined}
+                          onClick={() => handleSelect(opt)}
+                          className={`h-full pb-1 btn-3d-blue text-white font-black rounded-2xl shadow-md active:scale-95 transition-all flex items-center justify-center ${solvedOpt === opt ? 'ring-4 ring-emerald-300' : isCoachBtn ? 'ring-4 ring-amber-300/90' : ''} ${wrongOpt === opt ? 'btn-wrong-flash' : ''}`}
+                        >
+                          <FracText value={opt} size="sm" barClass="bg-white" />
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
+              <CoachOverlay
+                containerRef={containerRef}
+                active={gameState === 'playing' && showGuide && !solvedOpt}
+                steps={lv6CoachSteps}
+                onDismiss={dismissGuide}
+              />
             </div>
           )}
 
@@ -4001,7 +4710,7 @@
     };
 
     // ==================== 第 6 關組件：廣義角舵手 ====================
-    const Level5AngleSteeringMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap }) => {
+    const Level5AngleSteeringMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
       const starsThreshold = [3, 7, 12];
       const maxLives = 4;
@@ -4018,6 +4727,13 @@
       const [feedbackAnim, setFeedbackAnim] = useState('');
       const [floatingText, setFloatingText] = useState(null);
       const [isLockedSuccess, setIsLockedSuccess] = useState(false);
+      const [showGuide, setShowGuide] = useState(() => !hasSeenGuide && currentStars === 0);
+
+      const containerRef = useRef(null);
+      const dismissGuide = useCallback(() => {
+        setShowGuide(false);
+        if (onMarkGuideSeen) onMarkGuideSeen();
+      }, [onMarkGuideSeen]);
 
       const dialSvgRef = useRef(null);
       const lastTickAngleRef = useRef(0);
@@ -4047,6 +4763,7 @@
       const triggerSuccessMatch = () => {
         if (isLockedRef.current) return;
         isLockedRef.current = true;
+        if (showGuide) dismissGuide();
         setIsLockedSuccess(true);
         audio.sfxBonus();
         triggerFloat('能量鎖定!', "text-amber-400");
@@ -4103,6 +4820,41 @@
         generateNextTarget(0);
         audio.init();
       };
+
+      useEffect(() => {
+        startGame();
+      }, []);
+
+      const lv7CoachSteps = useMemo(() => ([
+        {
+          target: 'lv7-target',
+          anchorX: 0.5,
+          anchorY: 0.5,
+          pad: 8,
+          shape: 'ellipse',
+          tap: false,
+          desc: '看上方目標角度（正逆時針、負順時針）'
+        },
+        {
+          target: 'lv7-dial',
+          anchorX: 0.5,
+          anchorY: 0.5,
+          minW: 78,
+          minH: 78,
+          shape: 'circle',
+          tap: true,
+          desc: '拖曳終邊藍點旋轉到目標角，停駐 0.3 秒鎖定'
+        },
+        {
+          target: 'lv7-stepbtns',
+          anchorX: 0.5,
+          anchorY: 0.5,
+          pad: 6,
+          shape: 'pill',
+          tap: true,
+          desc: '也可點下方 ±5° 按鈕精準微調！'
+        }
+      ]), []);
 
       const handlePointerDown = (e) => {
         if (isLockedRef.current || !dialSvgRef.current) return;
@@ -4183,7 +4935,7 @@
       let quadrantText = principal === 0 ? "正向 X 軸" : principal < 90 ? "第 I 象限" : principal === 90 ? "正向 Y 軸" : principal < 180 ? "第 II 象限" : principal === 180 ? "負向 X 軸" : principal < 270 ? "第 III 象限" : principal === 270 ? "負向 Y 軸" : "第 IV 象限";
 
       return (
-        <div className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
+        <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
 
           {gameState === 'idle' && (
             <div className="flex-1 my-3 bg-white/95 rounded-3xl border-4 border-indigo-950 p-5 shadow-2xl flex flex-col justify-between text-center items-center">
@@ -4213,10 +4965,11 @@
                 healStreak={healStreak}
                 healTarget={healTarget}
                 onManualEnd={() => { if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current); finishNow(); }}
+                onOpenGuide={() => setShowGuide(true)}
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${isLockedSuccess ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                <div className="bg-gradient-to-r from-sky-500 to-indigo-600 py-2 px-3.5 flex justify-between items-center text-white border-b-2 border-indigo-800 shrink-0">
+                <div data-coach="lv7-target" className="bg-gradient-to-r from-sky-500 to-indigo-600 py-2 px-3.5 flex justify-between items-center text-white border-b-2 border-indigo-800 shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-sky-100 font-bold uppercase">目標角度</span>
                     <span className="text-2xl sm:text-3xl font-mono font-black text-white tracking-wider drop-shadow">{targetAngle}°</span>
@@ -4261,7 +5014,7 @@
                     <rect x="435" y="282" width="56" height="26" fill="white" stroke="#ef4444" strokeWidth="1.5" rx="6" />
                     <text x="463" y="300" fill="#b91c1c" fontSize="16" fontWeight="900" textAnchor="middle">始邊</text>
                     <line x1={270} y1={270} x2={ptTerminal.x} y2={ptTerminal.y} stroke={isLockedSuccess ? "#f59e0b" : "#3b82f6"} strokeWidth={isLockedSuccess ? "11" : "8"} strokeLinecap="round" />
-                    <g transform={`translate(${ptTerminal.x}, ${ptTerminal.y})`}>
+                    <g data-coach="lv7-dial" transform={`translate(${ptTerminal.x}, ${ptTerminal.y})`}>
                       {(isDragging || isLockedSuccess) && <circle cx="0" cy="0" r={isLockedSuccess ? 50 : 44} fill={isLockedSuccess ? "#fde047" : "#60a5fa"} opacity="0.4" className="animate-pulse" />}
                       <circle cx="0" cy="0" r={isDragging ? 22 : 18} fill={isLockedSuccess ? "#f59e0b" : "#2563eb"} stroke="#ffffff" strokeWidth="4" />
                       <circle cx="0" cy="0" r="6" fill="#ffffff" />
@@ -4270,11 +5023,17 @@
                   </svg>
                 </div>
 
-                <div className="bg-slate-50 border-t-2 border-slate-200 p-2 grid grid-cols-2 gap-2 shrink-0">
+                <div data-coach="lv7-stepbtns" className="bg-slate-50 border-t-2 border-slate-200 p-2 grid grid-cols-2 gap-2 shrink-0">
                   <button onClick={() => stepAngle(-5)} className="py-3 btn-3d-blue text-white font-mono font-black rounded-2xl shadow-md active:scale-95 text-sm flex items-center justify-center gap-1"><span>↺</span> -5° 微調</button>
                   <button onClick={() => stepAngle(5)} className="py-3 btn-3d-blue text-white font-mono font-black rounded-2xl shadow-md active:scale-95 text-sm flex items-center justify-center gap-1"><span>↻</span> +5° 微調</button>
                 </div>
               </div>
+              <CoachOverlay
+                containerRef={containerRef}
+                active={gameState === 'playing' && showGuide && !isLockedSuccess}
+                steps={lv7CoachSteps}
+                onDismiss={dismissGuide}
+              />
             </div>
           )}
 
@@ -4377,7 +5136,7 @@
       return { baseAngle, phase, bubbles: items };
     };
 
-    const LevelCoterminalPopMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap }) => {
+    const LevelCoterminalPopMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
       const starsThreshold = [3, 7, 12];
       const maxLives = 4;
@@ -4396,6 +5155,16 @@
       const [conceptTip, setConceptTip] = useState(null);
       const [bursts, setBursts] = useState([]);
       const [wrongFlash, setWrongFlash] = useState(false);
+      const [showGuide, setShowGuide] = useState(() => !hasSeenGuide && currentStars === 0);
+
+      const containerRef = useRef(null);
+      const showGuideRef = useRef(showGuide);
+      useEffect(() => { showGuideRef.current = showGuide; }, [showGuide]);
+
+      const dismissGuide = useCallback(() => {
+        setShowGuide(false);
+        if (onMarkGuideSeen) onMarkGuideSeen();
+      }, [onMarkGuideSeen]);
 
       const starsBg = useMemo(() => (
         Array.from({ length: 22 }, (_, i) => ({
@@ -4446,6 +5215,32 @@
       };
 
       useEffect(() => {
+        startGame();
+      }, []);
+
+      const lv8CoachSteps = useMemo(() => ([
+        {
+          target: 'lv8-base',
+          anchorX: 0.5,
+          anchorY: 0.5,
+          pad: 6,
+          shape: 'ellipse',
+          tap: false,
+          desc: '看上方基準角，找相差 360° 整數倍的泡泡'
+        },
+        {
+          target: 'lv8-correct',
+          anchorX: 0.5,
+          anchorY: 0.5,
+          minW: 84,
+          minH: 84,
+          shape: 'circle',
+          tap: true,
+          desc: '點破正確同界角泡泡，放過干擾項！'
+        }
+      ]), []);
+
+      useEffect(() => {
         if (gameState !== 'playing') {
           if (rafRef.current) cancelAnimationFrame(rafRef.current);
           return;
@@ -4455,7 +5250,7 @@
           const dt = Math.min(0.05, (now - lastTime) / 1000);
           lastTime = now;
 
-          if (!waveLockedRef.current && bubblesRef.current.length > 0) {
+          if (!waveLockedRef.current && !showGuideRef.current && bubblesRef.current.length > 0) {
             const curProg = progressRef.current;
             const baseSpeed = curProg >= starsThreshold[1] ? 11.0 : curProg >= starsThreshold[0] ? 9.5 : 8.0;
             const speed = isRelaxMode ? baseSpeed * 0.45 : baseSpeed * 0.55;
@@ -4565,7 +5360,7 @@
       );
 
       return (
-        <div className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
+        <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
           {gameState === 'idle' && (
             <div className="flex-1 my-3 bg-white/95 rounded-3xl border-4 border-indigo-950 p-5 shadow-2xl flex flex-col justify-between text-center items-center">
               <div className="w-full space-y-2.5 pt-2">
@@ -4595,10 +5390,11 @@
                 unitLabel="波"
                 extraRight={waveExtra}
                 onManualEnd={() => { clearTimeout(waveTimeoutRef.current); finishNow(); }}
+                onOpenGuide={() => setShowGuide(true)}
               />
 
               <div className={`flex-1 min-h-0 bg-gradient-to-b from-slate-950 via-indigo-950 to-purple-950 rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${wrongFlash ? 'ring-4 ring-red-500/75' : waveCleared ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                <div className="bg-slate-900/90 py-2 px-3.5 flex justify-between items-center text-white border-b-2 border-indigo-800/80 shrink-0">
+                <div data-coach="lv8-base" className="bg-slate-900/90 py-2 px-3.5 flex justify-between items-center text-white border-b-2 border-indigo-800/80 shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-black text-fuchsia-300 bg-fuchsia-500/20 border border-fuchsia-400/40 px-2 py-0.5 rounded-lg">基準角</span>
                     <span className="text-2xl font-mono font-black text-amber-300 drop-shadow">{baseAngle}°</span>
@@ -4671,10 +5467,13 @@
                     const isPopped = b.status === 'popped';
                     const isWrong = b.status === 'wrong';
                     const isFade = b.status === 'fade';
+                    const firstCorrectBubble = bubbles.find(item => item.isCorrect && item.status === 'active');
+                    const isCoachBubble = showGuide && firstCorrectBubble?.uid === b.uid;
                     return (
                       <button
                         key={b.uid}
-                        onClick={() => handleBubbleTap(b)}
+                        data-coach={isCoachBubble ? 'lv8-correct' : undefined}
+                        onClick={() => { if (showGuide && b.isCorrect) dismissGuide(); handleBubbleTap(b); }}
                         style={{ left: `${posX}%`, top: `${b.y}%` }}
                         className={`absolute -translate-x-1/2 -translate-y-1/2 w-[66px] h-[66px] sm:w-[72px] sm:h-[72px] rounded-full flex items-center justify-center font-mono font-black text-sm sm:text-base border-2 transition-transform active:scale-90 ${
                           isPopped
@@ -4695,6 +5494,12 @@
                   })}
                 </div>
               </div>
+              <CoachOverlay
+                containerRef={containerRef}
+                active={gameState === 'playing' && showGuide && !waveCleared}
+                steps={lv8CoachSteps}
+                onDismiss={dismissGuide}
+              />
             </div>
           )}
 
@@ -4725,7 +5530,7 @@
 
 
     // ==================== 第 8 關組件：動徑星標 ====================
-    const Level6VectorCompassMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap }) => {
+    const Level6VectorCompassMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap, hasSeenGuide = false, onMarkGuideSeen }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
       const starsThreshold = [3, 6, 9];
       const maxLives = 4;
@@ -4745,8 +5550,14 @@
       const [isLockedSuccess, setIsLockedSuccess] = useState(false);
       const [wrongBtnKey, setWrongBtnKey] = useState(null);
       const [conceptTip, setConceptTip] = useState(null);
+      const [showGuide, setShowGuide] = useState(() => !hasSeenGuide && currentStars === 0);
 
+      const containerRef = useRef(null);
       const questionMissedRef = useRef(false);
+      const dismissGuide = () => {
+        setShowGuide(false);
+        if (onMarkGuideSeen) onMarkGuideSeen();
+      };
 
       const triggerFloat = (text, color) => {
         const id = Date.now();
@@ -4774,6 +5585,8 @@
         audio.init();
       };
 
+      useEffect(() => { startGame('num'); }, []);
+
       const handleInputKey = (key) => {
         if (gameState !== 'playing' || !question || isLockedSuccess || (!isRelaxMode && lives <= 0)) return;
         const firstKey = pickOrder === 'num' ? selectedNumerator : selectedDenominator;
@@ -4791,6 +5604,7 @@
           setSelectedNumerator(numKey);
           setSelectedDenominator(denKey);
           if (numKey === question.correctNumeratorKey && denKey === question.correctDenominatorKey) {
+            if (showGuide) dismissGuide();
             audio.sfxBonus();
             setIsLockedSuccess(true);
             setConceptTip(null);
@@ -4821,7 +5635,7 @@
       const isLv7DenTurn = (pickOrder === 'den' && !selectedDenominator) || (pickOrder === 'num' && selectedNumerator && !selectedDenominator);
 
       return (
-        <div className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
+        <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
 
           {gameState === 'idle' && (
             <div className="flex-1 my-3 bg-white/95 rounded-3xl border-4 border-indigo-950 p-5 shadow-2xl flex flex-col justify-between text-center items-center">
@@ -4848,10 +5662,11 @@
                 healStreak={healStreak}
                 healTarget={healTarget}
                 onManualEnd={finishNow}
+                onOpenGuide={() => setShowGuide(true)}
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${isLockedSuccess ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                <div className="bg-gradient-to-r from-cyan-600 to-indigo-700 py-1.5 px-3.5 flex justify-between items-center text-white border-b-2 border-indigo-900 shrink-0">
+                <div data-coach="lv10-prompt" className="bg-gradient-to-r from-cyan-600 to-indigo-700 py-1.5 px-3.5 flex justify-between items-center text-white border-b-2 border-indigo-900 shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="text-lg sm:text-2xl font-serif font-black shrink-0">{question.targetFunc}(θ) =</span>
                     <div className="flex flex-col items-center shrink-0">
@@ -4889,7 +5704,7 @@
                 <div className="relative w-full flex-1 min-h-0 bg-white flex items-center justify-center overflow-hidden">
                   <HintBanner tip={conceptTip} />
                   {isLockedSuccess && <div className="absolute inset-0 bg-amber-400/25 z-30 pointer-events-none animate-ping"></div>}
-                  <svg viewBox="0 0 540 540" preserveAspectRatio="xMidYMid meet" className="w-full h-full object-contain select-none">
+                  <svg data-coach="lv10-tri" viewBox="0 0 540 540" preserveAspectRatio="xMidYMid meet" className="w-full h-full object-contain select-none">
                     <line x1={30} y1={270} x2={510} y2={270} stroke="#94a3b8" strokeWidth="2.5" />
                     <line x1={270} y1={30} x2={270} y2={510} stroke="#94a3b8" strokeWidth="2.5" />
                     <text x="500" y="255" fill="#94a3b8" fontSize="24" fontWeight="bold">x</text>
@@ -4924,7 +5739,7 @@
                   </svg>
                 </div>
 
-                <div className="bg-slate-50 border-t-2 border-slate-200 p-2 grid grid-cols-3 gap-2 shrink-0">
+                <div data-coach="lv10-btns" className="bg-slate-50 border-t-2 border-slate-200 p-2 grid grid-cols-3 gap-2 shrink-0">
                   <button onClick={() => handleInputKey('x')} className={`py-3 btn-3d-blue text-white font-mono font-black rounded-2xl shadow-md active:scale-95 text-lg flex items-center justify-center gap-2 transition-all ${(selectedNumerator === 'x' || selectedDenominator === 'x') ? 'ring-4 ring-amber-300 scale-[1.03]' : ''} ${wrongBtnKey === 'x' ? 'btn-wrong-flash' : ''}`}>
                     <span className="text-xl">x</span><span className="text-sm font-bold opacity-90 bg-white/20 px-2 py-0.5 rounded-lg">{question.xVal}</span>
                   </button>
@@ -4959,12 +5774,36 @@
               onBackToMap={onBackToMap}
             />
           )}
+
+          <CoachOverlay
+            containerRef={containerRef}
+            active={showGuide && gameState === 'playing'}
+            onDismiss={dismissGuide}
+            steps={[
+              {
+                targets: [
+                  { id: 'lv10-prompt', shape: 'ellipse', pad: 8 },
+                  { id: 'lv10-tri', shape: 'circle', pad: 6 }
+                ],
+                target: 'lv10-prompt',
+                text: '依上方函數與坐標，依序點選分子與分母',
+                shape: 'ellipse',
+                pad: 8
+              },
+              {
+                target: 'lv10-btns',
+                text: '依序點擊下方 x、y、r 按鈕作答',
+                shape: 'pill',
+                pad: 8
+              }
+            ]}
+          />
         </div>
       );
     };
 
     // ==================== 第 8 關組件：星象羅盤師 ====================
-    const Level7AstroCompassMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap }) => {
+    const Level7AstroCompassMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap, hasSeenGuide = false, onMarkGuideSeen }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
       const starsThreshold = [3, 6, 9];
       const maxLives = 4;
@@ -4987,7 +5826,9 @@
       const [floatingText, setFloatingText] = useState(null);
       const [wrongBtnKey, setWrongBtnKey] = useState(null);
       const [conceptTip, setConceptTip] = useState(null);
+      const [showGuide, setShowGuide] = useState(() => !hasSeenGuide && currentStars === 0);
 
+      const containerRef = useRef(null);
       const dialSvgRef = useRef(null);
       const lastTickAngleRef = useRef(0);
       const lastAtanRef = useRef(0);
@@ -4996,6 +5837,10 @@
       const dwellTimerRef = useRef(null);
       const stageLockedRef = useRef(false);
       const questionMissedRef = useRef(false);
+      const dismissGuide = () => {
+        setShowGuide(false);
+        if (onMarkGuideSeen) onMarkGuideSeen();
+      };
 
       const width = 540, height = 540, origin = { x: 270, y: 270 }, R = 195;
 
@@ -5033,6 +5878,8 @@
         nextQuestion(0, null);
         audio.init();
       };
+
+      useEffect(() => { startGame('num'); }, []);
 
       const lockRotationStage = () => {
         if (stageLockedRef.current) return;
@@ -5119,6 +5966,7 @@
           setSelectedNumerator(numKey);
           setSelectedDenominator(denKey);
           if (numKey === question.correctNumeratorKey && denKey === question.correctDenominatorKey) {
+            if (showGuide) dismissGuide();
             audio.sfxMatch();
             setIsLockedSuccess(true);
             setConceptTip(null);
@@ -5151,7 +5999,7 @@
       const isLv8DenTurn = (pickOrder === 'den' && !selectedDenominator) || (pickOrder === 'num' && selectedNumerator && !selectedDenominator);
 
       return (
-        <div className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
+        <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
 
           {gameState === 'idle' && (
             <div className="flex-1 my-3 bg-white/95 rounded-3xl border-4 border-indigo-950 p-5 shadow-2xl flex flex-col justify-between text-center items-center">
@@ -5178,10 +6026,11 @@
                 healStreak={healStreak}
                 healTarget={healTarget}
                 onManualEnd={() => { if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current); finishNow(); }}
+                onOpenGuide={() => setShowGuide(true)}
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${isLockedSuccess ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                <div className="bg-gradient-to-r from-violet-600 to-indigo-700 py-1.5 px-3.5 flex justify-between items-center text-white min-h-[52px] border-b-2 border-indigo-950 shrink-0">
+                <div data-coach="lv12-target" className="bg-gradient-to-r from-violet-600 to-indigo-700 py-1.5 px-3.5 flex justify-between items-center text-white min-h-[52px] border-b-2 border-indigo-950 shrink-0">
                   <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
                     <span className="text-lg sm:text-2xl font-serif font-black shrink-0">{question.targetFunc}({question.targetAngle}°) =</span>
                     {stage === 'rotate' ? (
@@ -5241,7 +6090,7 @@
                     {stage === 'rotate' ? (
                       <g>
                         <line x1={270} y1={270} x2={ptTerminal.x} y2={ptTerminal.y} stroke="#7c3aed" strokeWidth="8" strokeLinecap="round" />
-                        <g transform={`translate(${ptTerminal.x}, ${ptTerminal.y})`}>
+                        <g data-coach="lv12-dial" transform={`translate(${ptTerminal.x}, ${ptTerminal.y})`}>
                           <circle cx="0" cy="0" r={isDragging ? 22 : 18} fill="#7c3aed" stroke="#ffffff" strokeWidth="4" />
                           <circle cx="0" cy="0" r="6" fill="#ffffff" />
                         </g>
@@ -5271,12 +6120,12 @@
                 </div>
 
                 {stage === 'rotate' ? (
-                  <div className="bg-slate-50 border-t-2 border-slate-200 p-2 grid grid-cols-2 gap-2 shrink-0">
+                  <div data-coach="lv12-stepbtns" className="bg-slate-50 border-t-2 border-slate-200 p-2 grid grid-cols-2 gap-2 shrink-0">
                     <button onClick={() => stepAngle(-5)} className="py-3 btn-3d-purple text-white font-mono font-black rounded-2xl shadow-md active:scale-95 text-sm flex items-center justify-center gap-1"><span>↺</span> -5° 微調</button>
                     <button onClick={() => stepAngle(5)} className="py-3 btn-3d-purple text-white font-mono font-black rounded-2xl shadow-md active:scale-95 text-sm flex items-center justify-center gap-1"><span>↻</span> +5° 微調</button>
                   </div>
                 ) : (
-                  <div className="bg-slate-50 border-t-2 border-slate-200 p-2 grid grid-cols-3 gap-2 shrink-0 animate-jelly">
+                  <div data-coach="lv12-btns" className="bg-slate-50 border-t-2 border-slate-200 p-2 grid grid-cols-3 gap-2 shrink-0 animate-jelly">
                     <button onClick={() => handleInputKey('x')} className={`py-3 btn-3d-blue text-white font-mono font-black rounded-2xl shadow-md active:scale-95 text-lg flex items-center justify-center gap-2 ${(selectedNumerator === 'x' || selectedDenominator === 'x') ? 'ring-4 ring-amber-300 scale-[1.03]' : ''} ${wrongBtnKey === 'x' ? 'btn-wrong-flash' : ''}`}><span className="text-xl">x</span><span className="text-sm bg-white/20 px-2 py-0.5 rounded-lg">{question.xStr}</span></button>
                     <button onClick={() => handleInputKey('y')} className={`py-3 bg-gradient-to-b from-rose-400 to-red-600 border-b-[5px] border-red-800 text-white font-mono font-black rounded-2xl shadow-md active:scale-95 text-lg flex items-center justify-center gap-2 ${(selectedNumerator === 'y' || selectedDenominator === 'y') ? 'ring-4 ring-amber-300 scale-[1.03]' : ''} ${wrongBtnKey === 'y' ? 'btn-wrong-flash' : ''}`}><span className="text-xl">y</span><span className="text-sm bg-white/20 px-2 py-0.5 rounded-lg">{question.yStr}</span></button>
                     <button onClick={() => handleInputKey('r')} className={`py-3 btn-3d-yellow text-amber-950 font-mono font-black rounded-2xl shadow-md active:scale-95 text-lg flex items-center justify-center gap-2 ${(selectedNumerator === 'r' || selectedDenominator === 'r') ? 'ring-4 ring-white scale-[1.03]' : ''} ${wrongBtnKey === 'r' ? 'btn-wrong-flash' : ''}`}><span className="text-xl">r</span><span className="text-sm bg-amber-950/20 px-2 py-0.5 rounded-lg">{question.rStr}</span></button>
@@ -5306,6 +6155,44 @@
               onBackToMap={onBackToMap}
             />
           )}
+
+          <CoachOverlay
+            containerRef={containerRef}
+            active={showGuide && gameState === 'playing'}
+            onDismiss={dismissGuide}
+            steps={stage === 'rotate' ? [
+              {
+                targets: [
+                  { id: 'lv12-target', shape: 'ellipse', pad: 8 },
+                  { id: 'lv12-dial', shape: 'circle', pad: 18 }
+                ],
+                target: 'lv12-target',
+                text: '拖曳終邊到目標角，再選分子與分母',
+                shape: 'ellipse',
+                pad: 8,
+                tap: true
+              },
+              {
+                target: 'lv12-stepbtns',
+                text: '也可用 ±5° 按鈕精準微調',
+                shape: 'pill',
+                pad: 8
+              }
+            ] : [
+              {
+                target: 'lv12-target',
+                text: '依終邊坐標，點選分子與分母',
+                shape: 'ellipse',
+                pad: 8
+              },
+              {
+                target: 'lv12-btns',
+                text: '依序點擊下方 x、y、r 按鈕作答',
+                shape: 'pill',
+                pad: 8
+              }
+            ]}
+          />
         </div>
       );
     };
@@ -5356,7 +6243,7 @@
       { id: 'p2_q4_st', lines: ['sin θ < 0', 'tan θ < 0'], ans: '4', tip: 'sin<0 (III,IV) 與 tan<0 (II,IV) → 第 IV 象限' }
     ];
 
-    const Level8QuadrantSignMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap }) => {
+    const Level8QuadrantSignMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap, hasSeenGuide = false, onMarkGuideSeen }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
       const starsThreshold = [3, 7, 12];
       const maxLives = 4;
@@ -5376,7 +6263,9 @@
       const [feedbackAnim, setFeedbackAnim] = useState('');
       const [wrongTargetKey, setWrongTargetKey] = useState(null);
       const [conceptTip, setConceptTip] = useState(null);
+      const [showGuide, setShowGuide] = useState(() => !hasSeenGuide && currentStars === 0);
 
+      const containerRef = useRef(null);
       const bag0Ref = useRef([]);
       const bag1Ref = useRef([]);
       const bag2Ref = useRef([]);
@@ -5384,6 +6273,10 @@
       const dragStartRef = useRef(null);
       const nextPreviewRef = useRef(null);
       const questionErrorsRef = useRef(0);
+      const dismissGuide = () => {
+        setShowGuide(false);
+        if (onMarkGuideSeen) onMarkGuideSeen();
+      };
 
       const drawFromBag = (bagRef, sourcePool) => {
         if (bagRef.current.length === 0) {
@@ -5433,6 +6326,8 @@
         audio.init();
       };
 
+      useEffect(() => { startGame(); }, []);
+
       const getFlyVector = (choice) => {
         if (choice === 'neg') return { x: -240, y: -10 };
         if (choice === 'pos') return { x: 240, y: -10 };
@@ -5446,6 +6341,7 @@
       const submitSort = (choice) => {
         if (gameState !== 'playing' || !question || isTransitioning || (!isRelaxMode && lives <= 0)) return;
         if (choice === question.ans) {
+          if (showGuide) dismissGuide();
           setIsTransitioning(true);
           setConceptTip(null);
           const errs = questionErrorsRef.current;
@@ -5524,7 +6420,7 @@
         : `translate(${dragOffset.x}px, ${dragOffset.y}px) rotate(${dragOffset.x * 0.055}deg)`;
 
       return (
-        <div className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
+        <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
           {gameState === 'idle' && (
             <div className="flex-1 my-3 bg-white/95 rounded-3xl border-4 border-indigo-950 p-5 shadow-2xl flex flex-col justify-between text-center items-center">
               <div className="w-full space-y-2.5 pt-2">
@@ -5552,6 +6448,7 @@
                 healStreak={healStreak}
                 healTarget={healTarget}
                 onManualEnd={finishNow}
+                onOpenGuide={() => setShowGuide(true)}
               />
 
               <div className={`flex-1 min-h-0 rounded-3xl border-3 shadow-xl flex flex-col overflow-hidden transition-all duration-200 relative ${
@@ -5590,6 +6487,7 @@
                   {question.phase < 2 ? (
                     <div className="flex-1 min-h-0 grid grid-cols-[78px_1fr_78px] sm:grid-cols-[96px_1fr_96px] items-center gap-2">
                       <button
+                        data-coach="lv11-neg"
                         onClick={() => submitSort('neg')}
                         className={`h-full max-h-[260px] rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
                           wrongTargetKey === 'neg'
@@ -5611,6 +6509,7 @@
                           </div>
                         )}
                         <div
+                          data-coach="lv11-card"
                           onPointerDown={handleCardPointerDown}
                           onPointerMove={handleCardPointerMove}
                           onPointerUp={handleCardPointerUp}
@@ -5631,6 +6530,7 @@
                       </div>
 
                       <button
+                        data-coach="lv11-pos"
                         onClick={() => submitSort('pos')}
                         className={`h-full max-h-[260px] rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
                           wrongTargetKey === 'pos'
@@ -5673,6 +6573,7 @@
 
                       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                         <div
+                          data-coach="lv11-quadcard"
                           onPointerDown={handleCardPointerDown}
                           onPointerMove={handleCardPointerMove}
                           onPointerUp={handleCardPointerUp}
@@ -5718,13 +6619,44 @@
               onBackToMap={onBackToMap}
             />
           )}
+
+          <CoachOverlay
+            containerRef={containerRef}
+            active={showGuide && gameState === 'playing'}
+            onDismiss={dismissGuide}
+            steps={question?.phase < 2 ? [
+              {
+                target: 'lv11-card',
+                text: '判斷題卡正負，左右拖曳或點擊聖壇',
+                shape: 'ellipse',
+                pad: 10
+              },
+              {
+                targets: [
+                  { id: 'lv11-neg', shape: 'ellipse', pad: 6 },
+                  { id: 'lv11-pos', shape: 'ellipse', pad: 6 }
+                ],
+                target: 'lv11-neg',
+                text: '負值拖左邊，正值拖右邊',
+                shape: 'ellipse',
+                pad: 6
+              }
+            ] : [
+              {
+                target: 'lv11-quadcard',
+                text: '依正負條件，拖往對應象限',
+                shape: 'ellipse',
+                pad: 10
+              }
+            ]}
+          />
         </div>
       );
     };
 
 
     // ==================== 雙欄波次配對引擎 (Lv.18 & 修行幻境共用) ====================
-    const LevelLightingCardGame = ({ levelData, isDojo, currentStars, onUpdateStars, onCompleteLevel, onBackToMap }) => {
+    const LevelLightingCardGame = ({ levelData, isDojo, currentStars, onUpdateStars, onCompleteLevel, onBackToMap, hasSeenGuide = false, onMarkGuideSeen }) => {
       const levelConfig = levelData?.config || { maxTime: 60, stars: [750, 1600, 2500], quadrants: ['q1'], funcs: ['sin', 'cos', 'tan'] };
       const livesSession = useLivesLevelSession({
         starThresholds: [2, 4, 6],
@@ -5744,6 +6676,13 @@
       const [wrongCount, setWrongCount] = useState(0);
       const [wrongCardUids, setWrongCardUids] = useState([]);
       const [conceptTip, setConceptTip] = useState(null);
+      const [showGuide, setShowGuide] = useState(() => !isDojo && !hasSeenGuide && currentStars === 0);
+
+      const containerRef = useRef(null);
+      const dismissGuide = () => {
+        setShowGuide(false);
+        if (onMarkGuideSeen) onMarkGuideSeen();
+      };
 
       // 波次與動態難度狀態（左欄 3→4→5 張、右欄永遠多 1 張干擾卡 4→5→6 張）
       const [waveNumber, setWaveNumber] = useState(1);
@@ -5965,6 +6904,10 @@
       };
 
       useEffect(() => {
+        if (!isDojo) startAdventureGame();
+      }, [isDojo]);
+
+      useEffect(() => {
         if (isDojo && dojoGameState === 'playing') {
           recentPairsRef.current = [];
           setScore(0);
@@ -6034,6 +6977,7 @@
       const checkPairMatch = (lCard, rCard) => {
         setIsProcessing(true);
         if (lCard.valId === rCard.valId) {
+          if (!isDojo && showGuide) dismissGuide();
           audio.sfxMatch();
           setConceptTip(null);
 
@@ -6213,7 +7157,7 @@
       const solvedInCurrentWave = matchedUids.size / 2;
 
       return (
-        <div className="w-full h-full flex flex-col pt-0.5 pb-1 relative animate-jelly min-h-0">
+        <div ref={containerRef} className="w-full h-full flex flex-col pt-0.5 pb-1 relative animate-jelly min-h-0">
 
           {gameState === 'settings' && (
             <div className="flex-1 bg-white/95 rounded-3xl border-4 border-indigo-950 p-4 shadow-2xl flex flex-col gap-3 overflow-y-auto">
@@ -6284,7 +7228,7 @@
                   從 <span className="text-indigo-700 font-black">左 3 / 右 4</span> 起跳，隨進度升至 <span className="text-emerald-600 font-black">左 5 / 右 6</span>，不限時、配對錯誤扣愛心，連續完美清波可補心！
                 </p>
               </div>
-              <CompactStarPills thresholds={[2, 4, 6]} livesMode maxLives={4} unitLabel="波" />
+              <CompactStarPills starsThreshold={[2, 4, 6]} livesMode maxLives={4} unitLabel="波" />
               <div className="w-full space-y-2">
                 <button onClick={() => { audio.init(); startAdventureGame(); }} className="w-full py-4 btn-3d-blue text-white font-black text-lg rounded-2xl shadow-xl tracking-wider active:scale-95">🚀 開始挑戰！</button>
                 <button onClick={onBackToMap} className="w-full py-2 text-xs font-bold text-slate-400 hover:text-slate-600">返回聖域地圖</button>
@@ -6297,7 +7241,7 @@
               {isDojo ? (
                 <GameHUD score={score} combo={combo} timeLeft={timeLeft} maxTime={activeMaxTime} starsThreshold={levelConfig.stars} isDojo={true} extraRight={waveStatusExtra} onManualEnd={() => { clearInterval(timerRef.current); setDojoGameState('ended'); }} />
               ) : (
-                <GameHUD livesMode progress={livesSession.progress} starThresholds={[2, 4, 6]} lives={livesSession.lives} maxLives={4} healStreak={livesSession.healStreak} healTarget={2} unitLabel="波" extraRight={waveStatusExtra} onManualEnd={livesSession.finishNow} />
+                <GameHUD livesMode progress={livesSession.progress} starThresholds={[2, 4, 6]} lives={livesSession.lives} maxLives={4} healStreak={livesSession.healStreak} healTarget={2} unitLabel="波" extraRight={waveStatusExtra} onManualEnd={livesSession.finishNow} onOpenGuide={() => setShowGuide(true)} />
               )}
 
               <div className="flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150">
@@ -6323,7 +7267,7 @@
                   <HintBanner tip={conceptTip} />
 
                   {/* 左區：三角比題目卡（固定單張高度並垂直置中） */}
-                  <div className="bg-white p-1.5 rounded-2xl border-2 border-indigo-100 shadow-inner flex flex-col overflow-hidden">
+                  <div data-coach="lv18-left" className="bg-white p-1.5 rounded-2xl border-2 border-indigo-100 shadow-inner flex flex-col overflow-hidden">
                     <div className="text-[10px] font-black text-indigo-400 text-center uppercase tracking-wider pb-1 shrink-0">題目</div>
                     <div className="flex flex-col justify-center gap-1.5 flex-1 min-h-0 overflow-y-auto no-scrollbar">
                       {leftCards.map((card, idx) => {
@@ -6359,7 +7303,7 @@
                   </div>
 
                   {/* 右區：數值卡（比左欄多 1 張含相反數干擾項，固定單張高度） */}
-                  <div className="bg-white p-1.5 rounded-2xl border-2 border-amber-100 shadow-inner flex flex-col overflow-hidden">
+                  <div data-coach="lv18-right" className="bg-white p-1.5 rounded-2xl border-2 border-amber-100 shadow-inner flex flex-col overflow-hidden">
                     <div className="text-[10px] font-black text-amber-500 text-center uppercase tracking-wider pb-1 shrink-0">對應數值</div>
                     <div className="flex flex-col justify-center gap-1.5 flex-1 min-h-0 overflow-y-auto no-scrollbar">
                       {rightCards.map((card, idx) => {
@@ -6437,6 +7381,18 @@
               />
             )
           )}
+
+          {!isDojo && (
+            <CoachOverlay
+              containerRef={containerRef}
+              active={showGuide && gameState === 'playing'}
+              onDismiss={dismissGuide}
+              steps={[
+                { target: 'lv18-left', text: '先點選左側一張三角比題目卡', shape: 'ellipse', pad: 6, tap: true },
+                { target: 'lv18-right', text: '再點選右側對應的數值卡配對', shape: 'ellipse', pad: 6, tap: true }
+              ]}
+            />
+          )}
         </div>
       );
     };
@@ -6456,7 +7412,7 @@
     };
 
     const HEX_NODES_3D = [
-      // === 第一聖域｜月光艾達花園（正五邊形 sides: 5，Lv.1~6） ===
+      // === 第一聖域｜月光阿爾法花園（正五邊形 sides: 5，Lv.1~6） ===
       {
         id: 'shrine_1', kind: 'shrine', title: '銳角聖典', seaLabel: '🏛️ 第一聖域：月光花園',
         subtitle: '第一聖域知識聖所 • 三邊定義、比值公式與特殊角總覽',
@@ -6513,8 +7469,8 @@
 
     // 各關卡累積星數開放門檻（前三關直接開放，後續依累積總星數解鎖）
     const LEVEL_STAR_REQUIREMENTS = {
-      1: 0, 2: 0, 3: 0,
-      4: 3, 5: 5, 6: 7,
+      1: 0, 2: 1, 3: 2,
+      4: 4, 5: 6, 6: 8,
       7: 10, 8: 12, 9: 14, 10: 16, 11: 18, 12: 19,
       13: 20, 14: 22, 15: 24, 16: 26, 17: 28, 18: 20,
       19: 32
@@ -6585,6 +7541,8 @@
       mapCtrlRef,
       celebration = null,
       onCelebrationDone = null,
+      curtainPhase = 'hidden',
+      onMarkStoryFlag = null,
       onStartLevel,
       onOpenShrine1,
       onOpenShrine2,
@@ -6594,6 +7552,9 @@
     }) => {
       const mountRef = useRef(null);
       const sceneCtrlRef = useRef(null);
+      const guidePinRef = useRef(null);
+      const shrinePinRef = useRef(null);
+      const [mapGuideReady, setMapGuideReady] = useState(false);
       const [showConfetti, setShowConfetti] = useState(false);
       const [focusedNodeId, setFocusedNodeId] = useState(
         initialViewSnapshot?.focusedNodeId ?? initialViewSnapshot?.shipNodeId ?? null
@@ -7729,6 +8690,13 @@
         };
 
         const buildTransitionQueue = (fromId, toId, currentPos, isCurrentlyIdle) => {
+          if (typeof fromId === 'number' && typeof toId === 'number' && fromId === toId) {
+            return [{
+              type: 'walk',
+              waypoints: [currentPos.clone(), getPlatformStandPos(toId)]
+            }];
+          }
+
           if (typeof fromId === 'number' && typeof toId === 'number' && Math.abs(toId - fromId) === 1) {
             const lo = Math.min(fromId, toId);
             const hi = Math.max(fromId, toId);
@@ -7890,6 +8858,10 @@
         };
 
         const startWalkerTransition = (fromLvl, toLvl, walkStateObj) => {
+          if (walkStateObj.mode !== 'idle' && walkStateObj.lastTargetId === toLvl) {
+            cameraMode = 'focusTarget';
+            return;
+          }
           walkStateObj.lastTargetId = toLvl;
           if (fromLvl === toLvl && walkStateObj.mode === 'idle') {
             walkStateObj.mode = 'idle';
@@ -7939,37 +8911,10 @@
           lastTargetId: callbacksRef.current.currentTargetNodeId
         };
 
-        const handleSelectNode = (nodeId, options = {}) => {
-          const { allowDirectEnter = false } = options;
+        const handleSelectNode = (nodeId) => {
           const cb = callbacksRef.current;
           const entry = nodeObjects[nodeId];
           if (!entry) return;
-
-          const isAlreadySettledHere =
-            allowDirectEnter &&
-            focusedNodeIdRef.current === nodeId &&
-            walkState.mode === 'idle' &&
-            walkState.settledNodeId === nodeId;
-
-          if (isAlreadySettledHere) {
-            if (entry.node.kind === 'shrine') {
-              audio.sfxSelect();
-              if (entry.node.id === 'shrine_1') cb.onOpenShrine1();
-              else if (entry.node.id === 'shrine_2') cb.onOpenShrine2();
-              else if (entry.node.id === 'shrine_3') cb.onOpenDojo();
-              return;
-            } else {
-              const lockStatus = cb.getLevelLockStatus(nodeId);
-              if (!lockStatus.unlocked) {
-                audio.sfxError();
-                cb.onLockedAttempt(lockStatus.reason);
-                return;
-              }
-              audio.sfxSelect();
-              cb.onStartLevel(nodeId);
-              return;
-            }
-          }
 
           if (entry.node.kind === 'shrine') {
             audio.sfxSelect();
@@ -8762,6 +9707,31 @@
           });
 
           controls.update();
+          if (guidePinRef.current && mountRef.current && nodeObjects[1]) {
+            const n1 = nodeObjects[1];
+            const n1Apothem = n1.rad * Math.cos(Math.PI / n1.node.sides);
+            const proj = new THREE.Vector3(n1.node.x, n1.node.y - 1.02, n1.node.z + n1Apothem + 0.08).project(camera);
+            if (proj.z >= -1 && proj.z <= 1) {
+              const sx = (proj.x * 0.5 + 0.5) * mountRef.current.clientWidth;
+              const sy = (-proj.y * 0.5 + 0.5) * mountRef.current.clientHeight;
+              guidePinRef.current.style.transform = `translate3d(${sx.toFixed(1)}px, ${sy.toFixed(1)}px, 0)`;
+              guidePinRef.current.style.opacity = '1';
+            } else {
+              guidePinRef.current.style.opacity = '0';
+            }
+          }
+          if (shrinePinRef.current && mountRef.current && nodeObjects['shrine_1']) {
+            const s1 = nodeObjects['shrine_1'];
+            const proj = new THREE.Vector3(s1.node.x, s1.node.y + s1.surfaceY * 0.72, s1.node.z + 0.35).project(camera);
+            if (proj.z >= -1 && proj.z <= 1) {
+              const sx = (proj.x * 0.5 + 0.5) * mountRef.current.clientWidth;
+              const sy = (-proj.y * 0.5 + 0.5) * mountRef.current.clientHeight;
+              shrinePinRef.current.style.transform = `translate3d(${sx.toFixed(1)}px, ${sy.toFixed(1)}px, 0)`;
+              shrinePinRef.current.style.opacity = '1';
+            } else {
+              shrinePinRef.current.style.opacity = '0';
+            }
+          }
           renderer.render(scene, camera);
         };
 
@@ -8839,10 +9809,111 @@
         return levels.find(l => l.id === initialProgressLevelId) || levels[0];
       }, [levels, shipDockedNodeId, lastMainLevelId, initialProgressLevelId, getLevelLockStatus]);
 
+      const lv1Stars = gameMode === 'adventure' ? (userProgress.stars?.[1] || 0) : (userProgress.freeStars?.[1] || 0);
+      const mapGuidePending = !userProgress.seenStoryFlags?.mapGuide && lv1Stars === 0;
+
+      useEffect(() => {
+        if (!mapGuidePending || curtainPhase !== 'hidden') {
+          setMapGuideReady(false);
+          return;
+        }
+        const t = setTimeout(() => setMapGuideReady(true), 300);
+        return () => clearTimeout(t);
+      }, [mapGuidePending, curtainPhase]);
+
+      const showMapPinGuide = mapGuidePending && mapGuideReady && !focusedLevelObj && !focusedShrineObj;
+      const showDrawerStartGuide = mapGuidePending && mapGuideReady && focusedLevelObj?.id === 1;
+      const showShrine1Guide = lv1Stars >= 1 && !userProgress.seenStoryFlags?.shrine1Guide && curtainPhase === 'hidden' && !focusedLevelObj && !focusedShrineObj;
+
+      const dismissMapGuide = useCallback(() => {
+        if (onMarkStoryFlag) onMarkStoryFlag('mapGuide');
+      }, [onMarkStoryFlag]);
+
+      const dismissShrine1Guide = useCallback(() => {
+        if (onMarkStoryFlag) onMarkStoryFlag('shrine1Guide');
+      }, [onMarkStoryFlag]);
+
+      useEffect(() => {
+        if (focusedShrineObj?.id === 'shrine_1' && !userProgress.seenStoryFlags?.shrine1Guide) {
+          dismissShrine1Guide();
+        }
+      }, [focusedShrineObj, userProgress.seenStoryFlags, dismissShrine1Guide]);
+
       return (
         <div className="flex-1 w-full rounded-none sm:rounded-3xl border-y-2 sm:border-4 border-indigo-950 overflow-hidden relative z-10 shadow-2xl">
           <div ref={mountRef} className="w-full h-full relative" style={{ touchAction: 'none' }} />
           {showConfetti && <ConfettiOverlay />}
+
+          {showMapPinGuide && (
+            <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden">
+              <div
+                ref={guidePinRef}
+                className="absolute top-0 left-0 will-change-transform transition-opacity duration-300"
+                style={{ opacity: 0 }}
+              >
+                {/* 氣泡在手指下方，食指指尖精準壓在 Lv.1 銘牌 01 正下方 */}
+                <div className="relative">
+                  <div className="pointer-events-auto absolute top-[34px] left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur-md text-white border border-amber-400/80 rounded-full px-3 py-1 shadow-xl flex items-center gap-2 whitespace-nowrap animate-jelly">
+                    <span className="text-[11px] font-black text-amber-100">
+                      {gameMode === 'free' ? '點擊 Lv.1 或任一台柱開始練習' : '點擊 Lv.1 台柱，開始第一場試煉'}
+                    </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); dismissMapGuide(); }}
+                      className="w-4 h-4 rounded-full bg-white/15 hover:bg-rose-500/60 text-[9px] font-black text-slate-200 flex items-center justify-center"
+                      aria-label="關閉引導"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="-translate-x-[16px] -translate-y-[8px] relative flex items-center justify-center">
+                    <span className="absolute -top-1 left-[9px] w-7 h-7 rounded-full border-2 border-amber-400 animate-ping opacity-80" />
+                    <svg viewBox="0 0 48 56" className="w-10 h-11 drop-shadow-[0_4px_8px_rgba(15,23,42,0.55)] animate-coach-tap">
+                      <path
+                        d="M15 24V8.5C15 6 17 4 19.5 4C22 4 24 6 24 8.5V21.5C24.8 20.6 26.2 20 27.6 20C29.8 20 31.6 21.4 32.1 23.3C33 22.6 34.2 22.2 35.4 22.2C38.1 22.2 40.2 24.3 40.2 27V36.2C40.2 44.3 33.8 50.5 25.5 50.5H22.2C16.2 50.5 12 46.5 9.8 40.5L6.5 31.8C5.6 29.4 6.8 26.7 9.2 25.8C11.4 25 13.8 25.9 14.9 28L15 24Z"
+                        fill="#ffffff"
+                        stroke="#0f172a"
+                        strokeWidth="2.8"
+                        strokeLinejoin="round"
+                      />
+                      <circle cx="19.5" cy="9" r="2.2" fill="#fbbf24" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showShrine1Guide && (
+            <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden">
+              <div
+                ref={shrinePinRef}
+                className="absolute top-0 left-0 will-change-transform transition-opacity duration-300"
+                style={{ opacity: 0 }}
+              >
+                <div className="-translate-x-1/2 -translate-y-full pb-2 flex flex-col items-center">
+                  <div className="pointer-events-auto bg-slate-900/90 backdrop-blur-md text-white border border-sky-400/80 rounded-full px-2.5 py-1 shadow-xl flex items-center gap-1.5 whitespace-nowrap animate-jelly">
+                    <button
+                      onClick={() => {
+                        dismissShrine1Guide();
+                        if (sceneCtrlRef.current) sceneCtrlRef.current.selectNode('shrine_1');
+                      }}
+                      className="text-[11px] font-black text-sky-100 hover:text-amber-200 flex items-center gap-1"
+                    >
+                      <span>🏛️</span><span>點此開啟銳角聖典</span>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); dismissShrine1Guide(); }}
+                      className="w-4 h-4 rounded-full bg-white/15 hover:bg-rose-500/60 text-[9px] font-black text-slate-200 flex items-center justify-center"
+                      aria-label="關閉聖典提示"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <span className="w-2 h-2 rotate-45 bg-slate-900 border-r border-b border-sky-400/80 -mt-1" />
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="absolute top-2.5 right-2.5 z-20 flex items-center justify-end pointer-events-none">
             <button
@@ -8894,7 +9965,7 @@
                   </button>
                 </div>
 
-                {quickTargetLevelObj && (
+                {quickTargetLevelObj && (shipDockedNodeId !== quickTargetLevelObj.id || activeSea !== (HEX_NODES_3D.find(n => n.id === quickTargetLevelObj.id)?.sea ?? 1)) && (
                   <button
                     onClick={() => {
                       audio.init();
@@ -8905,12 +9976,10 @@
                         setFocusedNodeId(quickTargetLevelObj.id);
                       }
                     }}
-                    title={`前往關卡：${quickTargetLevelObj.id === 19 ? 'FINAL BOSS' : `Lv.${quickTargetLevelObj.id}`} ${quickTargetLevelObj.title}`}
+                    title={`回到主線：${quickTargetLevelObj.id === 19 ? 'FINAL BOSS' : `Lv.${quickTargetLevelObj.id}`} ${quickTargetLevelObj.title}`}
                     className="py-2 px-3 rounded-xl bg-gradient-to-b from-amber-300 to-amber-500 hover:from-amber-200 hover:to-amber-400 text-indigo-950 border-b-2 border-amber-700 font-black text-xs flex items-center justify-center gap-1 shadow-md active:scale-95 transition-all shrink-0"
                   >
-                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
+                    <span>🧭</span>
                     <span className="font-mono text-[11px]">{quickTargetLevelObj.id === 19 ? 'BOSS' : `Lv.${quickTargetLevelObj.id}`}</span>
                   </button>
                 )}
@@ -8966,6 +10035,20 @@
             </div>
           ) : (
             <div className="absolute bottom-0 pb-safe left-0 right-0 sm:bottom-3 sm:left-3 sm:right-3 z-30 bg-white/95 backdrop-blur-md border-t-4 sm:border-3 border-indigo-950 rounded-t-3xl sm:rounded-2xl p-3.5 sm:p-3.5 shadow-2xl animate-jelly">
+              {showDrawerStartGuide && (
+                <div className="pointer-events-none absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-40">
+                  <div className="pointer-events-auto bg-slate-950/95 backdrop-blur-md text-white border border-amber-400/90 rounded-full px-3.5 py-1.5 shadow-xl flex items-center gap-2 whitespace-nowrap animate-jelly">
+                    <span className="text-[11px] font-black text-amber-100">點擊「進入試煉」，開始第 1 關！</span>
+                    <button
+                      onClick={dismissMapGuide}
+                      className="w-4 h-4 rounded-full bg-white/15 hover:bg-rose-500/60 text-[9px] font-black text-slate-200 flex items-center justify-center"
+                      aria-label="關閉引導"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto mb-2 sm:hidden"></div>
               <div className="flex items-start justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2.5">
@@ -8973,10 +10056,7 @@
                     {focusedLevelObj.icon}
                   </div>
                   <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] font-black font-mono bg-indigo-950 text-amber-300 px-1.5 py-0.5 rounded">{focusedLevelObj.id === 19 ? '👑 FINAL BOSS' : `Lv.${focusedLevelObj.id}`}</span>
-                      <span className="text-sm font-black text-indigo-950">{focusedLevelObj.title}</span>
-                    </div>
+                    <div className="text-sm font-black text-indigo-950">{focusedLevelObj.id === 19 ? 'FINAL BOSS' : `Lv.${focusedLevelObj.id}`} {focusedLevelObj.title}</div>
                     <div className="text-[11px] font-bold text-slate-500 mt-0.5">{focusedLevelObj.island} • {focusedLevelObj.subtitle}</div>
                   </div>
                 </div>
@@ -9024,12 +10104,37 @@
                 </button>
 
                 {isPlaceholderFocused ? (
-                  <div className="flex-1 py-3 bg-slate-200 text-slate-600 font-black text-[11px] rounded-xl text-center border border-slate-300 truncate px-2">
-                    ✨ 敬請期待（可點下一關前進）
+                  <div className="flex-1 py-3 bg-slate-200 text-slate-500 font-black text-[11px] rounded-xl text-center border border-slate-300 truncate px-2">
+                    🚧 預留台座
                   </div>
                 ) : focusedLockStatus.unlocked ? (
-                  <button onClick={() => onStartLevel(focusedLevelObj.id)} className="flex-1 py-3 btn-3d-yellow text-amber-950 font-black text-sm rounded-xl shadow-lg tracking-wide flex items-center justify-center gap-1 truncate px-2">
-                    <span>🚀</span><span className="truncate">進入試煉</span>
+                  <button
+                    onClick={() => {
+                      if (showDrawerStartGuide) dismissMapGuide();
+                      onStartLevel(focusedLevelObj.id);
+                    }}
+                    className={`relative flex-1 py-3 rounded-xl font-black text-sm tracking-wide shadow-md transition-all active:translate-y-0.5 flex items-center justify-center gap-1.5 ${
+                      focusedLevelObj.isBoss
+                        ? 'bg-gradient-to-r from-rose-500 to-red-600 border-b-4 border-rose-800 text-white'
+                        : 'btn-3d-yellow text-amber-950'
+                    }`}
+                  >
+                    <span>🚀 進入挑戰</span>
+                    {showDrawerStartGuide && (
+                      <span className="pointer-events-none absolute -bottom-3 right-3 flex items-center justify-center">
+                        <span className="absolute -top-1 left-[5px] w-6 h-6 rounded-full border-2 border-amber-400 animate-ping opacity-80" />
+                        <svg viewBox="0 0 48 56" className="w-8 h-9 drop-shadow-[0_3px_6px_rgba(15,23,42,0.5)] animate-coach-tap">
+                          <path
+                            d="M15 24V8.5C15 6 17 4 19.5 4C22 4 24 6 24 8.5V21.5C24.8 20.6 26.2 20 27.6 20C29.8 20 31.6 21.4 32.1 23.3C33 22.6 34.2 22.2 35.4 22.2C38.1 22.2 40.2 24.3 40.2 27V36.2C40.2 44.3 33.8 50.5 25.5 50.5H22.2C16.2 50.5 12 46.5 9.8 40.5L6.5 31.8C5.6 29.4 6.8 26.7 9.2 25.8C11.4 25 13.8 25.9 14.9 28L15 24Z"
+                            fill="#ffffff"
+                            stroke="#0f172a"
+                            strokeWidth="2.8"
+                            strokeLinejoin="round"
+                          />
+                          <circle cx="19.5" cy="9" r="2.2" fill="#fbbf24" />
+                        </svg>
+                      </span>
+                    )}
                   </button>
                 ) : (
                   <div className="flex-1 py-3 bg-slate-200 text-slate-600 font-black text-[11px] rounded-xl text-center border border-slate-300 truncate px-2">
@@ -9067,7 +10172,8 @@
         stars: { ...zeros },
         highScores: { ...zeros },
         freeStars: { ...zeros },
-        freeHighScores: { ...zeros }
+        freeHighScores: { ...zeros },
+        seenGuides: {}
       };
     };
 
@@ -9086,7 +10192,8 @@
         stars: { ...base.stars, ...(raw.stars || {}) },
         highScores: { ...base.highScores, ...(raw.highScores || {}) },
         freeStars: { ...base.freeStars, ...(raw.freeStars || {}) },
-        freeHighScores: { ...base.freeHighScores, ...(raw.freeHighScores || {}) }
+        freeHighScores: { ...base.freeHighScores, ...(raw.freeHighScores || {}) },
+        seenGuides: { ...(raw.seenGuides || {}) }
       };
     };
 
@@ -9153,6 +10260,11 @@
       const [dialModalTab, setDialModalTab] = useState('rotate');
       const [showStatusModal, setShowStatusModal] = useState(false);
       const [showSettingsModal, setShowSettingsModal] = useState(false);
+      const isDebugMode = useMemo(() => (
+        typeof window !== 'undefined' &&
+        (new URLSearchParams(window.location.search).get('debug') === '1' || window.location.hash.includes('debug=1'))
+      ), []);
+      const [showDebugPanel, setShowDebugPanel] = useState(false);
       const [audioPrefs, setAudioPrefs] = useState(() => audio.getPrefs());
       const [editingSlotId, setEditingSlotId] = useState(null);
       const [editingSlotName, setEditingSlotName] = useState('');
@@ -9237,13 +10349,13 @@
         }, 24);
       }, [currentStage]);
 
-      const triggerStoryWhisper = useCallback((text, icon = '🕯️') => {
+      const triggerStoryWhisper = useCallback((text, icon = '🕯️', targetNodeId = null) => {
         clearTimeout(whisperTimerRef.current);
         const id = Date.now();
-        setStoryWhisper({ text, icon, id });
+        setStoryWhisper({ text, icon, targetNodeId, id });
         whisperTimerRef.current = setTimeout(() => {
           setStoryWhisper(prev => prev?.id === id ? null : prev);
-        }, 3800);
+        }, 4200);
       }, []);
 
       const updateAudioPrefs = useCallback((patch) => {
@@ -9283,13 +10395,19 @@
             seenStoryFlags: { ...(prev.seenStoryFlags || {}), sea3: true }
           }));
         } else if (gameMode === 'adventure' && adventureTotalStars >= 8 && !flags.sea2) {
-          triggerStoryWhisper('星門開啟——從靜止直角，踏入旋轉不息的星象迴廊', '💠');
+          triggerStoryWhisper('星門開啟——從靜止直角，踏入旋轉不息的星象迴廊', '💠', 'shrine_2');
           setUserProgress(prev => ({
             ...prev,
             seenStoryFlags: { ...(prev.seenStoryFlags || {}), sea2: true }
           }));
+        } else if ((userProgress.stars?.[1] || 0) >= 1 && !flags.shrine1Hint) {
+          triggerStoryWhisper('隨時可點擊地圖上的「銳角聖典」神殿，溫習幾何圖解秘笈', '🏛️', 'shrine_1');
+          setUserProgress(prev => ({
+            ...prev,
+            seenStoryFlags: { ...(prev.seenStoryFlags || {}), shrine1Hint: true }
+          }));
         }
-      }, [currentStage, gameMode, adventureTotalStars, userProgress.seenStoryFlags, setUserProgress, triggerStoryWhisper]);
+      }, [currentStage, gameMode, adventureTotalStars, userProgress.seenStoryFlags, userProgress.stars, setUserProgress, triggerStoryWhisper]);
 
       useEffect(() => {
         audio.setModalDucking(
@@ -9297,14 +10415,13 @@
         );
       }, [newCardModalSlot, showSettingsModal, showUnifiedShrine, showAngleDialModal, showStatusModal, showWinModal]);
 
-      const enterLevelFromMap = (lvlId) => {
+      const enterLevelFromMap = useCallback((lvlId) => {
         if (mapCtrlRef.current) {
           mapViewSnapshotRef.current = mapCtrlRef.current.getSnapshot();
         }
-        setSelectedLevel(lvlId);
-        setCurrentStage('playing');
         audio.init();
-      };
+        transitionToStage('playing', () => setSelectedLevel(lvlId), { mode: 'fade', inMs: 140, durationMs: 220 });
+      }, [transitionToStage]);
 
       const adventureTotalStars = useMemo(() => Object.values(userProgress.stars || {}).reduce((acc, cur) => acc + (cur || 0), 0), [userProgress.stars]);
       const freeTotalStars = useMemo(() => Object.values(userProgress.freeStars || {}).reduce((acc, cur) => acc + (cur || 0), 0), [userProgress.freeStars]);
@@ -9324,7 +10441,7 @@
       const getLevelLockStatus = useCallback((levelId) => {
         const targetLvl = LEVELS.find(l => l.id === levelId);
         if (targetLvl?.isPlaceholder) return { unlocked: false, reason: '此試煉尚未開放，敬請期待' };
-        if (gameMode === 'free' || levelId <= 3) return { unlocked: true, reason: '' };
+        if (gameMode === 'free' || levelId <= 1) return { unlocked: true, reason: '' };
         const reqStars = LEVEL_STAR_REQUIREMENTS[levelId] ?? 0;
         if (adventureTotalStars < reqStars) {
           return {
@@ -9380,7 +10497,7 @@
               holdMs: 900,
               icon: '🕯️',
               title: '序章 • 光之階梯',
-              sub: '星芒沉睡於黑夜，提燈旅人艾達踏上光之階梯…'
+              sub: '星芒沉睡於黑夜，提燈旅人阿爾法踏上光之階梯…'
             }
           : cardMode === 'free'
           ? {
@@ -9467,8 +10584,7 @@
           durationMs: 2500,
           holdMs: 900,
           icon: '🕯️',
-          title: '序章 • 光之階梯',
-          sub: '星芒沉睡於黑夜，提燈旅人艾達踏上光之階梯…'
+          sub: '星芒沉睡於黑夜，提燈旅人阿爾法踏上光之階梯…'
         });
       }, [newCardModalSlot, newCardName, transitionToStage]);
 
@@ -9577,7 +10693,19 @@
         }))
       ), []);
 
-      const gameModeCtxVal = useMemo(() => ({ isRelaxMode: gameMode === 'free' }), [gameMode]);
+      const hasSeenHudLifeGuide = Boolean(userProgress.seenGuides?.hudLife);
+      const markHudLifeGuideSeen = useCallback(() => {
+        setUserProgress(prev => ({
+          ...prev,
+          seenGuides: { ...(prev.seenGuides || {}), hudLife: true }
+        }));
+      }, []);
+
+      const gameModeCtxVal = useMemo(() => ({
+        isRelaxMode: gameMode === 'free',
+        hasSeenHudLifeGuide,
+        markHudLifeGuideSeen
+      }), [gameMode, hasSeenHudLifeGuide, markHudLifeGuideSeen]);
 
       return (
         <GameModeContext.Provider value={gameModeCtxVal}>
@@ -9604,8 +10732,7 @@
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     onClick={() => { audio.sfxClick(); setStatusSlot(activeSlot); setShowStatusModal(true); }}
-                    className="flex items-center gap-1 bg-gradient-to-r from-amber-400 to-yellow-500 border-2 border-amber-600 px-2.5 py-1 rounded-full shadow-md active:scale-95 transition-transform"
-                    title={`查看榮譽榜單 (${totalStars} / ${totalPossibleStars} 星)`}
+                    className="flex items-center gap-1 bg-amber-100 border-2 border-amber-400 px-2.5 py-1 rounded-full shadow-sm active:scale-95 transition-transform"
                   >
                     <span className="text-xs">⭐</span>
                     <span className="font-black text-amber-950 text-xs font-mono">{totalStars}/{totalPossibleStars}</span>
@@ -9689,11 +10816,20 @@
             {storyWhisper && currentStage === 'map' && (
               <button
                 key={storyWhisper.id}
-                onClick={() => setStoryWhisper(null)}
+                onClick={() => {
+                  const target = storyWhisper.targetNodeId;
+                  setStoryWhisper(null);
+                  if (target && mapCtrlRef.current?.selectNode) {
+                    mapCtrlRef.current.selectNode(target);
+                  }
+                }}
                 className="absolute top-3 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:max-w-[360px] z-40 bg-slate-950/85 backdrop-blur-md text-amber-100 border border-amber-400/55 px-3.5 py-2 rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.5)] text-[11px] font-bold flex items-center justify-center gap-2 animate-jelly"
               >
                 <span className="text-sm shrink-0">{storyWhisper.icon}</span>
-                <span className="leading-snug text-left">{storyWhisper.text}</span>
+                <span className="leading-snug text-left flex-1">{storyWhisper.text}</span>
+                {storyWhisper.targetNodeId && (
+                  <span className="text-[10px] font-black text-amber-300 bg-amber-400/15 border border-amber-400/40 px-1.5 py-0.5 rounded-md shrink-0">前往 ▶</span>
+                )}
               </button>
             )}
 
@@ -9710,22 +10846,42 @@
                 <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full bg-sky-400/20 blur-3xl" />
                 <div className="pointer-events-none absolute bottom-10 left-1/2 -translate-x-1/2 w-72 h-40 rounded-full bg-amber-400/10 blur-3xl" />
 
-                <button
-                  onClick={() => {
-                    audio.sfxClick();
-                    const firstValid = [1, 2, 3].find(id => Boolean(saveStore.slots[id])) || 1;
-                    setStatusSlot(firstValid);
-                    setShowStatusModal(true);
-                  }}
-                  className="absolute top-3.5 right-3.5 z-20 px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-amber-300/45 text-amber-200 text-xs font-black backdrop-blur-md shadow-lg flex items-center gap-1 active:scale-95 transition-all"
-                  aria-label="查看榮譽榜單"
-                >
-                  <span>🏆</span>
-                  <span>榜單</span>
-                </button>
+                {/* 右上角浮動簡約音量開關與細部設定鈕（不佔垂直版面空間） */}
+                <div className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 z-20 flex items-center gap-1.5">
+                  <button
+                    onClick={() => {
+                      const anyOn = (audioPrefs.bgmEnabled && audioPrefs.bgmVolume > 0) || (audioPrefs.sfxEnabled && audioPrefs.sfxVolume > 0);
+                      if (anyOn) {
+                        updateAudioPrefs({ bgmEnabled: false, sfxEnabled: false });
+                      } else {
+                        updateAudioPrefs({
+                          bgmEnabled: true,
+                          bgmVolume: audioPrefs.bgmVolume > 0 ? audioPrefs.bgmVolume : 0.7,
+                          sfxEnabled: true,
+                          sfxVolume: audioPrefs.sfxVolume > 0 ? audioPrefs.sfxVolume : 0.85
+                        });
+                        audio.init();
+                        audio.sfxClick();
+                      }
+                    }}
+                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-sky-100 text-xs flex items-center justify-center backdrop-blur-sm active:scale-90 transition-all"
+                    title="一鍵靜音 / 開啟聲音"
+                    aria-label="一鍵靜音或開啟聲音"
+                  >
+                    {(audioPrefs.bgmEnabled && audioPrefs.bgmVolume > 0) || (audioPrefs.sfxEnabled && audioPrefs.sfxVolume > 0) ? '🔊' : '🔇'}
+                  </button>
+                  <button
+                    onClick={() => { audio.init(); audio.sfxClick(); setShowSettingsModal(true); }}
+                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-sky-100 text-xs flex items-center justify-center backdrop-blur-sm active:scale-90 transition-all"
+                    title="聲音細部設定"
+                    aria-label="聲音細部設定"
+                  >
+                    ⚙️
+                  </button>
+                </div>
 
                 {/* 手遊幾何主視覺 Logo */}
-                <div className="relative z-10 flex flex-col items-center text-center pt-1 pb-0.5 shrink-0 animate-jelly">
+                <div className="relative z-10 flex flex-col items-center text-center pt-4 sm:pt-6 pb-2 shrink-0 animate-jelly">
                   <div className="relative w-20 h-20 mb-2 flex items-center justify-center">
                     <div className="absolute inset-0 rounded-full border-2 border-dashed border-sky-300/35 animate-slow-spin" />
                     <div className="absolute inset-1.5 rounded-full border border-amber-300/30" />
@@ -9747,8 +10903,8 @@
                   </div>
                 </div>
 
-                {/* 三張獨立記憶卡槽位 */}
-                <div className="relative z-10 flex flex-col gap-3 my-auto py-1">
+                {/* 三份獨立冒險日誌槽位 */}
+                <div className="relative z-10 flex flex-col gap-4 sm:gap-5 my-auto py-3">
                   {[1, 2, 3].map((slotId) => {
                     const slotData = saveStore.slots[slotId];
                     if (!slotData) {
@@ -9756,7 +10912,7 @@
                         <button
                           key={slotId}
                           onClick={() => handleSelectSlot(slotId)}
-                          className="w-full min-h-[84px] rounded-2xl border-2 border-dashed border-sky-300/35 bg-white/[0.06] hover:bg-white/[0.11] backdrop-blur-sm px-3.5 py-3 flex items-center justify-between transition-all active:scale-[0.98] group shadow-lg"
+                          className="w-full min-h-[88px] rounded-2xl border-2 border-dashed border-sky-300/35 bg-white/[0.06] hover:bg-white/[0.11] backdrop-blur-sm px-4 py-3.5 flex items-center justify-between transition-all active:scale-[0.98] group shadow-lg"
                         >
                           <div className="flex items-center gap-3.5">
                             <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400/25 to-indigo-500/25 border-2 border-sky-300/45 flex items-center justify-center text-2xl text-sky-200 font-black group-hover:scale-105 transition-transform shadow-inner shrink-0">
@@ -9766,7 +10922,7 @@
                               </span>
                             </div>
                             <div className="text-left">
-                              <div className="text-base font-black text-white/90 leading-tight">空白記憶卡</div>
+                              <div className="text-base font-black text-white/90 leading-tight">空白冒險日誌</div>
                               <div className="text-[11px] font-bold text-sky-300/75 mt-1">點擊選擇冒險模式</div>
                             </div>
                           </div>
@@ -9788,7 +10944,7 @@
                     return (
                       <div
                         key={slotId}
-                        className={`w-full min-h-[84px] rounded-2xl border-2 py-3 px-3.5 flex items-center gap-3 shadow-xl transition-all backdrop-blur-sm ${
+                        className={`w-full min-h-[88px] rounded-2xl border-2 py-3.5 px-4 flex items-center gap-3 shadow-xl transition-all backdrop-blur-sm ${
                           cardMode === 'free'
                             ? 'bg-gradient-to-r from-emerald-950/90 via-slate-900/95 to-teal-950/90 border-emerald-400/65'
                             : 'bg-gradient-to-r from-indigo-950/90 via-slate-900/95 to-indigo-900/90 border-amber-400/75'
@@ -9822,18 +10978,25 @@
                                 className="w-full bg-slate-800 text-white text-sm font-black px-2 py-0.5 rounded-lg border border-amber-400 outline-none"
                               />
                             ) : (
-                              <button
-                                onClick={() => {
-                                  audio.sfxClick();
-                                  setEditingSlotId(slotId);
-                                  setEditingSlotName(slotData.name || `冒險者 ${slotId}`);
-                                }}
-                                className="flex items-center gap-1.5 min-w-0 group text-left"
-                                aria-label="修改名稱"
-                              >
-                                <span className="text-base font-black text-white truncate leading-tight">{slotData.name || `冒險者 ${slotId}`}</span>
-                                <span className="text-[11px] opacity-55 group-hover:opacity-100 shrink-0">✏️</span>
-                              </button>
+                              <div className="flex items-center justify-between gap-1.5 min-w-0">
+                                <button
+                                  onClick={() => {
+                                    audio.sfxClick();
+                                    setEditingSlotId(slotId);
+                                    setEditingSlotName(slotData.name || `冒險者 ${slotId}`);
+                                  }}
+                                  className="flex items-center gap-1.5 min-w-0 group text-left"
+                                  aria-label="修改名稱"
+                                >
+                                  <span className="text-base font-black text-white truncate leading-tight">{slotData.name || `冒險者 ${slotId}`}</span>
+                                  <span className="text-[11px] opacity-55 group-hover:opacity-100 shrink-0">✏️</span>
+                                </button>
+                                {cardMode === 'adventure' && (
+                                  <span className="text-[10px] font-black text-amber-200 bg-amber-400/15 border border-amber-300/35 px-1.5 py-0.5 rounded-md leading-none shrink-0">
+                                    {slotRank.title}
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
 
@@ -9869,8 +11032,8 @@
                                 ? 'px-2.5 bg-rose-500/90 border-rose-300 text-white animate-pulse shadow-md'
                                 : 'w-8 bg-white/10 hover:bg-rose-500/25 border-white/15 hover:border-rose-400/50 text-sky-200/75 hover:text-rose-200'
                             }`}
-                            aria-label="重置記憶卡"
-                            title="重置記憶卡"
+                            aria-label="重置冒險日誌"
+                            title="重置冒險日誌"
                           >
                             {isConfirmDel ? '重置?' : (
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
@@ -9886,7 +11049,7 @@
                             className={`h-10 px-3.5 font-black text-sm rounded-xl shadow-lg flex items-center justify-center active:scale-95 ${
                               cardMode === 'free' ? 'btn-3d-green text-white' : 'btn-3d-yellow text-amber-950'
                             }`}
-                            aria-label={`進入記憶卡 ${slotId}`}
+                            aria-label={`進入冒險日誌 ${slotId}`}
                           >
                             ▶
                           </button>
@@ -9896,93 +11059,7 @@
                   })}
                 </div>
 
-                {/* 底部毛玻璃音樂與音效直接控制列（發光進度條） */}
-                <div className="relative z-10 pb-safe pt-1 shrink-0">
-                  <div className="bg-slate-900/75 backdrop-blur-md border border-white/15 rounded-2xl p-2.5 px-3 grid grid-cols-2 gap-3 shadow-xl">
-                    {/* 音樂控制 */}
-                    {(() => {
-                      const bgmPct = audioPrefs.bgmEnabled ? Math.round(audioPrefs.bgmVolume * 100) : 0;
-                      return (
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex items-center justify-between">
-                            <button
-                              onClick={() => {
-                                const nextEnabled = !audioPrefs.bgmEnabled;
-                                const nextVol = nextEnabled && audioPrefs.bgmVolume === 0 ? 0.7 : audioPrefs.bgmVolume;
-                                updateAudioPrefs({ bgmEnabled: nextEnabled, bgmVolume: nextVol });
-                                audio.sfxClick();
-                              }}
-                              className={`px-2 py-0.5 rounded-lg text-[11px] font-black transition-all active:scale-95 ${
-                                bgmPct > 0
-                                  ? 'bg-sky-500/30 border border-sky-400/60 text-sky-200'
-                                  : 'bg-white/10 border border-white/15 text-slate-400'
-                              }`}
-                            >
-                              {bgmPct > 0 ? '🎵 音樂' : '🔇 音樂'}
-                            </button>
-                            <span className="text-[10px] font-mono font-black text-sky-200/80">{bgmPct}%</span>
-                          </div>
-                          <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            step="5"
-                            value={bgmPct}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value, 10) / 100;
-                              updateAudioPrefs({ bgmEnabled: val > 0, bgmVolume: val });
-                            }}
-                            style={{ background: `linear-gradient(to right, #38bdf8 0%, #38bdf8 ${bgmPct}%, #334155 ${bgmPct}%, #334155 100%)` }}
-                            className="w-full h-2 rounded-full appearance-none cursor-pointer accent-sky-300"
-                            aria-label="音樂音量"
-                          />
-                        </div>
-                      );
-                    })()}
-
-                    {/* 音效控制 */}
-                    {(() => {
-                      const sfxPct = audioPrefs.sfxEnabled ? Math.round(audioPrefs.sfxVolume * 100) : 0;
-                      return (
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex items-center justify-between">
-                            <button
-                              onClick={() => {
-                                const nextEnabled = !audioPrefs.sfxEnabled;
-                                const nextVol = nextEnabled && audioPrefs.sfxVolume === 0 ? 0.85 : audioPrefs.sfxVolume;
-                                updateAudioPrefs({ sfxEnabled: nextEnabled, sfxVolume: nextVol });
-                                if (nextEnabled) audio.sfxSelect();
-                              }}
-                              className={`px-2 py-0.5 rounded-lg text-[11px] font-black transition-all active:scale-95 ${
-                                sfxPct > 0
-                                  ? 'bg-amber-500/30 border border-amber-400/60 text-amber-200'
-                                  : 'bg-white/10 border border-white/15 text-slate-400'
-                              }`}
-                            >
-                              {sfxPct > 0 ? '🔊 音效' : '🔇 音效'}
-                            </button>
-                            <span className="text-[10px] font-mono font-black text-amber-200/80">{sfxPct}%</span>
-                          </div>
-                          <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            step="5"
-                            value={sfxPct}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value, 10) / 100;
-                              updateAudioPrefs({ sfxEnabled: val > 0, sfxVolume: val });
-                            }}
-                            onPointerUp={() => audio.sfxClick()}
-                            style={{ background: `linear-gradient(to right, #fbbf24 0%, #fbbf24 ${sfxPct}%, #334155 ${sfxPct}%, #334155 100%)` }}
-                            className="w-full h-2 rounded-full appearance-none cursor-pointer accent-amber-300"
-                            aria-label="音效音量"
-                          />
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
+                <div className="pb-safe shrink-0" />
               </div>
             ) : currentStage === 'map' ? (
               <ThreeDIslandMap
@@ -9995,6 +11072,11 @@
                 mapCtrlRef={mapCtrlRef}
                 celebration={pendingCelebration}
                 onCelebrationDone={() => setPendingCelebration(null)}
+                curtainPhase={curtainState.phase}
+                onMarkStoryFlag={(flagKey) => setUserProgress(prev => ({
+                  ...prev,
+                  seenStoryFlags: { ...(prev.seenStoryFlags || {}), [flagKey]: true }
+                }))}
                 onStartLevel={(lvlId) => enterLevelFromMap(lvlId)}
                 onOpenShrine1={() => setShowUnifiedShrine(true)}
                 onOpenShrine2={() => setShowAngleDialModal(true)}
@@ -10006,33 +11088,40 @@
               <div className="w-full h-full flex-1 flex flex-col overflow-hidden">
                 {(() => {
                   const activeStarsMap = gameMode === 'adventure' ? userProgress.stars : (userProgress.freeStars || {});
+                  const markGuideSeen = (lvlId) => setUserProgress(prev => ({
+                    ...prev,
+                    seenGuides: { ...(prev.seenGuides || {}), [lvlId]: true }
+                  }));
+                  const hasSeenGuide = (lvlId) => Boolean(userProgress.seenGuides?.[lvlId]);
                   return selectedLevel === 1 ? (
-                    <Level1EdgeMaster currentStars={activeStarsMap[1] || 0} onUpdateStars={(c, s) => handleUpdateStars(1, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
+                    <Level1EdgeMaster currentStars={activeStarsMap[1] || 0} hasSeenGuide={hasSeenGuide(1)} onMarkGuideSeen={() => markGuideSeen(1)} onUpdateStars={(c, s) => handleUpdateStars(1, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 2 ? (
-                    <Level2RatioMaster currentStars={activeStarsMap[2] || 0} onUpdateStars={(c, s) => handleUpdateStars(2, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
+                    <Level2RatioMaster currentStars={activeStarsMap[2] || 0} hasSeenGuide={hasSeenGuide(2)} onMarkGuideSeen={() => markGuideSeen(2)} onUpdateStars={(c, s) => handleUpdateStars(2, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 3 ? (
-                    <Level3MissingSideMaster currentStars={activeStarsMap[3] || 0} onUpdateStars={(c, s) => handleUpdateStars(3, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
+                    <Level3MissingSideMaster currentStars={activeStarsMap[3] || 0} hasSeenGuide={hasSeenGuide(3)} onMarkGuideSeen={() => markGuideSeen(3)} onUpdateStars={(c, s) => handleUpdateStars(3, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 4 ? (
-                    <Level4SpecialAnglesMaster currentStars={activeStarsMap[4] || 0} onUpdateStars={(c, s) => handleUpdateStars(4, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
+                    <Level4SpecialAnglesMaster currentStars={activeStarsMap[4] || 0} hasSeenGuide={hasSeenGuide(4)} onMarkGuideSeen={() => markGuideSeen(4)} onUpdateStars={(c, s) => handleUpdateStars(4, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 5 ? (
-                    <Level5TrigRelationsMaster currentStars={activeStarsMap[5] || 0} onUpdateStars={(c, s) => handleUpdateStars(5, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
+                    <Level5TrigRelationsMaster currentStars={activeStarsMap[5] || 0} hasSeenGuide={hasSeenGuide(5)} onMarkGuideSeen={() => markGuideSeen(5)} onUpdateStars={(c, s) => handleUpdateStars(5, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 6 ? (
-                    <Level6PythagoreanTripleMaster currentStars={activeStarsMap[6] || 0} onUpdateStars={(c, s) => handleUpdateStars(6, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
+                    <Level6PythagoreanTripleMaster currentStars={activeStarsMap[6] || 0} hasSeenGuide={hasSeenGuide(6)} onMarkGuideSeen={() => markGuideSeen(6)} onUpdateStars={(c, s) => handleUpdateStars(6, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 7 ? (
-                    <Level5AngleSteeringMaster currentStars={activeStarsMap[7] || 0} onUpdateStars={(c, s) => handleUpdateStars(7, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
+                    <Level5AngleSteeringMaster currentStars={activeStarsMap[7] || 0} hasSeenGuide={hasSeenGuide(7)} onMarkGuideSeen={() => markGuideSeen(7)} onUpdateStars={(c, s) => handleUpdateStars(7, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 8 ? (
-                    <LevelCoterminalPopMaster currentStars={activeStarsMap[8] || 0} onUpdateStars={(c, s) => handleUpdateStars(8, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
+                    <LevelCoterminalPopMaster currentStars={activeStarsMap[8] || 0} hasSeenGuide={hasSeenGuide(8)} onMarkGuideSeen={() => markGuideSeen(8)} onUpdateStars={(c, s) => handleUpdateStars(8, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 10 ? (
-                    <Level6VectorCompassMaster currentStars={activeStarsMap[10] || 0} onUpdateStars={(c, s) => handleUpdateStars(10, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
+                    <Level6VectorCompassMaster currentStars={activeStarsMap[10] || 0} hasSeenGuide={hasSeenGuide(10)} onMarkGuideSeen={() => markGuideSeen(10)} onUpdateStars={(c, s) => handleUpdateStars(10, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 11 ? (
-                    <Level8QuadrantSignMaster currentStars={activeStarsMap[11] || 0} onUpdateStars={(c, s) => handleUpdateStars(11, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
+                    <Level8QuadrantSignMaster currentStars={activeStarsMap[11] || 0} hasSeenGuide={hasSeenGuide(11)} onMarkGuideSeen={() => markGuideSeen(11)} onUpdateStars={(c, s) => handleUpdateStars(11, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 12 ? (
-                    <Level7AstroCompassMaster currentStars={activeStarsMap[12] || 0} onUpdateStars={(c, s) => handleUpdateStars(12, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
+                    <Level7AstroCompassMaster currentStars={activeStarsMap[12] || 0} hasSeenGuide={hasSeenGuide(12)} onMarkGuideSeen={() => markGuideSeen(12)} onUpdateStars={(c, s) => handleUpdateStars(12, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : (
                     <LevelLightingCardGame
                       levelData={LEVELS.find(l => l.id === selectedLevel)}
                       isDojo={selectedLevel === 'dojo'}
                       currentStars={activeStarsMap[selectedLevel] || 0}
+                      hasSeenGuide={selectedLevel !== 'dojo' && hasSeenGuide(selectedLevel)}
+                      onMarkGuideSeen={() => selectedLevel !== 'dojo' && markGuideSeen(selectedLevel)}
                       onUpdateStars={(c, s) => handleUpdateStars(selectedLevel, c, s)}
                       onCompleteLevel={handleCompleteLevel}
                       onBackToMap={returnToMapFromLevel}
@@ -10160,7 +11249,7 @@
                       <span className="text-2xl animate-bounce">🏆</span>
                       <div>
                         <h3 className="text-base font-black text-indigo-950 leading-none">聖域榮譽榜單</h3>
-                        <span className="text-[10px] font-bold text-amber-600">三張記憶卡各關星數與最高分</span>
+                        <span className="text-[10px] font-bold text-amber-600">三份冒險日誌各關星數與最高分</span>
                       </div>
                     </div>
                     <button onClick={() => { audio.sfxClick(); setShowStatusModal(false); }} className="w-7 h-7 rounded-full bg-slate-100 text-slate-500 font-black text-sm flex items-center justify-center">✕</button>
@@ -10222,7 +11311,7 @@
                   ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-400 gap-2">
                       <span className="text-4xl">💾</span>
-                      <div className="text-sm font-black text-slate-500">尚未建立任何記憶卡</div>
+                      <div className="text-sm font-black text-slate-500">尚未建立任何冒險日誌</div>
                       <div className="text-xs font-bold">請先於首頁選擇槽位建立角色！</div>
                     </div>
                   )}
@@ -10235,7 +11324,7 @@
           {/* 知識聖所 1：銳角三角比聖典 Modal（對應第一聖域 Lv.1～Lv.6 共 6 頁圖解） */}
           {showUnifiedShrine && (
             <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 animate-jelly">
-              <div className="bg-white rounded-3xl border-4 border-amber-600 p-4 w-full max-w-sm h-[520px] max-h-[90vh] shadow-2xl relative flex flex-col justify-between gap-2">
+              <div className="bg-white rounded-3xl border-4 border-amber-600 p-4 w-full max-w-sm h-[620px] max-h-[88dvh] shadow-2xl relative flex flex-col justify-between gap-2">
                 <div className="flex items-center justify-between border-b-2 border-amber-200 pb-2 shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="text-2xl animate-bounce">📜</span>
@@ -10266,11 +11355,12 @@
                   ))}
                 </div>
 
-                <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar py-1 flex flex-col justify-center text-xs">
+                <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar py-2 text-xs">
+                  <div className="min-h-full flex flex-col justify-center">
                   {shrineTab === 1 && (
-                    <div className="space-y-2.5">
-                      <div className="bg-slate-50 border-2 border-amber-200 rounded-2xl p-2 flex justify-center">
-                        <svg viewBox="0 0 280 165" className="w-full max-w-[260px] h-[145px]">
+                    <div className="space-y-3">
+                      <div className="bg-slate-50 border-2 border-amber-200 rounded-2xl p-3 flex justify-center">
+                        <svg viewBox="0 0 280 165" className="w-full max-w-[280px] h-[168px]">
                           <polygon points="40,135 225,135 225,28" fill="#fffbeb" stroke="none" />
                           <polyline points="209,135 209,119 225,119" fill="none" stroke="#64748b" strokeWidth="2.5" />
                           <path d="M 40 135 L 74 135 A 34 34 0 0 0 70 118 Z" fill="rgba(245,158,11,0.22)" stroke="#f59e0b" strokeWidth="2" />
@@ -10286,7 +11376,7 @@
                           <text x="132" y="154" fill="#047857" fontSize="13" fontWeight="900" textAnchor="middle">鄰邊</text>
                         </svg>
                       </div>
-                      <div className="bg-amber-50 border border-amber-200 p-3 rounded-2xl text-[11px] text-amber-950 font-bold space-y-1.5 leading-relaxed">
+                      <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl text-xs text-amber-950 font-bold space-y-2 leading-relaxed">
                         <div>• <span className="text-blue-600 font-black">斜邊</span>：直角正對面，永遠最長且固定不變。</div>
                         <div>• <span className="text-rose-600 font-black">對邊</span>：基準角 <span className="font-serif">θ</span> 目光正對面。</div>
                         <div>• <span className="text-emerald-600 font-black">鄰邊</span>：貼著 <span className="font-serif">θ</span> 與直角的股（<span className="text-amber-700">若基準角換至頂角，對邊與鄰邊互換</span>）。</div>
@@ -10295,9 +11385,9 @@
                   )}
 
                   {shrineTab === 2 && (
-                    <div className="space-y-2.5">
-                      <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-2 flex items-center justify-around">
-                        <svg viewBox="0 0 180 120" className="w-[155px] h-[100px] shrink-0">
+                    <div className="space-y-3">
+                      <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-3 flex items-center justify-around">
+                        <svg viewBox="0 0 180 120" className="w-[165px] h-[112px] shrink-0">
                           <polygon points="24,98 148,98 148,22" fill="#f0fdfa" stroke="none" />
                           <polyline points="135,98 135,85 148,85" fill="none" stroke="#94a3b8" strokeWidth="2" />
                           <path d="M 24 98 L 50 98 A 26 26 0 0 0 47 84 Z" fill="rgba(245,158,11,0.22)" stroke="#f59e0b" strokeWidth="1.8" />
@@ -10316,16 +11406,16 @@
                         </div>
                       </div>
                       <div className="grid grid-cols-3 gap-2 text-center">
-                        <div className="bg-pink-50 border-2 border-pink-200 p-2.5 rounded-2xl flex flex-col items-center">
-                          <div className="text-sm font-serif font-black text-pink-700 mb-1">sin θ =</div>
+                        <div className="bg-pink-50 border-2 border-pink-200 py-3.5 px-2 rounded-2xl flex flex-col items-center">
+                          <div className="text-sm font-serif font-black text-pink-700 mb-1.5">sin θ =</div>
                           <FracText value="對邊/斜邊" size="md" className="text-pink-900 font-black" />
                         </div>
-                        <div className="bg-teal-50 border-2 border-teal-200 p-2.5 rounded-2xl flex flex-col items-center">
-                          <div className="text-sm font-serif font-black text-teal-700 mb-1">cos θ =</div>
+                        <div className="bg-teal-50 border-2 border-teal-200 py-3.5 px-2 rounded-2xl flex flex-col items-center">
+                          <div className="text-sm font-serif font-black text-teal-700 mb-1.5">cos θ =</div>
                           <FracText value="鄰邊/斜邊" size="md" className="text-teal-900 font-black" />
                         </div>
-                        <div className="bg-amber-50 border-2 border-amber-200 p-2.5 rounded-2xl flex flex-col items-center">
-                          <div className="text-sm font-serif font-black text-amber-700 mb-1">tan θ =</div>
+                        <div className="bg-amber-50 border-2 border-amber-200 py-3.5 px-2 rounded-2xl flex flex-col items-center">
+                          <div className="text-sm font-serif font-black text-amber-700 mb-1.5">tan θ =</div>
                           <FracText value="對邊/鄰邊" size="md" className="text-amber-900 font-black" />
                         </div>
                       </div>
@@ -10333,9 +11423,9 @@
                   )}
 
                   {shrineTab === 3 && (
-                    <div className="space-y-2.5">
-                      <div className="bg-indigo-50 border-2 border-indigo-200 rounded-2xl p-3 flex items-center justify-around">
-                        <svg viewBox="0 0 130 95" className="w-[115px] h-[82px] shrink-0">
+                    <div className="space-y-3">
+                      <div className="bg-indigo-50 border-2 border-indigo-200 rounded-2xl p-3.5 flex items-center justify-around">
+                        <svg viewBox="0 0 130 95" className="w-[125px] h-[92px] shrink-0">
                           <polygon points="18,78 106,78 106,18" fill="#eef2ff" stroke="#4f46e5" strokeWidth="3.5" strokeLinejoin="round" />
                           <polyline points="95,78 95,67 106,67" fill="none" stroke="#6366f1" strokeWidth="2" />
                           <text x="56" y="42" fill="#312e81" fontSize="13" fontWeight="900" className="font-serif">c</text>
@@ -10344,8 +11434,8 @@
                         </svg>
                         <div className="space-y-1 text-center">
                           <div className="text-lg font-serif font-black text-indigo-700">a² + b² = c²</div>
-                          <div className="text-[11px] font-bold text-indigo-950">求斜邊：c = √(a² + b²)</div>
-                          <div className="text-[11px] font-bold text-indigo-950">求股長：a = √(c² − b²)</div>
+                          <div className="text-[11px] font-bold text-indigo-950"><SqrtText text="求斜邊：c = √(a² + b²)" /></div>
+                          <div className="text-[11px] font-bold text-indigo-950"><SqrtText text="求股長：a = √(c² − b²)" /></div>
                         </div>
                       </div>
                       <div className="bg-slate-50 border border-slate-200 p-3 rounded-2xl space-y-2">
@@ -10361,9 +11451,9 @@
                   )}
 
                   {shrineTab === 4 && (
-                    <div className="space-y-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-2 flex flex-col items-center">
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div className="bg-amber-50 border border-amber-200 rounded-2xl py-3 px-2 flex flex-col items-center">
                           <svg viewBox="0 0 120 90" className="w-[105px] h-[76px]">
                             <polygon points="22,74 96,74 96,14" fill="#fef3c7" stroke="#d97706" strokeWidth="3" strokeLinejoin="round" />
                             <polyline points="86,74 86,64 96,64" fill="none" stroke="#b45309" strokeWidth="1.8" />
@@ -10373,9 +11463,9 @@
                             <text x="105" y="47" fill="#b45309" fontSize="11" fontWeight="900">1</text>
                             <text x="50" y="39" fill="#d97706" fontSize="11" fontWeight="900">√2</text>
                           </svg>
-                          <div className="text-[10px] font-mono font-black text-amber-900">1 : 1 : √2</div>
+                          <div className="text-[10px] font-mono font-black text-amber-900"><SqrtText text="1 : 1 : √2" /></div>
                         </div>
-                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-2 flex flex-col items-center">
+                        <div className="bg-amber-50 border border-amber-200 rounded-2xl py-3 px-2 flex flex-col items-center">
                           <svg viewBox="0 0 120 90" className="w-[105px] h-[76px]">
                             <polygon points="12,74 102,74 102,22" fill="#fef3c7" stroke="#d97706" strokeWidth="3" strokeLinejoin="round" />
                             <polyline points="92,74 92,64 102,64" fill="none" stroke="#b45309" strokeWidth="1.8" />
@@ -10385,7 +11475,7 @@
                             <text x="110" y="51" fill="#b45309" fontSize="11" fontWeight="900">1</text>
                             <text x="49" y="42" fill="#d97706" fontSize="11" fontWeight="900">2</text>
                           </svg>
-                          <div className="text-[10px] font-mono font-black text-amber-900">1 : √3 : 2</div>
+                          <div className="text-[10px] font-mono font-black text-amber-900"><SqrtText text="1 : √3 : 2" /></div>
                         </div>
                       </div>
                       <div className="bg-slate-50 border border-slate-200 rounded-2xl p-2">
@@ -10397,7 +11487,7 @@
                           { fn: 'cos', vals: ['√3/2', '√2/2', '1/2'], cls: 'text-teal-700' },
                           { fn: 'tan', vals: ['√3/3', '1', '√3'], cls: 'text-amber-700' }
                         ].map(row => (
-                          <div key={row.fn} className="grid grid-cols-4 items-center text-center py-1 border-b last:border-b-0 border-slate-100">
+                          <div key={row.fn} className="grid grid-cols-4 items-center text-center py-1.5 border-b last:border-b-0 border-slate-100">
                             <div className={`font-serif font-black text-xs ${row.cls}`}>{row.fn}</div>
                             {row.vals.map((v, i) => (
                               <div key={i} className="font-black text-slate-800"><FracText value={v} size="sm" /></div>
@@ -10409,8 +11499,8 @@
                   )}
 
                   {shrineTab === 5 && (
-                    <div className="space-y-2">
-                      <div className="bg-sky-50 border border-sky-200 rounded-2xl p-2.5 space-y-1">
+                    <div className="space-y-3">
+                      <div className="bg-sky-50 border border-sky-200 rounded-2xl p-3 space-y-1.5">
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-black text-sky-800">① 餘角關係</span>
                           <span className="text-[10px] font-bold text-sky-600">兩角和 90° 即互換</span>
@@ -10420,7 +11510,7 @@
                           <div>cos(90°−θ) = sin θ</div>
                         </div>
                       </div>
-                      <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-2.5 space-y-1">
+                      <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-3 space-y-1.5">
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-black text-indigo-800">② 平方關係</span>
                           <span className="text-[10px] font-bold text-indigo-600">由畢氏 a²+b²=c² 推得</span>
@@ -10433,7 +11523,7 @@
                           <div>cos²θ = 1 − sin²θ</div>
                         </div>
                       </div>
-                      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-2.5 space-y-1">
+                      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 space-y-1.5">
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-black text-amber-800">③ 商數關係</span>
                           <span className="text-[10px] font-bold text-amber-700">移項：sin θ = tan θ cos θ</span>
@@ -10447,9 +11537,9 @@
                   )}
 
                   {shrineTab === 6 && (
-                    <div className="space-y-2.5">
-                      <div className="bg-teal-50 border-2 border-teal-200 rounded-2xl p-2.5 flex items-center justify-around">
-                        <svg viewBox="0 0 150 105" className="w-[135px] h-[95px] shrink-0">
+                    <div className="space-y-3">
+                      <div className="bg-teal-50 border-2 border-teal-200 rounded-2xl p-3 flex items-center justify-around">
+                        <svg viewBox="0 0 150 105" className="w-[148px] h-[108px] shrink-0">
                           <polygon points="18,86 122,86 122,18" fill="#f0fdfa" stroke="none" />
                           <polyline points="110,86 110,74 122,74" fill="none" stroke="#94a3b8" strokeWidth="2" />
                           <path d="M 18 86 L 44 86 A 26 26 0 0 0 41 72 Z" fill="rgba(245,158,11,0.22)" stroke="#f59e0b" strokeWidth="1.8" />
@@ -10467,7 +11557,7 @@
                             <FracText value="3/5" size="sm" />
                           </div>
                           <div>① 定兩邊：對=3, 斜=5</div>
-                          <div>② 畢氏求鄰：<span className="text-emerald-700 font-black">√(5²−3²) = 4</span></div>
+                          <div>② 畢氏求鄰：<span className="text-emerald-700 font-black"><SqrtText text="√(5²−3²) = 4" /></span></div>
                         </div>
                       </div>
                       <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-1.5">
@@ -10484,6 +11574,7 @@
                       </div>
                     </div>
                   )}
+                  </div>
                 </div>
 
                 <button onClick={() => { audio.sfxClick(); setShowUnifiedShrine(false); }} className="w-full py-2.5 btn-3d-yellow text-amber-950 font-black text-sm rounded-xl shadow shrink-0">領悟完畢，回聖域挑戰！</button>
@@ -10491,13 +11582,13 @@
             </div>
           )}
 
-          {/* 開新記憶卡：模式選擇視窗（建立後不可更改） */}
+          {/* 開新冒險日誌：模式選擇視窗（建立後不可更改） */}
           {newCardModalSlot !== null && (
             <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-jelly">
               <div className="bg-gradient-to-b from-slate-900 to-indigo-950 rounded-3xl border-3 border-amber-400/80 p-4 w-full max-w-xs shadow-2xl space-y-3 text-white">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-mono font-black bg-sky-500/20 border border-sky-400/40 text-sky-200 px-2.5 py-0.5 rounded-full">
-                    CARD 0{newCardModalSlot}
+                    LOG 0{newCardModalSlot}
                   </span>
                   <button
                     onClick={() => { audio.sfxClick(); setNewCardModalSlot(null); }}
@@ -10542,7 +11633,7 @@
             </div>
           )}
 
-          {/* 系統設定 Modal（記憶卡模式鎖定顯示 + 背景音樂 + 遊戲音效） */}
+          {/* 系統設定 Modal（冒險日誌模式鎖定顯示 + 背景音樂 + 遊戲音效） */}
           {showSettingsModal && (
             <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 animate-jelly">
               <div className="bg-white rounded-3xl border-4 border-indigo-950 p-4 w-full max-w-sm max-h-[88dvh] overflow-y-auto no-scrollbar shadow-2xl space-y-3">
@@ -10552,7 +11643,7 @@
                     <div>
                       <h3 className="text-base font-black text-indigo-950 leading-none">聲音與存檔</h3>
                       <span className="text-[10px] font-bold text-slate-500">
-                        {userProgress.name || `CARD 0${activeSlot}`} • {gameMode === 'adventure' ? '🗺️ 闖關 (🔒)' : '🌱 休閒 (🔒)'}
+                        {userProgress.name || `LOG 0${activeSlot}`} • {gameMode === 'adventure' ? '🗺️ 闖關 (🔒)' : '🌱 休閒 (🔒)'}
                       </span>
                     </div>
                   </div>
@@ -10673,6 +11764,73 @@
                 </div>
                 <button onClick={() => { audio.sfxClick(); returnToMapFromLevel(); }} className="w-full py-2.5 btn-3d-green text-white font-black text-sm rounded-2xl shadow-lg">返回聖域繼續冒險</button>
               </div>
+            </div>
+          )}
+
+          {isDebugMode && (
+            <div className="fixed bottom-3 left-3 z-[120] flex flex-col items-start gap-2">
+              {showDebugPanel && (
+                <div className="w-64 bg-slate-950/95 backdrop-blur-md text-white border-2 border-amber-400/80 rounded-2xl p-3 shadow-2xl space-y-2 text-[11px] animate-jelly">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
+                    <span className="font-black text-amber-300">🛠️ 開發者測試面板</span>
+                    <button onClick={() => setShowDebugPanel(false)} className="text-slate-400 hover:text-white font-black">✕</button>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-[10px] font-bold text-slate-400">引導與劇情旗標</div>
+                    <button
+                      onClick={() => {
+                        setUserProgress(prev => ({ ...prev, seenStoryFlags: { intro: true }, seenGuides: {} }));
+                      }}
+                      className="w-full py-1.5 px-2 rounded-lg bg-sky-600/80 hover:bg-sky-500 font-black text-left"
+                    >
+                      🔄 重置地圖與關卡引導旗標
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-[10px] font-bold text-slate-400">快速設定星等（當前存檔）</div>
+                    <div className="grid grid-cols-2 gap-1">
+                      <button
+                        onClick={() => setUserProgress(prev => ({ ...prev, stars: {}, freeStars: {} }))}
+                        className="py-1 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 font-black"
+                      >
+                        0★ 全新
+                      </button>
+                      <button
+                        onClick={() => setUserProgress(prev => ({ ...prev, stars: { 1: 3 }, freeStars: { 1: 3 } }))}
+                        className="py-1 px-2 rounded-lg bg-emerald-700/80 hover:bg-emerald-600 font-black"
+                      >
+                        Lv.1 (3★)
+                      </button>
+                      <button
+                        onClick={() => setUserProgress(prev => ({ ...prev, stars: { 1: 3, 2: 3, 3: 2 }, freeStars: { 1: 3, 2: 3, 3: 2 } }))}
+                        className="py-1 px-2 rounded-lg bg-indigo-700/80 hover:bg-indigo-600 font-black"
+                      >
+                        8★ 二聖域
+                      </button>
+                      <button
+                        onClick={() => setUserProgress(prev => ({ ...prev, stars: { 1: 3, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2 }, freeStars: { 1: 3, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2 } }))}
+                        className="py-1 px-2 rounded-lg bg-purple-700/80 hover:bg-purple-600 font-black"
+                      >
+                        17★ 三聖域
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-[10px] font-bold text-slate-400">快捷跳轉</div>
+                    <div className="grid grid-cols-3 gap-1">
+                      <button onClick={() => { setShowDebugPanel(false); enterLevelFromMap(1); }} className="py-1 rounded-lg bg-amber-500/80 hover:bg-amber-400 text-slate-950 font-black">Lv.1</button>
+                      <button onClick={() => { setShowDebugPanel(false); enterLevelFromMap(8); }} className="py-1 rounded-lg bg-amber-500/80 hover:bg-amber-400 text-slate-950 font-black">Lv.8</button>
+                      <button onClick={() => { setShowDebugPanel(false); enterLevelFromMap(18); }} className="py-1 rounded-lg bg-amber-500/80 hover:bg-amber-400 text-slate-950 font-black">Lv.18</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <button
+                onClick={() => setShowDebugPanel(s => !s)}
+                className="px-2.5 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-800 text-amber-300 border border-amber-400/70 text-[11px] font-black shadow-lg"
+              >
+                🛠️ Debug
+              </button>
             </div>
           )}
 
