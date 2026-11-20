@@ -7946,7 +7946,14 @@
       const [newCardModalSlot, setNewCardModalSlot] = useState(null);
       const [newCardName, setNewCardName] = useState('');
       const [storyWhisper, setStoryWhisper] = useState(null);
-      const [stageCurtain, setStageCurtain] = useState('hidden'); // 'hidden' | 'in' | 'out'
+      const [curtainState, setCurtainState] = useState({
+        phase: 'hidden', // 'hidden' | 'in' | 'out'
+        isMist: false,
+        icon: '',
+        title: '',
+        sub: '',
+        durationMs: 780
+      });
       const [shrineTab, setShrineTab] = useState(1);
       const mapCtrlRef = useRef(null);
       const mapViewSnapshotRef = useRef(null);
@@ -7954,17 +7961,27 @@
       const whisperTimerRef = useRef(null);
       const curtainTimerRef = useRef(null);
 
-      const transitionToStage = useCallback((nextStage, beforeSwitch) => {
+      const transitionToStage = useCallback((nextStage, beforeSwitch, opts = {}) => {
         clearTimeout(curtainTimerRef.current);
-        setStageCurtain('in');
+        const durationMs = opts.durationMs || 420;
+        setCurtainState({
+          phase: 'in',
+          isMist: Boolean(opts.isMist),
+          icon: opts.icon || '',
+          title: opts.title || '',
+          sub: opts.sub || '',
+          durationMs
+        });
         curtainTimerRef.current = setTimeout(() => {
           if (beforeSwitch) beforeSwitch();
           setCurrentStage(nextStage);
-          setStageCurtain('out');
-          curtainTimerRef.current = setTimeout(() => {
-            setStageCurtain('hidden');
-          }, 340);
-        }, 220);
+          setTimeout(() => {
+            setCurtainState(prev => ({ ...prev, phase: 'out' }));
+            curtainTimerRef.current = setTimeout(() => {
+              setCurtainState(prev => ({ ...prev, phase: 'hidden' }));
+            }, durationMs + 60);
+          }, 40);
+        }, 240);
       }, []);
 
       const triggerStoryWhisper = useCallback((text, icon = '🕯️') => {
@@ -8006,13 +8023,7 @@
       useEffect(() => {
         if (currentStage !== 'map') return;
         const flags = userProgress.seenStoryFlags || {};
-        if (!flags.intro) {
-          triggerStoryWhisper('提燈旅人艾達踏上光之階梯，重燃散落的三角星芒…', '🕯️');
-          setUserProgress(prev => ({
-            ...prev,
-            seenStoryFlags: { ...(prev.seenStoryFlags || {}), intro: true }
-          }));
-        } else if (gameMode === 'adventure' && adventureTotalStars >= 17 && !flags.sea3) {
+        if (gameMode === 'adventure' && adventureTotalStars >= 17 && !flags.sea3) {
           triggerStoryWhisper('幻夜星軌共鳴——攀向雲端之上，喚醒最終的聖域王座', '👑');
           setUserProgress(prev => ({
             ...prev,
@@ -8093,7 +8104,8 @@
 
       const handleSelectSlot = useCallback((slotId) => {
         audio.init();
-        if (!saveStore.slots[slotId]) {
+        const slotData = saveStore.slots[slotId];
+        if (!slotData) {
           audio.sfxClick();
           setConfirmDeleteSlot(null);
           setEditingSlotId(null);
@@ -8104,13 +8116,69 @@
         audio.sfxBonus();
         setEditingSlotId(null);
         setConfirmDeleteSlot(null);
+
+        const isFirstIntro = !(slotData.seenStoryFlags && slotData.seenStoryFlags.intro);
+        const cardMode = slotData.mode === 'free' ? 'free' : 'adventure';
+        const advStars = Object.values(slotData.stars || {}).reduce((a, b) => a + (b || 0), 0);
+        const mistOpts = isFirstIntro
+          ? {
+              isMist: true,
+              durationMs: 1900,
+              icon: '🕯️',
+              title: '序章 • 光之階梯',
+              sub: '星芒沉睡於黑夜，提燈旅人艾達踏上光之階梯…'
+            }
+          : cardMode === 'free'
+          ? {
+              isMist: true,
+              durationMs: 850,
+              icon: '⚡',
+              title: '自由挑戰 • 全聖域開放',
+              sub: slotData.name || `冒險者 ${slotId}`
+            }
+          : advStars >= 17
+          ? {
+              isMist: true,
+              durationMs: 850,
+              icon: '👑',
+              title: '第三聖域 • 幻夜尖塔',
+              sub: slotData.name || `冒險者 ${slotId}`
+            }
+          : advStars >= 8
+          ? {
+              isMist: true,
+              durationMs: 850,
+              icon: '💠',
+              title: '第二聖域 • 星象迴廊',
+              sub: slotData.name || `冒險者 ${slotId}`
+            }
+          : {
+              isMist: true,
+              durationMs: 850,
+              icon: '🏛️',
+              title: '第一聖域 • 月光花園',
+              sub: slotData.name || `冒險者 ${slotId}`
+            };
+
         transitionToStage('map', () => {
-          setSaveStore(prev => ({
-            ...prev,
-            activeSlot: slotId
-          }));
+          setSaveStore(prev => {
+            const cur = prev.slots[slotId];
+            return {
+              ...prev,
+              activeSlot: slotId,
+              slots: cur && isFirstIntro
+                ? {
+                    ...prev.slots,
+                    [slotId]: {
+                      ...cur,
+                      seenStoryFlags: { ...(cur.seenStoryFlags || {}), intro: true }
+                    }
+                  }
+                : prev.slots
+            };
+          });
           mapViewSnapshotRef.current = null;
-        });
+        }, mistOpts);
       }, [saveStore.slots, transitionToStage]);
 
       const handleCreateNewCard = useCallback((chosenMode) => {
@@ -8130,11 +8198,18 @@
                 ...createEmptyProgress(),
                 mode: chosenMode === 'free' ? 'free' : 'adventure',
                 name: finalName,
+                seenStoryFlags: { intro: true },
                 updatedAt: Date.now()
               }
             }
           }));
           mapViewSnapshotRef.current = null;
+        }, {
+          isMist: true,
+          durationMs: 1900,
+          icon: '🕯️',
+          title: '序章 • 光之階梯',
+          sub: '星芒沉睡於黑夜，提燈旅人艾達踏上光之階梯…'
         });
       }, [newCardModalSlot, newCardName, transitionToStage]);
 
@@ -9076,24 +9151,74 @@
             </div>
           )}
 
-          {/* 主畫面 ↔ 地圖 星光帷幕轉場 */}
-          {stageCurtain !== 'hidden' && (
-            <div
-              className={`fixed inset-0 z-[100] bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-950 flex items-center justify-center transition-opacity ease-out ${
-                stageCurtain === 'in'
-                  ? 'opacity-100 duration-200 pointer-events-auto'
-                  : 'opacity-0 duration-300 pointer-events-none'
-              }`}
-            >
-              <div className="relative flex items-center justify-center">
-                <div className="w-24 h-24 rounded-full bg-sky-400/20 blur-xl animate-pulse" />
-                <svg viewBox="0 0 64 64" className="absolute w-14 h-14 drop-shadow-[0_0_16px_rgba(251,191,36,0.85)]">
-                  <polygon points="14,50 50,50 50,14" fill="rgba(56,189,248,0.22)" stroke="#fde047" strokeWidth="3.5" strokeLinejoin="round" />
-                  <circle cx="50" cy="14" r="3.5" fill="#fde047" />
-                </svg>
+          {/* 主畫面 ↔ 地圖 雲霧漸散與故事轉場 */}
+          {curtainState.phase !== 'hidden' && (() => {
+            const isOut = curtainState.phase === 'out';
+            const durStyle = { transitionDuration: isOut ? `${curtainState.durationMs}ms` : '220ms' };
+            return (
+              <div
+                style={durStyle}
+                className={`fixed inset-0 z-[100] overflow-hidden flex items-center justify-center transition-opacity ease-out ${
+                  isOut ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
+                }`}
+              >
+                {/* 底層深藍夜霧 */}
+                <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-950" />
+
+                {/* 左右雙層撥開雲霧（僅進地圖時展開） */}
+                {curtainState.isMist && (
+                  <>
+                    <div
+                      style={{
+                        ...durStyle,
+                        background: 'radial-gradient(circle at 60% 50%, rgba(186,230,253,0.28) 0%, rgba(99,102,241,0.22) 45%, rgba(15,23,42,0) 75%)'
+                      }}
+                      className={`absolute -left-1/4 -top-10 w-[90%] h-[115%] blur-2xl transition-transform ease-out ${
+                        isOut ? '-translate-x-1/2 scale-125' : 'translate-x-0 scale-100'
+                      }`}
+                    />
+                    <div
+                      style={{
+                        ...durStyle,
+                        background: 'radial-gradient(circle at 40% 50%, rgba(224,231,255,0.26) 0%, rgba(56,189,248,0.2) 45%, rgba(15,23,42,0) 75%)'
+                      }}
+                      className={`absolute -right-1/4 -bottom-10 w-[90%] h-[115%] blur-2xl transition-transform ease-out ${
+                        isOut ? 'translate-x-1/2 scale-125' : 'translate-x-0 scale-100'
+                      }`}
+                    />
+                  </>
+                )}
+
+                {/* 中央發光三角徽章與簡短故事文字 */}
+                <div
+                  style={durStyle}
+                  className={`relative z-10 flex flex-col items-center text-center px-6 max-w-xs transition-all ease-out ${
+                    isOut ? 'scale-105 opacity-0' : 'scale-100 opacity-100'
+                  }`}
+                >
+                  <div className="relative flex items-center justify-center mb-3">
+                    <div className="w-20 h-20 rounded-full bg-sky-400/20 blur-xl animate-pulse" />
+                    <svg viewBox="0 0 64 64" className="absolute w-12 h-12 drop-shadow-[0_0_16px_rgba(251,191,36,0.85)]">
+                      <polygon points="14,50 50,50 50,14" fill="rgba(56,189,248,0.22)" stroke="#fde047" strokeWidth="3.5" strokeLinejoin="round" />
+                      <circle cx="50" cy="14" r="3.5" fill="#fde047" />
+                    </svg>
+                  </div>
+
+                  {curtainState.title && (
+                    <div className="flex items-center gap-1.5 text-xs font-black tracking-widest text-amber-300 mb-1.5">
+                      <span>{curtainState.icon}</span>
+                      <span>{curtainState.title}</span>
+                    </div>
+                  )}
+                  {curtainState.sub && (
+                    <div className="text-sm sm:text-base font-bold text-indigo-100 leading-relaxed drop-shadow">
+                      {curtainState.sub}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
         </div>
       );
