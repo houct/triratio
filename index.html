@@ -6662,23 +6662,44 @@
           };
         };
 
+        let fogDensityTarget = 0.0115;
+        let cameraMode = 'idle';
+        let flightAnim = null;
+
         if (initialViewSnapshot && initialViewSnapshot.camPos && initialViewSnapshot.targetPos) {
           camera.position.set(initialViewSnapshot.camPos.x, initialViewSnapshot.camPos.y, initialViewSnapshot.camPos.z);
           controls.target.set(initialViewSnapshot.targetPos.x, initialViewSnapshot.targetPos.y, initialViewSnapshot.targetPos.z);
           controls.update();
+          cameraTargetPos.copy(camera.position);
+          controlsTargetPos.copy(controls.target);
         } else {
-          camera.position.copy(computeAxisOverviewPos());
-          controls.target.copy(defaultTarget);
+          const overviewPos = computeAxisOverviewPos();
+          const startPos = new THREE.Vector3(overviewPos.x + 18, overviewPos.y + 26, overviewPos.z + 38);
+          const midPos = new THREE.Vector3(overviewPos.x + 6, overviewPos.y + 11, overviewPos.z + 16);
+
+          const camCurve = new THREE.CatmullRomCurve3([startPos, midPos, overviewPos]);
+          const targetCurve = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(defaultTarget.x, defaultTarget.y + 5.5, defaultTarget.z),
+            defaultTarget.clone()
+          ]);
+
+          camera.position.copy(startPos);
+          controls.target.copy(targetCurve.getPoint(0));
           controls.update();
+          cameraTargetPos.copy(overviewPos);
+          controlsTargetPos.copy(defaultTarget);
+          scene.fog.density = 0.026;
+          fogDensityTarget = 0.0115;
+          renderer.domElement.style.transition = 'none';
+          renderer.domElement.style.filter = 'blur(8px)';
+          controls.enabled = false;
+          flightAnim = { active: true, elapsed: 0, frameCount: 0, duration: 2.25, camCurve, targetCurve, isExit: false };
         }
-        cameraTargetPos.copy(camera.position);
-        controlsTargetPos.copy(controls.target);
 
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         let pointerDownPos = { x: 0, y: 0 };
         let celebrateSpinTimer = 0;
-        let cameraMode = 'idle';
 
         const beginNextSegment = (walkStateObj) => {
           const seg = walkStateObj.segQueue.shift();
@@ -6907,6 +6928,23 @@
               cameraTargetPos.copy(seaView.pos);
             }
             isTransitioning = true;
+          },
+          flyOutToClouds: () => {
+            userInteracting = false;
+            controls.enabled = false;
+            const curCam = camera.position.clone();
+            const curTgt = controls.target.clone();
+            const exitEnd = new THREE.Vector3(curCam.x + 16, curCam.y + 24, curCam.z + 34);
+            const exitMid = new THREE.Vector3(curCam.x + 6, curCam.y + 10, curCam.z + 15);
+            const camCurve = new THREE.CatmullRomCurve3([curCam, exitMid, exitEnd]);
+            const targetCurve = new THREE.CatmullRomCurve3([
+              curTgt,
+              new THREE.Vector3(curTgt.x, curTgt.y + 5.5, curTgt.z)
+            ]);
+            fogDensityTarget = 0.032;
+            renderer.domElement.style.transition = 'filter 0.75s ease-in';
+            renderer.domElement.style.filter = 'blur(7px)';
+            flightAnim = { active: true, elapsed: 0, frameCount: 0, duration: 0.85, camCurve, targetCurve, isExit: true };
           },
           triggerCelebration: (lvlId) => {
             celebrateSpinTimer = 1.85;
@@ -7351,7 +7389,28 @@
             }
           }
 
-          if (!userInteracting) {
+          if (flightAnim && flightAnim.active) {
+            flightAnim.frameCount += 1;
+            if (!flightAnim.isExit && flightAnim.frameCount === 2) {
+              renderer.domElement.style.transition = 'filter 1.2s ease-out';
+              renderer.domElement.style.filter = 'blur(0px)';
+            }
+            if (flightAnim.frameCount > 1) {
+              flightAnim.elapsed += Math.min(0.033, dt);
+            }
+            const rawP = Math.min(1, flightAnim.elapsed / flightAnim.duration);
+            const p = flightAnim.isExit ? rawP * rawP : 1 - Math.pow(1 - rawP, 3);
+            camera.position.copy(flightAnim.camCurve.getPoint(p));
+            controls.target.copy(flightAnim.targetCurve.getPoint(p));
+            if (rawP >= 1) {
+              flightAnim.active = false;
+              if (!flightAnim.isExit) {
+                renderer.domElement.style.transition = 'none';
+                renderer.domElement.style.filter = 'none';
+                controls.enabled = true;
+              }
+            }
+          } else if (!userInteracting) {
             const zFactor = getPortraitZoomFactor();
             if (cameraMode === 'followWalker') {
               const isMovingNow = walkState.mode === 'walk' || walkState.mode === 'photonOut' || walkState.mode === 'photonFly' || walkState.mode === 'photonIn';
@@ -7412,6 +7471,7 @@
           idaBaseRingMat.opacity = (1 - ringPulse) * 0.72;
 
           const camDist = camera.position.distanceTo(controls.target);
+          scene.fog.density += (fogDensityTarget - scene.fog.density) * Math.min(1, dt * 2.8);
 
           const seaBlend = Math.min(2, Math.max(0, (controls.target.y - 1.8) / 4.1));
           const fogColors = [new THREE.Color(0x091926), new THREE.Color(0x0b1126), new THREE.Color(0x160d2b)];
@@ -7948,7 +8008,7 @@
       const [storyWhisper, setStoryWhisper] = useState(null);
       const [curtainState, setCurtainState] = useState({
         phase: 'hidden', // 'hidden' | 'in' | 'out'
-        isMist: false,
+        mode: 'fade', // 'mist-in' | 'mist-out' | 'fade'
         icon: '',
         title: '',
         sub: '',
@@ -7963,10 +8023,12 @@
 
       const transitionToStage = useCallback((nextStage, beforeSwitch, opts = {}) => {
         clearTimeout(curtainTimerRef.current);
-        const durationMs = opts.durationMs || 420;
+        const mode = opts.mode || (opts.isMist ? 'mist-in' : 'fade');
+        const inMs = opts.inMs || 150;
+        const durationMs = opts.durationMs || 280;
         setCurtainState({
           phase: 'in',
-          isMist: Boolean(opts.isMist),
+          mode,
           icon: opts.icon || '',
           title: opts.title || '',
           sub: opts.sub || '',
@@ -7975,14 +8037,49 @@
         curtainTimerRef.current = setTimeout(() => {
           if (beforeSwitch) beforeSwitch();
           setCurrentStage(nextStage);
-          setTimeout(() => {
-            setCurtainState(prev => ({ ...prev, phase: 'out' }));
-            curtainTimerRef.current = setTimeout(() => {
-              setCurtainState(prev => ({ ...prev, phase: 'hidden' }));
-            }, durationMs + 60);
-          }, 40);
-        }, 240);
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              setCurtainState(prev => ({ ...prev, phase: 'out' }));
+              curtainTimerRef.current = setTimeout(() => {
+                setCurtainState(prev => ({ ...prev, phase: 'hidden' }));
+              }, durationMs + 60);
+            });
+          });
+        }, inMs);
       }, []);
+
+      const returnToMapFromLevel = useCallback(() => {
+        setShowWinModal(false);
+        transitionToStage('map', null, { mode: 'fade', inMs: 160, durationMs: 260 });
+      }, [transitionToStage]);
+
+      const triggerReturnToTitle = useCallback(() => {
+        clearTimeout(curtainTimerRef.current);
+        if (currentStage === 'map' && mapCtrlRef.current?.flyOutToClouds) {
+          mapCtrlRef.current.flyOutToClouds();
+        }
+        setCurtainState({
+          phase: 'prep',
+          mode: 'mist-out',
+          icon: '',
+          title: '',
+          sub: '',
+          durationMs: 340
+        });
+        curtainTimerRef.current = setTimeout(() => {
+          setCurtainState(prev => ({ ...prev, phase: 'in' }));
+          curtainTimerRef.current = setTimeout(() => {
+            mapViewSnapshotRef.current = null;
+            setCurrentStage('title');
+            setTimeout(() => {
+              setCurtainState(prev => ({ ...prev, phase: 'out' }));
+              curtainTimerRef.current = setTimeout(() => {
+                setCurtainState(prev => ({ ...prev, phase: 'hidden' }));
+              }, 380);
+            }, 40);
+          }, 720);
+        }, 24);
+      }, [currentStage]);
 
       const triggerStoryWhisper = useCallback((text, icon = '🕯️') => {
         clearTimeout(whisperTimerRef.current);
@@ -8123,7 +8220,7 @@
         const mistOpts = isFirstIntro
           ? {
               isMist: true,
-              durationMs: 1900,
+              durationMs: 2150,
               icon: '🕯️',
               title: '序章 • 光之階梯',
               sub: '星芒沉睡於黑夜，提燈旅人艾達踏上光之階梯…'
@@ -8131,7 +8228,7 @@
           : cardMode === 'free'
           ? {
               isMist: true,
-              durationMs: 850,
+              durationMs: 1150,
               icon: '⚡',
               title: '自由挑戰 • 全聖域開放',
               sub: slotData.name || `冒險者 ${slotId}`
@@ -8139,7 +8236,7 @@
           : advStars >= 17
           ? {
               isMist: true,
-              durationMs: 850,
+              durationMs: 1150,
               icon: '👑',
               title: '第三聖域 • 幻夜尖塔',
               sub: slotData.name || `冒險者 ${slotId}`
@@ -8147,14 +8244,14 @@
           : advStars >= 8
           ? {
               isMist: true,
-              durationMs: 850,
+              durationMs: 1150,
               icon: '💠',
               title: '第二聖域 • 星象迴廊',
               sub: slotData.name || `冒險者 ${slotId}`
             }
           : {
               isMist: true,
-              durationMs: 850,
+              durationMs: 1150,
               icon: '🏛️',
               title: '第一聖域 • 月光花園',
               sub: slotData.name || `冒險者 ${slotId}`
@@ -8326,7 +8423,7 @@
             {currentStage === 'playing' ? (
               <>
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <button onClick={() => { audio.sfxClick(); setCurrentStage('map'); }} className="btn-3d-blue text-white px-2.5 py-1.5 rounded-xl font-black text-xs flex items-center gap-1 shadow shrink-0">
+                  <button onClick={() => { audio.sfxClick(); returnToMapFromLevel(); }} className="btn-3d-blue text-white px-2.5 py-1.5 rounded-xl font-black text-xs flex items-center gap-1 shadow shrink-0">
                     <span>🗺️</span> 地圖
                   </button>
                   <div className="min-w-0 flex-1">
@@ -8392,9 +8489,7 @@
                   <button
                     onClick={() => {
                       audio.sfxClick();
-                      transitionToStage('title', () => {
-                        mapViewSnapshotRef.current = null;
-                      });
+                      triggerReturnToTitle();
                     }}
                     className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 border-2 border-slate-300 flex items-center justify-center text-sm shadow-sm active:scale-95 transition-all"
                     title="返回主畫面 / 切換存檔"
@@ -8724,23 +8819,23 @@
                 {(() => {
                   const activeStarsMap = gameMode === 'adventure' ? userProgress.stars : (userProgress.freeStars || {});
                   return selectedLevel === 1 ? (
-                    <Level1EdgeMaster currentStars={activeStarsMap[1] || 0} onUpdateStars={(c, s) => handleUpdateStars(1, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={() => setCurrentStage('map')} />
+                    <Level1EdgeMaster currentStars={activeStarsMap[1] || 0} onUpdateStars={(c, s) => handleUpdateStars(1, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 2 ? (
-                    <Level2RatioMaster currentStars={activeStarsMap[2] || 0} onUpdateStars={(c, s) => handleUpdateStars(2, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={() => setCurrentStage('map')} />
+                    <Level2RatioMaster currentStars={activeStarsMap[2] || 0} onUpdateStars={(c, s) => handleUpdateStars(2, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 3 ? (
-                    <Level3MissingSideMaster currentStars={activeStarsMap[3] || 0} onUpdateStars={(c, s) => handleUpdateStars(3, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={() => setCurrentStage('map')} />
+                    <Level3MissingSideMaster currentStars={activeStarsMap[3] || 0} onUpdateStars={(c, s) => handleUpdateStars(3, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 4 ? (
-                    <Level4SpecialAnglesMaster currentStars={activeStarsMap[4] || 0} onUpdateStars={(c, s) => handleUpdateStars(4, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={() => setCurrentStage('map')} />
+                    <Level4SpecialAnglesMaster currentStars={activeStarsMap[4] || 0} onUpdateStars={(c, s) => handleUpdateStars(4, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 6 ? (
-                    <Level5AngleSteeringMaster currentStars={activeStarsMap[6] || 0} onUpdateStars={(c, s) => handleUpdateStars(6, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={() => setCurrentStage('map')} />
+                    <Level5AngleSteeringMaster currentStars={activeStarsMap[6] || 0} onUpdateStars={(c, s) => handleUpdateStars(6, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 7 ? (
-                    <LevelCoterminalPopMaster currentStars={activeStarsMap[7] || 0} onUpdateStars={(c, s) => handleUpdateStars(7, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={() => setCurrentStage('map')} />
+                    <LevelCoterminalPopMaster currentStars={activeStarsMap[7] || 0} onUpdateStars={(c, s) => handleUpdateStars(7, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 8 ? (
-                    <Level6VectorCompassMaster currentStars={activeStarsMap[8] || 0} onUpdateStars={(c, s) => handleUpdateStars(8, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={() => setCurrentStage('map')} />
+                    <Level6VectorCompassMaster currentStars={activeStarsMap[8] || 0} onUpdateStars={(c, s) => handleUpdateStars(8, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 9 ? (
-                    <Level7AstroCompassMaster currentStars={activeStarsMap[9] || 0} onUpdateStars={(c, s) => handleUpdateStars(9, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={() => setCurrentStage('map')} />
+                    <Level7AstroCompassMaster currentStars={activeStarsMap[9] || 0} onUpdateStars={(c, s) => handleUpdateStars(9, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 10 ? (
-                    <Level8QuadrantSignMaster currentStars={activeStarsMap[10] || 0} onUpdateStars={(c, s) => handleUpdateStars(10, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={() => setCurrentStage('map')} />
+                    <Level8QuadrantSignMaster currentStars={activeStarsMap[10] || 0} onUpdateStars={(c, s) => handleUpdateStars(10, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : (
                     <LevelLightingCardGame
                       levelData={LEVELS.find(l => l.id === selectedLevel)}
@@ -8748,7 +8843,7 @@
                       currentStars={activeStarsMap[selectedLevel] || 0}
                       onUpdateStars={(c, s) => handleUpdateStars(selectedLevel, c, s)}
                       onCompleteLevel={handleCompleteLevel}
-                      onBackToMap={() => setCurrentStage('map')}
+                      onBackToMap={returnToMapFromLevel}
                     />
                   );
                 })()}
@@ -9117,9 +9212,7 @@
                       onClick={() => {
                         audio.sfxClick();
                         setShowSettingsModal(false);
-                        transitionToStage('title', () => {
-                          mapViewSnapshotRef.current = null;
-                        });
+                        triggerReturnToTitle();
                       }}
                       className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 border-b-4 border-slate-300 text-slate-700 font-black text-sm rounded-xl active:translate-y-0.5 transition-all"
                     >
@@ -9146,76 +9239,123 @@
                 <div className="bg-white/95 rounded-2xl p-2.5 border-2 border-amber-600 text-xs font-black text-amber-950 shadow-inner">
                   {earnedStars === 3 ? '🏆 完美三星通關！制霸此台座！' : earnedStars === 2 ? '🌟 獲得 2 顆星！試煉順利！' : '🎉 獲得 1 顆星！繼續向下一座神殿前行！'}
                 </div>
-                <button onClick={() => { setShowWinModal(false); setCurrentStage('map'); }} className="w-full py-2.5 btn-3d-green text-white font-black text-sm rounded-2xl shadow-lg">返回聖域繼續冒險</button>
+                <button onClick={() => { audio.sfxClick(); returnToMapFromLevel(); }} className="w-full py-2.5 btn-3d-green text-white font-black text-sm rounded-2xl shadow-lg">返回聖域繼續冒險</button>
               </div>
             </div>
           )}
 
-          {/* 主畫面 ↔ 地圖 雲霧漸散與故事轉場 */}
+          {/* 主畫面 ↔ 地圖 滑翔穿雲（細緻 2D 碎形雲絮＋輪廓漸清）/ 關卡輕轉場 */}
           {curtainState.phase !== 'hidden' && (() => {
-            const isOut = curtainState.phase === 'out';
-            const durStyle = { transitionDuration: isOut ? `${curtainState.durationMs}ms` : '220ms' };
+            const { phase, mode, durationMs } = curtainState;
+            const isOut = phase === 'out';
+            const isPrep = phase === 'prep';
+            const isMistIn = mode === 'mist-in';
+            const isMistOut = mode === 'mist-out';
+
+            const bgDurStyle = isMistOut
+              ? { transitionDuration: isOut ? '320ms' : '560ms' }
+              : isMistIn
+              ? { transitionDuration: isOut ? `${Math.round(durationMs * 0.72)}ms` : '200ms' }
+              : { transitionDuration: isOut ? `${durationMs}ms` : '160ms' };
+            const cloudDurStyle = isMistOut
+              ? { transitionDuration: isOut ? '320ms' : '640ms' }
+              : { transitionDuration: isOut ? `${durationMs}ms` : '220ms' };
+            const textDurStyle = { transitionDuration: isOut ? `${durationMs}ms` : '220ms' };
+
+            const bgOpacityClass = isMistOut
+              ? (isPrep || isOut ? 'opacity-0' : 'opacity-100')
+              : (isOut ? 'opacity-0' : 'opacity-100');
+
             return (
               <div
-                style={durStyle}
-                className={`fixed inset-0 z-[100] overflow-hidden flex items-center justify-center transition-opacity ease-out ${
-                  isOut ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
+                className={`fixed inset-0 z-[100] overflow-hidden flex items-center justify-center ${
+                  isOut ? 'pointer-events-none' : 'pointer-events-auto'
                 }`}
               >
-                {/* 底層深藍夜霧 */}
-                <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-950" />
+                {/* 底層夜空薄霧（mist-in 較早變透明，讓模糊聖域輪廓從雲霧後透出） */}
+                <div
+                  style={bgDurStyle}
+                  className={`absolute inset-0 bg-gradient-to-b from-slate-950/90 via-indigo-950/85 to-slate-950/90 transition-opacity ease-out ${bgOpacityClass}`}
+                />
 
-                {/* 左右雙層撥開雲霧（僅進地圖時展開） */}
-                {curtainState.isMist && (
+                {/* 細緻 2D SVG 碎形雲絮層（mist-in 輕柔飄散；mist-out 柔和聚攏） */}
+                {(isMistIn || isMistOut) && (
                   <>
-                    <div
-                      style={{
-                        ...durStyle,
-                        background: 'radial-gradient(circle at 60% 50%, rgba(186,230,253,0.28) 0%, rgba(99,102,241,0.22) 45%, rgba(15,23,42,0) 75%)'
-                      }}
-                      className={`absolute -left-1/4 -top-10 w-[90%] h-[115%] blur-2xl transition-transform ease-out ${
-                        isOut ? '-translate-x-1/2 scale-125' : 'translate-x-0 scale-100'
+                    {/* 遠景與中景捲雲（SVG turbulence 碎形雲緣） */}
+                    <svg
+                      viewBox="0 0 400 700"
+                      preserveAspectRatio="xMidYMid slice"
+                      style={{ ...cloudDurStyle, willChange: 'transform, opacity' }}
+                      className={`absolute inset-0 w-full h-full transition-all ease-out ${
+                        isMistIn
+                          ? (isOut ? 'scale-[1.45] opacity-0' : 'scale-100 opacity-95')
+                          : (isPrep ? 'scale-[1.4] opacity-0' : isOut ? 'scale-100 opacity-0' : 'scale-100 opacity-95')
                       }`}
-                    />
-                    <div
-                      style={{
-                        ...durStyle,
-                        background: 'radial-gradient(circle at 40% 50%, rgba(224,231,255,0.26) 0%, rgba(56,189,248,0.2) 45%, rgba(15,23,42,0) 75%)'
-                      }}
-                      className={`absolute -right-1/4 -bottom-10 w-[90%] h-[115%] blur-2xl transition-transform ease-out ${
-                        isOut ? 'translate-x-1/2 scale-125' : 'translate-x-0 scale-100'
+                    >
+                      <defs>
+                        <filter id="cirrusMist" x="-25%" y="-25%" width="150%" height="150%">
+                          <feTurbulence type="fractalNoise" baseFrequency="0.018 0.028" numOctaves="2" seed="7" result="noise" />
+                          <feDisplacementMap in="SourceGraphic" in2="noise" scale="52" xChannelSelector="R" yChannelSelector="G" result="wispy" />
+                          <feGaussianBlur in="wispy" stdDeviation="9" />
+                        </filter>
+                      </defs>
+                      <g filter="url(#cirrusMist)">
+                        <ellipse cx="90" cy="140" rx="185" ry="95" fill="rgba(224,242,254,0.58)" />
+                        <ellipse cx="320" cy="190" rx="195" ry="105" fill="rgba(199,210,254,0.54)" />
+                        <ellipse cx="200" cy="340" rx="230" ry="125" fill="rgba(240,249,255,0.62)" />
+                        <ellipse cx="75" cy="510" rx="190" ry="105" fill="rgba(186,230,253,0.52)" />
+                        <ellipse cx="315" cy="560" rx="205" ry="110" fill="rgba(224,231,255,0.56)" />
+                      </g>
+                    </svg>
+
+                    {/* 前景絲狀輕煙（略快飄散，增加層次感） */}
+                    <svg
+                      viewBox="0 0 400 700"
+                      preserveAspectRatio="xMidYMid slice"
+                      style={{ ...cloudDurStyle, willChange: 'transform, opacity' }}
+                      className={`absolute inset-0 w-full h-full transition-all ease-out ${
+                        isMistIn
+                          ? (isOut ? 'scale-[1.75] -translate-x-6 opacity-0' : 'scale-105 translate-x-0 opacity-85')
+                          : (isPrep ? 'scale-[1.65] translate-x-6 opacity-0' : isOut ? 'scale-105 opacity-0' : 'scale-105 translate-x-0 opacity-85')
                       }`}
-                    />
+                    >
+                      <defs>
+                        <filter id="fgMist" x="-25%" y="-25%" width="150%" height="150%">
+                          <feTurbulence type="fractalNoise" baseFrequency="0.025 0.04" numOctaves="2" seed="19" result="fgNoise" />
+                          <feDisplacementMap in="SourceGraphic" in2="fgNoise" scale="38" xChannelSelector="R" yChannelSelector="G" result="fgWispy" />
+                          <feGaussianBlur in="fgWispy" stdDeviation="6" />
+                        </filter>
+                      </defs>
+                      <g filter="url(#fgMist)">
+                        <ellipse cx="60" cy="250" rx="150" ry="62" fill="rgba(255,255,255,0.45)" />
+                        <ellipse cx="340" cy="420" rx="160" ry="68" fill="rgba(224,242,254,0.42)" />
+                        <ellipse cx="195" cy="630" rx="180" ry="70" fill="rgba(255,255,255,0.38)" />
+                      </g>
+                    </svg>
                   </>
                 )}
 
-                {/* 中央發光三角徽章與簡短故事文字 */}
-                <div
-                  style={durStyle}
-                  className={`relative z-10 flex flex-col items-center text-center px-6 max-w-xs transition-all ease-out ${
-                    isOut ? 'scale-105 opacity-0' : 'scale-100 opacity-100'
-                  }`}
-                >
-                  <div className="relative flex items-center justify-center mb-3">
-                    <div className="w-20 h-20 rounded-full bg-sky-400/20 blur-xl animate-pulse" />
-                    <svg viewBox="0 0 64 64" className="absolute w-12 h-12 drop-shadow-[0_0_16px_rgba(251,191,36,0.85)]">
-                      <polygon points="14,50 50,50 50,14" fill="rgba(56,189,248,0.22)" stroke="#fde047" strokeWidth="3.5" strokeLinejoin="round" />
-                      <circle cx="50" cy="14" r="3.5" fill="#fde047" />
-                    </svg>
+                {/* 進地圖時的故事字幕（懸浮於細緻雲霧與聖域之上） */}
+                {!isMistOut && (curtainState.title || curtainState.sub) && (
+                  <div
+                    style={textDurStyle}
+                    className={`relative z-10 flex flex-col items-center text-center px-6 max-w-xs transition-all ease-out ${
+                      isOut ? 'scale-105 opacity-0' : 'scale-100 opacity-100'
+                    }`}
+                  >
+                    {curtainState.title && (
+                      <div className="flex items-center gap-1.5 text-xs font-black tracking-widest text-amber-300 bg-slate-950/70 backdrop-blur-sm px-3.5 py-1 rounded-full border border-amber-400/45 mb-2 shadow-lg">
+                        <span>{curtainState.icon}</span>
+                        <span>{curtainState.title}</span>
+                      </div>
+                    )}
+                    {curtainState.sub && (
+                      <div className="text-sm sm:text-base font-bold text-white leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
+                        {curtainState.sub}
+                      </div>
+                    )}
                   </div>
-
-                  {curtainState.title && (
-                    <div className="flex items-center gap-1.5 text-xs font-black tracking-widest text-amber-300 mb-1.5">
-                      <span>{curtainState.icon}</span>
-                      <span>{curtainState.title}</span>
-                    </div>
-                  )}
-                  {curtainState.sub && (
-                    <div className="text-sm sm:text-base font-bold text-indigo-100 leading-relaxed drop-shadow">
-                      {curtainState.sub}
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
             );
           })()}
