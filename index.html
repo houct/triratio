@@ -7945,10 +7945,36 @@
       const [confirmDeleteSlot, setConfirmDeleteSlot] = useState(null);
       const [newCardModalSlot, setNewCardModalSlot] = useState(null);
       const [newCardName, setNewCardName] = useState('');
+      const [storyWhisper, setStoryWhisper] = useState(null);
+      const [stageCurtain, setStageCurtain] = useState('hidden'); // 'hidden' | 'in' | 'out'
       const [shrineTab, setShrineTab] = useState(1);
       const mapCtrlRef = useRef(null);
       const mapViewSnapshotRef = useRef(null);
       const deleteTimerRef = useRef(null);
+      const whisperTimerRef = useRef(null);
+      const curtainTimerRef = useRef(null);
+
+      const transitionToStage = useCallback((nextStage, beforeSwitch) => {
+        clearTimeout(curtainTimerRef.current);
+        setStageCurtain('in');
+        curtainTimerRef.current = setTimeout(() => {
+          if (beforeSwitch) beforeSwitch();
+          setCurrentStage(nextStage);
+          setStageCurtain('out');
+          curtainTimerRef.current = setTimeout(() => {
+            setStageCurtain('hidden');
+          }, 340);
+        }, 220);
+      }, []);
+
+      const triggerStoryWhisper = useCallback((text, icon = '🕯️') => {
+        clearTimeout(whisperTimerRef.current);
+        const id = Date.now();
+        setStoryWhisper({ text, icon, id });
+        whisperTimerRef.current = setTimeout(() => {
+          setStoryWhisper(prev => prev?.id === id ? null : prev);
+        }, 3800);
+      }, []);
 
       const updateAudioPrefs = useCallback((patch) => {
         audio.init();
@@ -7972,7 +7998,34 @@
 
       useEffect(() => {
         audio.setBgmScene(currentStage === 'playing' ? 'playing' : 'map');
+        if (currentStage !== 'map') {
+          setStoryWhisper(null);
+        }
       }, [currentStage]);
+
+      useEffect(() => {
+        if (currentStage !== 'map') return;
+        const flags = userProgress.seenStoryFlags || {};
+        if (!flags.intro) {
+          triggerStoryWhisper('提燈旅人艾達踏上光之階梯，重燃散落的三角星芒…', '🕯️');
+          setUserProgress(prev => ({
+            ...prev,
+            seenStoryFlags: { ...(prev.seenStoryFlags || {}), intro: true }
+          }));
+        } else if (gameMode === 'adventure' && adventureTotalStars >= 17 && !flags.sea3) {
+          triggerStoryWhisper('幻夜星軌共鳴——攀向雲端之上，喚醒最終的聖域王座', '👑');
+          setUserProgress(prev => ({
+            ...prev,
+            seenStoryFlags: { ...(prev.seenStoryFlags || {}), sea3: true }
+          }));
+        } else if (gameMode === 'adventure' && adventureTotalStars >= 8 && !flags.sea2) {
+          triggerStoryWhisper('星門開啟——從靜止直角，踏入旋轉不息的星象迴廊', '💠');
+          setUserProgress(prev => ({
+            ...prev,
+            seenStoryFlags: { ...(prev.seenStoryFlags || {}), sea2: true }
+          }));
+        }
+      }, [currentStage, gameMode, adventureTotalStars, userProgress.seenStoryFlags, setUserProgress, triggerStoryWhisper]);
 
       useEffect(() => {
         audio.setModalDucking(
@@ -8012,7 +8065,7 @@
         if (adventureTotalStars < reqStars) {
           return {
             unlocked: false,
-            reason: `需累積 ${reqStars}⭐ 解鎖（目前 ${adventureTotalStars}⭐，差 ${reqStars - adventureTotalStars}⭐）`
+            reason: `需 ${reqStars}⭐ 解鎖（尚差 ${reqStars - adventureTotalStars}⭐）`
           };
         }
         return { unlocked: true, reason: '' };
@@ -8049,15 +8102,16 @@
           return;
         }
         audio.sfxBonus();
-        setSaveStore(prev => ({
-          ...prev,
-          activeSlot: slotId
-        }));
-        mapViewSnapshotRef.current = null;
         setEditingSlotId(null);
         setConfirmDeleteSlot(null);
-        setCurrentStage('map');
-      }, [saveStore.slots]);
+        transitionToStage('map', () => {
+          setSaveStore(prev => ({
+            ...prev,
+            activeSlot: slotId
+          }));
+          mapViewSnapshotRef.current = null;
+        });
+      }, [saveStore.slots, transitionToStage]);
 
       const handleCreateNewCard = useCallback((chosenMode) => {
         if (!newCardModalSlot) return;
@@ -8065,23 +8119,24 @@
         const finalName = newCardName.trim().slice(0, 12) || `冒險者 ${slotId}`;
         audio.init();
         audio.sfxBonus();
-        setSaveStore(prev => ({
-          ...prev,
-          activeSlot: slotId,
-          slots: {
-            ...prev.slots,
-            [slotId]: {
-              ...createEmptyProgress(),
-              mode: chosenMode === 'free' ? 'free' : 'adventure',
-              name: finalName,
-              updatedAt: Date.now()
-            }
-          }
-        }));
-        mapViewSnapshotRef.current = null;
         setNewCardModalSlot(null);
-        setCurrentStage('map');
-      }, [newCardModalSlot, newCardName]);
+        transitionToStage('map', () => {
+          setSaveStore(prev => ({
+            ...prev,
+            activeSlot: slotId,
+            slots: {
+              ...prev.slots,
+              [slotId]: {
+                ...createEmptyProgress(),
+                mode: chosenMode === 'free' ? 'free' : 'adventure',
+                name: finalName,
+                updatedAt: Date.now()
+              }
+            }
+          }));
+          mapViewSnapshotRef.current = null;
+        });
+      }, [newCardModalSlot, newCardName, transitionToStage]);
 
       const handleClearSlot = useCallback((slotId) => {
         if (confirmDeleteSlot !== slotId) {
@@ -8262,8 +8317,9 @@
                   <button
                     onClick={() => {
                       audio.sfxClick();
-                      mapViewSnapshotRef.current = null;
-                      setCurrentStage('title');
+                      transitionToStage('title', () => {
+                        mapViewSnapshotRef.current = null;
+                      });
                     }}
                     className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 border-2 border-slate-300 flex items-center justify-center text-sm shadow-sm active:scale-95 transition-all"
                     title="返回主畫面 / 切換存檔"
@@ -8290,9 +8346,19 @@
 
           <main className={`w-full flex-1 min-h-0 flex flex-col overflow-hidden relative ${currentStage === 'playing' ? 'px-2.5 py-1.5' : 'my-0 sm:my-2'}`}>
             {lockedNotice && (
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 text-amber-300 border-2 border-amber-400 px-4 py-2 rounded-2xl shadow-2xl text-xs font-black flex items-center gap-2 animate-jelly whitespace-nowrap pointer-events-none">
-                <span>✦</span><span>{lockedNotice}</span>
+              <div className="absolute top-3 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:max-w-[360px] z-50 bg-slate-950/95 text-amber-300 border-2 border-amber-400 px-3.5 py-2 rounded-2xl shadow-2xl text-xs font-black flex items-center justify-center text-center gap-1.5 leading-snug animate-jelly pointer-events-none">
+                <span className="shrink-0">✦</span><span>{lockedNotice}</span>
               </div>
+            )}
+            {storyWhisper && currentStage === 'map' && (
+              <button
+                key={storyWhisper.id}
+                onClick={() => setStoryWhisper(null)}
+                className="absolute top-3 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:max-w-[360px] z-40 bg-slate-950/85 backdrop-blur-md text-amber-100 border border-amber-400/55 px-3.5 py-2 rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.5)] text-[11px] font-bold flex items-center justify-center gap-2 animate-jelly"
+              >
+                <span className="text-sm shrink-0">{storyWhisper.icon}</span>
+                <span className="leading-snug text-left">{storyWhisper.text}</span>
+              </button>
             )}
 
             {currentStage === 'title' ? (
@@ -8975,9 +9041,10 @@
                     <button
                       onClick={() => {
                         audio.sfxClick();
-                        mapViewSnapshotRef.current = null;
                         setShowSettingsModal(false);
-                        setCurrentStage('title');
+                        transitionToStage('title', () => {
+                          mapViewSnapshotRef.current = null;
+                        });
                       }}
                       className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 border-b-4 border-slate-300 text-slate-700 font-black text-sm rounded-xl active:translate-y-0.5 transition-all"
                     >
@@ -9005,6 +9072,25 @@
                   {earnedStars === 3 ? '🏆 完美三星通關！制霸此台座！' : earnedStars === 2 ? '🌟 獲得 2 顆星！試煉順利！' : '🎉 獲得 1 顆星！繼續向下一座神殿前行！'}
                 </div>
                 <button onClick={() => { setShowWinModal(false); setCurrentStage('map'); }} className="w-full py-2.5 btn-3d-green text-white font-black text-sm rounded-2xl shadow-lg">返回聖域繼續冒險</button>
+              </div>
+            </div>
+          )}
+
+          {/* 主畫面 ↔ 地圖 星光帷幕轉場 */}
+          {stageCurtain !== 'hidden' && (
+            <div
+              className={`fixed inset-0 z-[100] bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-950 flex items-center justify-center transition-opacity ease-out ${
+                stageCurtain === 'in'
+                  ? 'opacity-100 duration-200 pointer-events-auto'
+                  : 'opacity-0 duration-300 pointer-events-none'
+              }`}
+            >
+              <div className="relative flex items-center justify-center">
+                <div className="w-24 h-24 rounded-full bg-sky-400/20 blur-xl animate-pulse" />
+                <svg viewBox="0 0 64 64" className="absolute w-14 h-14 drop-shadow-[0_0_16px_rgba(251,191,36,0.85)]">
+                  <polygon points="14,50 50,50 50,14" fill="rgba(56,189,248,0.22)" stroke="#fde047" strokeWidth="3.5" strokeLinejoin="round" />
+                  <circle cx="50" cy="14" r="3.5" fill="#fde047" />
+                </svg>
               </div>
             </div>
           )}
