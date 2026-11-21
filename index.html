@@ -119,6 +119,16 @@
       animation: jellyPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
     }
 
+    @keyframes arcSweep {
+      from { stroke-dashoffset: 600; }
+      to { stroke-dashoffset: 0; }
+    }
+    .animate-arc-sweep {
+      stroke-dasharray: 600;
+      stroke-dashoffset: 600;
+      animation: arcSweep 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
     /* 答錯晃動 */
     @keyframes shakeWrong {
       0%, 100% { transform: translateX(0); }
@@ -238,13 +248,38 @@
       </svg>
     );
 
-    // ==================== 即時教學糾錯提示浮層（不推擠畫布高度） ====================
+    // ==================== 即時教學糾錯與答對印證提示浮層（不推擠畫布高度） ====================
     const HintBanner = ({ tip }) => {
       if (!tip) return null;
+      const isSuccess = tip.tone === 'success';
       return (
-        <div key={tip.id} className="absolute bottom-2 left-2 right-2 z-20 bg-amber-50/95 backdrop-blur-sm border-2 border-amber-400 rounded-xl px-3 py-1.5 text-xs font-black text-amber-950 flex items-center gap-1.5 shadow-md animate-jelly pointer-events-none">
-          <span>💡</span>
-          <span>{tip.text}</span>
+        <div
+          key={tip.id}
+          className={`absolute bottom-2 left-2 right-2 z-20 backdrop-blur-sm border-2 rounded-xl px-3 py-1.5 text-xs font-black flex items-center justify-between gap-2 shadow-md animate-jelly pointer-events-none ${
+            isSuccess
+              ? 'bg-emerald-50/95 border-emerald-400 text-emerald-950'
+              : 'bg-amber-50/95 border-amber-400 text-amber-950'
+          }`}
+        >
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="shrink-0">{isSuccess ? '✓' : '💡'}</span>
+            <span className="truncate flex items-center gap-1">{tip.node || tip.text}</span>
+          </div>
+          {isSuccess && tip.canSkip && (
+            <span className="text-[10px] font-bold text-emerald-700/80 shrink-0 whitespace-nowrap">輕點繼續 ▸</span>
+          )}
+        </div>
+      );
+    };
+
+    // ==================== 統一 24px 頂部階段說明細條（呼應 HUD 綠/藍/金三階段） ====================
+    const StagePhaseStrip = ({ phase = 0, labels = [] }) => {
+      const safePhase = Math.min(Math.max(0, phase), Math.max(0, labels.length - 1));
+      const dotCls = safePhase === 0 ? 'bg-emerald-400' : safePhase === 1 ? 'bg-sky-400' : 'bg-amber-400';
+      return (
+        <div className="bg-slate-900/90 border-b border-white/10 h-6 px-3.5 flex items-center gap-1.5 text-[11px] font-bold text-slate-200 shrink-0">
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotCls}`} />
+          <span className="truncate">{labels[safePhase] || ''}</span>
         </div>
       );
     };
@@ -1355,7 +1390,7 @@
       { id: 6, title: "知一求一聖殿", subtitle: "畢氏三元數三角比推導", island: "凱旋高台", sea: 1, icon: "📐", color: "from-emerald-500 to-teal-700", borderColor: "border-teal-900" },
       { id: 7, title: "廣義角舵手", subtitle: "有向角與 15° 放射雷達定向", island: "旋風群礁", sea: 2, icon: "🧭", color: "from-sky-400 to-indigo-600", borderColor: "border-indigo-800" },
       { id: 8, title: "同界角星爆", subtitle: "同界角星光泡泡攔截", island: "星雲高台", sea: 2, icon: "🫧", color: "from-fuchsia-500 to-indigo-700", borderColor: "border-indigo-900" },
-      { id: 9, title: "四象限領航員", subtitle: "廣義角象限空間滑卡（設計中）", island: "星圖分流站", sea: 2, icon: "🗺️", color: "from-slate-500 to-slate-700", borderColor: "border-slate-800", isPlaceholder: true },
+      { id: 9, title: "四象限領航員", subtitle: "廣義角象限與軸上角空間滑卡", island: "星圖分流站", sea: 2, icon: "🗺️", color: "from-teal-500 to-indigo-700", borderColor: "border-indigo-900" },
       { id: 10, title: "動徑星標", subtitle: "(x, y, r) 廣義角坐標定義", island: "星象群礁", sea: 2, icon: "🎯", color: "from-cyan-400 to-blue-600", borderColor: "border-blue-800" },
       { id: 11, title: "正負傳送帶", subtitle: "三角比正負與無意義分流", island: "四象限祭壇", sea: 2, icon: "⚡", color: "from-rose-500 to-indigo-700", borderColor: "border-indigo-900" },
       { id: 12, title: "星象羅盤師", subtitle: "廣義特殊角旋轉推導", island: "星軌聖壇", sea: 2, icon: "🔭", color: "from-violet-500 to-indigo-700", borderColor: "border-indigo-900" },
@@ -2757,6 +2792,17 @@
       const containerRef = useRef(null);
       const prevTypeRef = useRef('');
       const questionMissedRef = useRef(false);
+      const confirmTimerRef = useRef(null);
+      const pendingNextRef = useRef(null);
+      const handleConfirmSkip = () => {
+        if (!pendingNextRef.current) return;
+        clearTimeout(confirmTimerRef.current);
+        const fn = pendingNextRef.current;
+        pendingNextRef.current = null;
+        audio.sfxClick();
+        fn();
+      };
+      useEffect(() => () => clearTimeout(confirmTimerRef.current), []);
 
       const dismissGuide = useCallback(() => {
         setShowGuide(false);
@@ -2892,6 +2938,7 @@
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${correctEdgeId ? 'ring-4 ring-emerald-400/75' : ''}`}>
+                <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['底角定位 • 辨識三邊', '雙角切換 • 對邊鄰邊互換', '全向旋轉 • 視覺脫離慣性']} />
                 <div data-coach="lv1-prompt" className="bg-gradient-to-r from-emerald-500 to-green-600 py-2.5 px-3 flex items-center justify-center gap-2 text-white text-center shrink-0 border-b-2 border-emerald-700">
                   <span className="text-base sm:text-lg font-black tracking-wide drop-shadow">{question.questionText}</span>
                   <SuccessBadge show={Boolean(correctEdgeId)} />
@@ -3008,6 +3055,17 @@
       const prevKeyRef = useRef('');
       const usedKeysRef = useRef(new Set());
       const questionMissedRef = useRef(false);
+      const confirmTimerRef = useRef(null);
+      const pendingNextRef = useRef(null);
+      const handleConfirmSkip = () => {
+        if (!pendingNextRef.current) return;
+        clearTimeout(confirmTimerRef.current);
+        const fn = pendingNextRef.current;
+        pendingNextRef.current = null;
+        audio.sfxClick();
+        fn();
+      };
+      useEffect(() => () => clearTimeout(confirmTimerRef.current), []);
 
       const dismissGuide = useCallback(() => {
         setShowGuide(false);
@@ -3122,6 +3180,7 @@
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${solvedFunc ? 'ring-4 ring-emerald-400/75' : ''}`}>
+                <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['基礎畢氏對 • 固定底角逆推', '進階畢氏對 • 頂角底角切換', '全角度旋轉 • 自由逆向破譯']} />
                 <div data-coach="lv2-clue" className="bg-slate-800 py-2 px-3 flex items-center justify-center gap-2.5 text-white border-b-2 border-slate-700 shrink-0">
                   <div className="flex items-center gap-1.5 font-serif font-black text-lg">
                     <span className={`min-w-[44px] px-2.5 py-0.5 rounded-xl border-2 text-center transition-all ${
@@ -3260,6 +3319,17 @@
       const containerRef = useRef(null);
       const prevKeyRef = useRef('');
       const questionMissedRef = useRef(false);
+      const confirmTimerRef = useRef(null);
+      const pendingNextRef = useRef(null);
+      const handleConfirmSkip = () => {
+        if (!pendingNextRef.current) return;
+        clearTimeout(confirmTimerRef.current);
+        const fn = pendingNextRef.current;
+        pendingNextRef.current = null;
+        audio.sfxClick();
+        fn();
+      };
+      useEffect(() => () => clearTimeout(confirmTimerRef.current), []);
 
       const dismissGuide = useCallback(() => {
         setShowGuide(false);
@@ -3317,13 +3387,31 @@
           audio.sfxBonus();
           if (showGuide) dismissGuide();
           setSolvedVal(opt);
-          setConceptTip(null);
           setFeedbackAnim('animate-correct');
-          const { completed, nextProgress } = recordCorrect({ wasMissed: questionMissedRef.current, delayEndMs: 480 });
+          const confirmDur = 1100;
+          const { completed, nextProgress } = recordCorrect({ wasMissed: questionMissedRef.current, delayEndMs: confirmDur });
+          setConceptTip({
+            node: (
+              <span className="inline-flex items-center gap-1.5 font-serif font-black">
+                <span>{question.targetFunc}({question.angleName}) =</span>
+                <FracText value={`${question.clueNum}/${question.clueDen}`} size="sm" barClass="bg-emerald-900" />
+                <span>➔ ? = {opt}</span>
+              </span>
+            ),
+            tone: 'success',
+            canSkip: !completed,
+            id: Date.now()
+          });
           if (!completed) {
-            setTimeout(() => { setFeedbackAnim(''); nextQuestion(nextProgress); }, 480);
+            const advanceFn = () => {
+              pendingNextRef.current = null;
+              setFeedbackAnim('');
+              nextQuestion(nextProgress);
+            };
+            pendingNextRef.current = advanceFn;
+            confirmTimerRef.current = setTimeout(advanceFn, confirmDur);
           } else {
-            setTimeout(() => setFeedbackAnim(''), 480);
+            setTimeout(() => setFeedbackAnim(''), confirmDur);
           }
         } else {
           audio.sfxError();
@@ -3372,6 +3460,7 @@
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${solvedVal ? 'ring-4 ring-emerald-400/75' : ''}`}>
+                <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['3-4-5 比例狙擊 • 固定底角', '多組畢氏對 • 雙角比例切換', '全向旋轉 • 綜合未知邊狙擊']} />
                 <div data-coach="lv3-clue" className="bg-gradient-to-r from-indigo-600 to-blue-700 py-2 px-3.5 flex items-center justify-between gap-2 text-white border-b-2 border-indigo-800 shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-black bg-white/15 px-2 py-0.5 rounded-lg">線索</span>
@@ -3392,7 +3481,7 @@
                   </div>
                 </div>
 
-                <div className="relative w-full flex-1 min-h-0 bg-white flex items-center justify-center overflow-hidden">
+                <div onClick={handleConfirmSkip} className="relative w-full flex-1 min-h-0 bg-white flex items-center justify-center overflow-hidden">
                   <HintBanner tip={conceptTip} />
                   <svg viewBox="0 0 500 500" className="w-full h-full object-contain drop-shadow-md">
                     <TriangleBlueprintBg id="triGridLv3" />
@@ -3653,6 +3742,17 @@
       const valBagRef = useRef([]);
       const lastValRef = useRef(null);
       const stepMissedRef = useRef(false);
+      const confirmTimerRef = useRef(null);
+      const pendingNextRef = useRef(null);
+      const handleConfirmSkip = () => {
+        if (!pendingNextRef.current) return;
+        clearTimeout(confirmTimerRef.current);
+        const fn = pendingNextRef.current;
+        pendingNextRef.current = null;
+        audio.sfxClick();
+        fn();
+      };
+      useEffect(() => () => clearTimeout(confirmTimerRef.current), []);
 
       const dismissGuide = useCallback(() => {
         setShowGuide(false);
@@ -3748,13 +3848,20 @@
           setSolvedKeys([pairKey]);
           audio.sfxBonus();
           setIsSolved(true);
-          setConceptTip(null);
           setFeedbackAnim('animate-correct');
-          const { completed, nextProgress } = recordCorrect({ wasMissed, delayEndMs: 520 });
+          setConceptTip(null);
+          const confirmDur = question.phase >= 1 ? 1350 : 550;
+          const { completed, nextProgress } = recordCorrect({ wasMissed, delayEndMs: confirmDur });
           if (!completed) {
-            setTimeout(() => { setFeedbackAnim(''); nextQuestion(nextProgress); }, 520);
+            const advanceFn = () => {
+              pendingNextRef.current = null;
+              setFeedbackAnim('');
+              nextQuestion(nextProgress);
+            };
+            pendingNextRef.current = advanceFn;
+            confirmTimerRef.current = setTimeout(advanceFn, confirmDur);
           } else {
-            setTimeout(() => setFeedbackAnim(''), 520);
+            setTimeout(() => setFeedbackAnim(''), confirmDur);
           }
         } else {
           audio.sfxError();
@@ -3813,6 +3920,7 @@
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-amber-900 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${isSolved ? 'ring-4 ring-emerald-400/75' : ''}`}>
+                <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['階段一：邊長實景（附比例數字）', '階段二：輪廓心算（隱藏邊長數字）', '階段三：盲鎖熟記（隱藏三角形）']} />
                 <div data-coach="lv4-eq" className="bg-gradient-to-r from-amber-500 to-yellow-600 h-[48px] px-3.5 flex items-center justify-between gap-2 text-amber-950 border-b-2 border-amber-700 shrink-0">
                   <span className="text-xs font-black bg-white/45 px-2.5 py-1 rounded-lg">
                     {phase === 0 ? '邊長實景' : phase === 1 ? '輪廓心算' : '盲鎖熟記'}
@@ -3830,7 +3938,7 @@
                   </div>
                 </div>
 
-                <div className="relative w-full flex-1 min-h-0 bg-gradient-to-b from-amber-50/40 to-white flex items-center justify-center overflow-hidden">
+                <div onClick={handleConfirmSkip} className="relative w-full flex-1 min-h-0 bg-gradient-to-b from-amber-50/40 to-white flex items-center justify-center overflow-hidden">
                   <HintBanner tip={conceptTip} />
                   {showDiagram ? (
                     <>
@@ -4250,6 +4358,7 @@
               />
 
               <div className="flex-1 min-h-0 bg-white rounded-3xl border-3 border-sky-950 shadow-xl flex flex-col overflow-hidden">
+                <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['基本三大關係（餘角・平方・商數）', '等式移項變形速配', '綜合三角恆等式化簡']} />
                 <div className="bg-slate-800 h-[46px] px-3 flex justify-center items-center gap-2 text-sm sm:text-base font-serif text-white border-b-2 border-slate-700 shrink-0">
                   <div className={`px-3 h-[30px] inline-flex items-center justify-center rounded-lg border-b-2 font-black truncate max-w-[44%] ${selLeft ? 'text-sky-300 border-sky-400 bg-slate-700' : 'text-slate-400 border-dashed border-slate-600 bg-slate-900/70 text-xs min-w-[48px]'}`}>
                     {selLeft ? selLeft.label : '?'}
@@ -4479,6 +4588,17 @@
       const containerRef = useRef(null);
       const prevKeyRef = useRef('');
       const questionMissedRef = useRef(false);
+      const confirmTimerRef = useRef(null);
+      const pendingNextRef = useRef(null);
+      const handleConfirmSkip = () => {
+        if (!pendingNextRef.current) return;
+        clearTimeout(confirmTimerRef.current);
+        const fn = pendingNextRef.current;
+        pendingNextRef.current = null;
+        audio.sfxClick();
+        fn();
+      };
+      useEffect(() => () => clearTimeout(confirmTimerRef.current), []);
 
       const dismissGuide = useCallback(() => {
         setShowGuide(false);
@@ -4535,13 +4655,29 @@
           audio.sfxBonus();
           if (showGuide) dismissGuide();
           setSolvedOpt(opt);
-          setConceptTip(null);
           setFeedbackAnim('animate-correct');
-          const { completed, nextProgress } = recordCorrect({ wasMissed: questionMissedRef.current, delayEndMs: 520 });
-          if (!completed) {
-            setTimeout(() => { setFeedbackAnim(''); nextQuestion(nextProgress); }, 520);
+          const confirmDur = question.phase >= 1 ? 1400 : 550;
+          const { completed, nextProgress } = recordCorrect({ wasMissed: questionMissedRef.current, delayEndMs: confirmDur });
+          if (question.phase >= 1) {
+            setConceptTip({
+              node: <SqrtText text={question.conceptTip || `${question.targetFunc} θ = ${opt}`} className="font-serif font-black" />,
+              tone: 'success',
+              canSkip: !completed,
+              id: Date.now()
+            });
           } else {
-            setTimeout(() => setFeedbackAnim(''), 520);
+            setConceptTip(null);
+          }
+          if (!completed) {
+            const advanceFn = () => {
+              pendingNextRef.current = null;
+              setFeedbackAnim('');
+              nextQuestion(nextProgress);
+            };
+            pendingNextRef.current = advanceFn;
+            confirmTimerRef.current = setTimeout(advanceFn, confirmDur);
+          } else {
+            setTimeout(() => setFeedbackAnim(''), confirmDur);
           }
         } else {
           audio.sfxError();
@@ -4593,6 +4729,7 @@
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-teal-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${solvedOpt ? 'ring-4 ring-emerald-400/75' : ''}`}>
+                <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['圖形標邊引導 • 知一求一', '輪廓心算推導 • 隱藏數字', '脫圖盲算 • 綜合 sin / cos / tan']} />
                 <div data-coach="lv6-clue" className="bg-gradient-to-r from-teal-700 to-emerald-800 h-[52px] px-3.5 flex items-center justify-between gap-2 text-white border-b-2 border-teal-950 shrink-0">
                   <div className="flex items-center gap-2 font-serif font-black text-base sm:text-lg">
                     <span className="text-[11px] font-sans bg-white/20 px-2 py-0.5 rounded-lg">已知</span>
@@ -4613,7 +4750,7 @@
                   </div>
                 </div>
 
-                <div className="relative w-full flex-1 min-h-0 bg-white flex items-center justify-center overflow-hidden">
+                <div onClick={handleConfirmSkip} className="relative w-full flex-1 min-h-0 bg-white flex items-center justify-center overflow-hidden">
                   <HintBanner tip={conceptTip} />
                   {showDiagram ? (
                     <svg viewBox="0 0 500 500" className="w-full h-full object-contain drop-shadow-md">
@@ -4969,6 +5106,7 @@
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${isLockedSuccess ? 'ring-4 ring-emerald-400/75' : ''}`}>
+                <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['單圈正角定向（0°～360°）', '負角與跨圈旋轉（順時針方向）', '多圈廣義角精準操舵']} />
                 <div data-coach="lv7-target" className="bg-gradient-to-r from-sky-500 to-indigo-600 py-2 px-3.5 flex justify-between items-center text-white border-b-2 border-indigo-800 shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-sky-100 font-bold uppercase">目標角度</span>
@@ -5155,6 +5293,7 @@
       const [conceptTip, setConceptTip] = useState(null);
       const [bursts, setBursts] = useState([]);
       const [wrongFlash, setWrongFlash] = useState(false);
+      const [waveClearDiagram, setWaveClearDiagram] = useState(null);
       const [showGuide, setShowGuide] = useState(() => !hasSeenGuide && currentStars === 0);
 
       const containerRef = useRef(null);
@@ -5185,11 +5324,21 @@
       const recordWrongRef = useRef(recordWrong);
       const rafRef = useRef(null);
       const waveTimeoutRef = useRef(null);
+      const pendingWaveNextRef = useRef(null);
+      const handleWaveConfirmSkip = () => {
+        if (!pendingWaveNextRef.current) return;
+        clearTimeout(waveTimeoutRef.current);
+        const fn = pendingWaveNextRef.current;
+        pendingWaveNextRef.current = null;
+        audio.sfxClick();
+        fn();
+      };
 
       useEffect(() => { progressRef.current = progress; }, [progress]);
       useEffect(() => { recordWrongRef.current = recordWrong; }, [recordWrong]);
 
       const spawnNextWave = useCallback((curProg) => {
+        setWaveClearDiagram(null);
         const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
         const w = generateCoterminalWave(phase, baseAngleRef.current);
         baseAngleRef.current = w.baseAngle;
@@ -5316,15 +5465,27 @@
             setFeedbackAnim('animate-correct');
             bubblesRef.current = nextBubbles.map(b => b.status === 'active' ? { ...b, status: 'fade' } : b);
             setBubbles(bubblesRef.current);
-            const { completed, nextProgress } = recordCorrect({ wasMissed: waveErrorsRef.current > 0, delayEndMs: 500 });
+            const confirmDur = 1500;
+            const { completed, nextProgress } = recordCorrect({ wasMissed: waveErrorsRef.current > 0, delayEndMs: confirmDur });
+            const waveCorrects = nextBubbles.filter(b => b.isCorrect);
+            setConceptTip(null);
+            setWaveClearDiagram({
+              baseAngle,
+              canSkip: !completed,
+              items: waveCorrects.map(b => ({ angle: b.angle, delta: b.angle - baseAngle }))
+            });
             if (!completed) {
-              waveTimeoutRef.current = setTimeout(() => {
+              const advanceWaveFn = () => {
+                pendingWaveNextRef.current = null;
+                setWaveClearDiagram(null);
                 setFeedbackAnim('');
                 setWaveNum(w => w + 1);
                 spawnNextWave(nextProgress);
-              }, 500);
+              };
+              pendingWaveNextRef.current = advanceWaveFn;
+              waveTimeoutRef.current = setTimeout(advanceWaveFn, confirmDur);
             } else {
-              setTimeout(() => setFeedbackAnim(''), 500);
+              setTimeout(() => setFeedbackAnim(''), confirmDur);
             }
           } else {
             bubblesRef.current = nextBubbles;
@@ -5394,6 +5555,7 @@
               />
 
               <div className={`flex-1 min-h-0 bg-gradient-to-b from-slate-950 via-indigo-950 to-purple-950 rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${wrongFlash ? 'ring-4 ring-red-500/75' : waveCleared ? 'ring-4 ring-emerald-400/75' : ''}`}>
+                <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['標準正角同界角攔截', '單圈負角同界角轉換', '多圈大角度快速化簡']} />
                 <div data-coach="lv8-base" className="bg-slate-900/90 py-2 px-3.5 flex justify-between items-center text-white border-b-2 border-indigo-800/80 shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-black text-fuchsia-300 bg-fuchsia-500/20 border border-fuchsia-400/40 px-2 py-0.5 rounded-lg">基準角</span>
@@ -5414,7 +5576,7 @@
                   </div>
                 </div>
 
-                <div className="relative w-full flex-1 min-h-0 overflow-hidden select-none">
+                <div onClick={handleWaveConfirmSkip} className="relative w-full flex-1 min-h-0 overflow-hidden select-none">
                   {/* 夜空星塵 */}
                   {starsBg.map(s => (
                     <span
@@ -5431,6 +5593,39 @@
                   {waveCleared && (
                     <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-emerald-400/15 via-amber-300/10 to-transparent animate-pulse" />
                   )}
+
+                  {/* 清波同界角單位圓對照小圖 */}
+                  {waveClearDiagram && (() => {
+                    const bRad = (waveClearDiagram.baseAngle * Math.PI) / 180;
+                    const tx = 50 + 34 * Math.cos(bRad);
+                    const ty = 50 - 34 * Math.sin(bRad);
+                    return (
+                      <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center p-4">
+                        <div className="bg-slate-950/92 backdrop-blur-md border-2 border-emerald-400/80 rounded-3xl px-4 py-3 shadow-2xl flex items-center gap-3.5 animate-jelly max-w-[300px]">
+                          <svg viewBox="0 0 100 100" className="w-[88px] h-[88px] shrink-0">
+                            <line x1="8" y1="50" x2="92" y2="50" stroke="rgba(148,163,184,0.35)" strokeWidth="1.2" />
+                            <line x1="50" y1="8" x2="50" y2="92" stroke="rgba(148,163,184,0.35)" strokeWidth="1.2" />
+                            <circle cx="50" cy="50" r="34" fill="none" stroke="rgba(148,163,184,0.3)" strokeWidth="1.2" strokeDasharray="3 3" />
+                            <circle cx="50" cy="50" r="24" fill="none" stroke="#38bdf8" strokeWidth="2.2" strokeDasharray="118 32" strokeLinecap="round" className="animate-arc-sweep" />
+                            <circle cx="50" cy="50" r="16" fill="none" stroke="#34d399" strokeWidth="2.2" strokeDasharray="75 26" strokeLinecap="round" className="animate-arc-sweep" />
+                            <line x1="50" y1="50" x2={tx} y2={ty} stroke="#fde047" strokeWidth="3.5" strokeLinecap="round" />
+                            <circle cx={tx} cy={ty} r="4" fill="#fde047" />
+                          </svg>
+                          <div className="flex flex-col gap-1 min-w-0">
+                            <div className="text-[11px] font-black text-amber-300">共同終邊 {waveClearDiagram.baseAngle}°</div>
+                            {waveClearDiagram.items.map((it, idx) => (
+                              <div key={idx} className="text-xs font-mono font-black text-emerald-200 whitespace-nowrap">
+                                ✓ {it.angle}° <span className="text-[10px] text-sky-300">({it.delta >= 0 ? `+${it.delta}°` : `${it.delta}°`})</span>
+                              </div>
+                            ))}
+                            {waveClearDiagram.canSkip && (
+                              <div className="text-[10px] font-bold text-slate-400 pt-0.5">輕點繼續 ▸</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <HintBanner tip={conceptTip} />
 
@@ -5529,6 +5724,432 @@
     };
 
 
+    // ==================== 第 9 關題庫與組件：四象限領航員 ====================
+    const LEVEL9_PHASE0_POOL = [
+      { id: 'p0_28',  deg: 28,  std: 28,  ans: '1', tip: '28° 介於 0°～90° ➔ 第 I 象限' },
+      { id: 'p0_55',  deg: 55,  std: 55,  ans: '1', tip: '55° 介於 0°～90° ➔ 第 I 象限' },
+      { id: 'p0_78',  deg: 78,  std: 78,  ans: '1', tip: '78° 介於 0°～90° ➔ 第 I 象限' },
+      { id: 'p0_112', deg: 112, std: 112, ans: '2', tip: '112° 介於 90°～180° ➔ 第 II 象限' },
+      { id: 'p0_145', deg: 145, std: 145, ans: '2', tip: '145° 介於 90°～180° ➔ 第 II 象限' },
+      { id: 'p0_168', deg: 168, std: 168, ans: '2', tip: '168° 介於 90°～180° ➔ 第 II 象限' },
+      { id: 'p0_195', deg: 195, std: 195, ans: '3', tip: '195° 介於 180°～270° ➔ 第 III 象限' },
+      { id: 'p0_225', deg: 225, std: 225, ans: '3', tip: '225° 介於 180°～270° ➔ 第 III 象限' },
+      { id: 'p0_258', deg: 258, std: 258, ans: '3', tip: '258° 介於 180°～270° ➔ 第 III 象限' },
+      { id: 'p0_285', deg: 285, std: 285, ans: '4', tip: '285° 介於 270°～360° ➔ 第 IV 象限' },
+      { id: 'p0_315', deg: 315, std: 315, ans: '4', tip: '315° 介於 270°～360° ➔ 第 IV 象限' },
+      { id: 'p0_342', deg: 342, std: 342, ans: '4', tip: '342° 介於 270°～360° ➔ 第 IV 象限' }
+    ];
+
+    const LEVEL9_PHASE1_POOL = [
+      { id: 'p1_n32',  deg: -32,  std: 328, ans: '4', tip: '-32° + 360° = 328°（順時針旋轉 32°）➔ 第 IV 象限' },
+      { id: 'p1_n65',  deg: -65,  std: 295, ans: '4', tip: '-65° + 360° = 295°（順時針旋轉 65°）➔ 第 IV 象限' },
+      { id: 'p1_n118', deg: -118, std: 242, ans: '3', tip: '-118° + 360° = 242°（介於 180°～270°）➔ 第 III 象限' },
+      { id: 'p1_n152', deg: -152, std: 208, ans: '3', tip: '-152° + 360° = 208°（介於 180°～270°）➔ 第 III 象限' },
+      { id: 'p1_n205', deg: -205, std: 155, ans: '2', tip: '-205° + 360° = 155°（介於 90°～180°）➔ 第 II 象限' },
+      { id: 'p1_n242', deg: -242, std: 118, ans: '2', tip: '-242° + 360° = 118°（介於 90°～180°）➔ 第 II 象限' },
+      { id: 'p1_n295', deg: -295, std: 65,  ans: '1', tip: '-295° + 360° = 65°（介於 0°～90°）➔ 第 I 象限' },
+      { id: 'p1_n335', deg: -335, std: 25,  ans: '1', tip: '-335° + 360° = 25°（介於 0°～90°）➔ 第 I 象限' },
+      { id: 'p1_132',  deg: 132,  std: 132, ans: '2', tip: '132° 介於 90°～180° ➔ 第 II 象限' },
+      { id: 'p1_248',  deg: 248,  std: 248, ans: '3', tip: '248° 介於 180°～270° ➔ 第 III 象限' }
+    ];
+
+    const LEVEL9_PHASE2_POOL = [
+      { id: 'p2_405',  deg: 405,  std: 45,  ans: '1',    tip: '405° − 360° = 45° ➔ 第 I 象限' },
+      { id: 'p2_495',  deg: 495,  std: 135, ans: '2',    tip: '495° − 360° = 135° ➔ 第 II 象限' },
+      { id: 'p2_580',  deg: 580,  std: 220, ans: '3',    tip: '580° − 360° = 220° ➔ 第 III 象限' },
+      { id: 'p2_685',  deg: 685,  std: 325, ans: '4',    tip: '685° − 360° = 325° ➔ 第 IV 象限' },
+      { id: 'p2_750',  deg: 750,  std: 30,  ans: '1',    tip: '750° − 720° = 30° ➔ 第 I 象限' },
+      { id: 'p2_855',  deg: 855,  std: 135, ans: '2',    tip: '855° − 720° = 135° ➔ 第 II 象限' },
+      { id: 'p2_n400', deg: -400, std: 320, ans: '4',    tip: '-400° + 720° = 320° ➔ 第 IV 象限' },
+      { id: 'p2_n510', deg: -510, std: 210, ans: '3',    tip: '-510° + 720° = 210° ➔ 第 III 象限' },
+      { id: 'p2_n605', deg: -605, std: 115, ans: '2',    tip: '-605° + 720° = 115° ➔ 第 II 象限' },
+      { id: 'p2_180',  deg: 180,  std: 180, ans: 'axis', tip: '180° 終邊落在 x 軸負向（象限角不屬任何象限）' },
+      { id: 'p2_n90',  deg: -90,  std: 270, ans: 'axis', tip: '-90° + 360° = 270°（落在 y 軸負向，不屬任何象限）' },
+      { id: 'p2_450',  deg: 450,  std: 90,  ans: 'axis', tip: '450° − 360° = 90°（落在 y 軸正向，不屬任何象限）' },
+      { id: 'p2_720',  deg: 720,  std: 0,   ans: 'axis', tip: '720° 為兩整圈 = 0°（落在 x 軸正向，不屬任何象限）' }
+    ];
+
+    const Level9QuadrantNavigator = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap, hasSeenGuide = false, onMarkGuideSeen }) => {
+      const { isRelaxMode } = React.useContext(GameModeContext);
+      const starsThreshold = [3, 7, 12];
+      const maxLives = 4;
+      const healTarget = 4;
+      const {
+        gameState, progress, lives, healStreak, correctCount, wrongCount, elapsedSec,
+        earnedStars, baseScore, lifeBonus, accuracyBonus, speedBonus, finalScore,
+        startSession, recordCorrect, recordWrong, finishNow
+      } = useLivesLevelSession({ starThresholds: starsThreshold, maxLives, healTarget, currentStars, onUpdateStars });
+
+      const [question, setQuestion] = useState(null);
+      const [nextPreview, setNextPreview] = useState(null);
+      const [isTransitioning, setIsTransitioning] = useState(false);
+      const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+      const [isDragging, setIsDragging] = useState(false);
+      const [flyOutTarget, setFlyOutTarget] = useState(null);
+      const [feedbackAnim, setFeedbackAnim] = useState('');
+      const [wrongTargetKey, setWrongTargetKey] = useState(null);
+      const [conceptTip, setConceptTip] = useState(null);
+      const [flashRay, setFlashRay] = useState(null); // { stdDeg, ok }
+      const [showGuide, setShowGuide] = useState(() => !hasSeenGuide && currentStars === 0);
+
+      const containerRef = useRef(null);
+      const bag0Ref = useRef([]);
+      const bag1Ref = useRef([]);
+      const bag2Ref = useRef([]);
+      const lastIdRef = useRef(null);
+      const dragStartRef = useRef(null);
+      const nextPreviewRef = useRef(null);
+      const questionErrorsRef = useRef(0);
+      const confirmTimerRef = useRef(null);
+      const pendingNextRef = useRef(null);
+      const handleConfirmSkip = () => {
+        if (!pendingNextRef.current) return;
+        clearTimeout(confirmTimerRef.current);
+        const fn = pendingNextRef.current;
+        pendingNextRef.current = null;
+        audio.sfxClick();
+        fn();
+      };
+      useEffect(() => () => clearTimeout(confirmTimerRef.current), []);
+      const dismissGuide = () => {
+        setShowGuide(false);
+        if (onMarkGuideSeen) onMarkGuideSeen();
+      };
+
+      const drawFromBag = (bagRef, sourcePool) => {
+        if (bagRef.current.length === 0) {
+          let fresh = shuffle(sourcePool);
+          if (fresh.length > 1 && fresh[0].id === lastIdRef.current) {
+            const swapIdx = 1 + Math.floor(Math.random() * (fresh.length - 1));
+            [fresh[0], fresh[swapIdx]] = [fresh[swapIdx], fresh[0]];
+          }
+          bagRef.current = fresh;
+        }
+        const picked = bagRef.current.shift();
+        lastIdRef.current = picked.id;
+        return picked;
+      };
+
+      const pickQuestionForProg = (curProg) => {
+        const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
+        const pool = phase === 0 ? LEVEL9_PHASE0_POOL : phase === 1 ? LEVEL9_PHASE1_POOL : LEVEL9_PHASE2_POOL;
+        const bagRef = phase === 0 ? bag0Ref : phase === 1 ? bag1Ref : bag2Ref;
+        return { ...drawFromBag(bagRef, pool), phase };
+      };
+
+      const advanceCard = (curProg) => {
+        const curPhase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
+        const currentCard = nextPreviewRef.current && nextPreviewRef.current.phase === curPhase
+          ? nextPreviewRef.current
+          : pickQuestionForProg(curProg);
+        const upcoming = pickQuestionForProg(curProg);
+        nextPreviewRef.current = upcoming;
+        questionErrorsRef.current = 0;
+        setQuestion(currentCard);
+        setNextPreview(upcoming);
+        setDragOffset({ x: 0, y: 0 });
+        setFlyOutTarget(null);
+        setIsTransitioning(false);
+        setConceptTip(null);
+        setFlashRay(null);
+      };
+
+      const startGame = () => {
+        bag0Ref.current = []; bag1Ref.current = []; bag2Ref.current = []; lastIdRef.current = null;
+        nextPreviewRef.current = null;
+        setFeedbackAnim('');
+        setWrongTargetKey(null); setConceptTip(null); setFlashRay(null);
+        setDragOffset({ x: 0, y: 0 }); setFlyOutTarget(null);
+        setIsTransitioning(false);
+        startSession();
+        advanceCard(0);
+        audio.init();
+      };
+
+      useEffect(() => { startGame(); }, []);
+
+      const getFlyVector = (choice) => {
+        if (choice === '1') return { x: 180, y: -150 };
+        if (choice === '2') return { x: -180, y: -150 };
+        if (choice === '3') return { x: -180, y: 150 };
+        if (choice === '4') return { x: 180, y: 150 };
+        return { x: 0, y: 200 };
+      };
+
+      const submitSort = (choice) => {
+        if (gameState !== 'playing' || !question || isTransitioning || (!isRelaxMode && lives <= 0)) return;
+        if (choice === question.ans) {
+          if (showGuide) dismissGuide();
+          setIsTransitioning(true);
+          setFlashRay({ stdDeg: question.std, deg: question.deg, ok: true });
+          const errs = questionErrorsRef.current;
+          audio.sfxSwipeSort(false, 0);
+          setFlyOutTarget(getFlyVector(choice));
+          setFeedbackAnim('animate-correct');
+          const confirmDur = question.phase >= 1 ? 1500 : 800;
+          const { completed, nextProgress } = recordCorrect({ wasMissed: errs > 0, delayEndMs: confirmDur });
+          if (question.phase >= 1 && question.tip) {
+            const shortEq = question.tip.split('（')[0].replace(/➔.*$/, '').trim();
+            setConceptTip({
+              text: shortEq || question.tip,
+              tone: 'success',
+              canSkip: !completed,
+              id: Date.now()
+            });
+          } else {
+            setConceptTip(null);
+          }
+          const advanceFn = () => {
+            pendingNextRef.current = null;
+            setFeedbackAnim('');
+            if (!completed) advanceCard(nextProgress);
+          };
+          pendingNextRef.current = advanceFn;
+          confirmTimerRef.current = setTimeout(advanceFn, confirmDur);
+        } else {
+          audio.sfxError();
+          questionErrorsRef.current += 1;
+          setFlashRay({ stdDeg: question.std, ok: false });
+          const { gameOver } = recordWrong({ delayEndMs: 360 });
+          setWrongTargetKey(choice);
+          setDragOffset({ x: 0, y: 0 });
+          if (question?.tip) setConceptTip({ text: question.tip, id: Date.now() });
+          setFeedbackAnim('animate-shake');
+          if (!gameOver) {
+            setTimeout(() => {
+              setFeedbackAnim('');
+              setWrongTargetKey(null);
+            }, 350);
+          }
+        }
+      };
+
+      const getHoverTarget = (dx, dy) => {
+        if (!question) return null;
+        if (Math.hypot(dx, dy) < 48) return null;
+        if (dx >= 0 && dy < 0) return '1';
+        if (dx < 0 && dy < 0) return '2';
+        if (dx < 0 && dy >= 0) return '3';
+        return '4';
+      };
+
+      const handleCardPointerDown = (e) => {
+        if (gameState !== 'playing' || isTransitioning || !question || (!isRelaxMode && lives <= 0)) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        dragStartRef.current = { x: e.clientX, y: e.clientY };
+        setIsDragging(true);
+      };
+
+      const handleCardPointerMove = (e) => {
+        if (!isDragging || !dragStartRef.current) return;
+        setDragOffset({
+          x: e.clientX - dragStartRef.current.x,
+          y: e.clientY - dragStartRef.current.y
+        });
+      };
+
+      const handleCardPointerUp = (e) => {
+        if (!isDragging) return;
+        setIsDragging(false);
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+        const choice = getHoverTarget(dragOffset.x, dragOffset.y);
+        dragStartRef.current = null;
+        if (choice) submitSort(choice);
+        else setDragOffset({ x: 0, y: 0 });
+      };
+
+      const hoverTarget = isDragging ? getHoverTarget(dragOffset.x, dragOffset.y) : null;
+      const cardTransform = flyOutTarget
+        ? `translate3d(${flyOutTarget.x}px, ${flyOutTarget.y}px, 0) rotate(${flyOutTarget.x * 0.08}deg) scale(0.85)`
+        : `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0) rotate(${dragOffset.x * 0.06}deg)`;
+
+      const quadButtons = [
+        { key: '2', label: '第 II 象限', sub: '↖ 左上', range: '90°～180°' },
+        { key: '1', label: '第 I 象限', sub: '↗ 右上', range: '0°～90°' },
+        { key: '3', label: '第 III 象限', sub: '↙ 左下', range: '180°～270°' },
+        { key: '4', label: '第 IV 象限', sub: '↘ 右下', range: '270°～360°' }
+      ];
+
+      const rayRad = flashRay ? (flashRay.stdDeg * Math.PI) / 180 : 0;
+      const sweepArcPath = useMemo(() => {
+        if (!flashRay || !flashRay.ok || flashRay.deg === undefined || flashRay.deg === 0) return '';
+        const steps = 28;
+        const pts = [];
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const a = (flashRay.deg * t * Math.PI) / 180;
+          const r = 20 + 18 * t;
+          pts.push(`${i === 0 ? 'M' : 'L'} ${(100 + r * Math.cos(a)).toFixed(1)} ${(100 - r * Math.sin(a)).toFixed(1)}`);
+        }
+        return pts.join(' ');
+      }, [flashRay]);
+
+      return (
+        <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
+          {gameState === 'playing' && question && (
+            <div className={`flex-1 min-h-0 flex flex-col justify-between gap-2 overflow-hidden pb-0.5 ${feedbackAnim}`}>
+              <GameHUD
+                progress={progress}
+                starsThreshold={starsThreshold}
+                lives={lives}
+                maxLives={maxLives}
+                healStreak={healStreak}
+                healTarget={healTarget}
+                onManualEnd={finishNow}
+                onOpenGuide={() => setShowGuide(true)}
+              />
+
+              <div className="flex-1 min-h-0 rounded-3xl border-3 border-teal-900 bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-950 shadow-xl flex flex-col overflow-hidden relative">
+                <StagePhaseStrip phase={question.phase} labels={['正角空間定位（附區間鷹架）', '撤除區間 • 負角與單圈轉換', '多圈同界角 ＋ 坐標軸上角']} />
+
+                <div onClick={handleConfirmSkip} data-coach="lv9-board" className="relative flex-1 min-h-0 p-2.5 flex flex-col justify-between gap-2 overflow-hidden select-none">
+                  <HintBanner tip={conceptTip} />
+
+                  <div className="relative flex-1 min-h-0 grid grid-cols-2 gap-2">
+                    {/* 背景坐標軸與閃現終邊射線 */}
+                    <svg viewBox="0 0 200 200" className="pointer-events-none absolute inset-0 w-full h-full z-10 opacity-90" preserveAspectRatio="xMidYMid meet">
+                      <line x1="12" y1="100" x2="188" y2="100" stroke="rgba(148,163,184,0.35)" strokeWidth="1.5" strokeDasharray="4 4" />
+                      <line x1="100" y1="12" x2="100" y2="188" stroke="rgba(148,163,184,0.35)" strokeWidth="1.5" strokeDasharray="4 4" />
+                      {flashRay && (
+                        <g>
+                          {flashRay.ok && sweepArcPath && (
+                            <>
+                              <line x1="100" y1="100" x2="174" y2="100" stroke="rgba(148,163,184,0.5)" strokeWidth="2" strokeLinecap="round" />
+                              <path
+                                d={sweepArcPath}
+                                fill="none"
+                                stroke={flashRay.deg >= 0 ? '#34d399' : '#fbbf24'}
+                                strokeWidth="3"
+                                strokeLinecap="round"
+                                className="animate-arc-sweep"
+                              />
+                            </>
+                          )}
+                          <line
+                            x1="100"
+                            y1="100"
+                            x2={100 + 74 * Math.cos(rayRad)}
+                            y2={100 - 74 * Math.sin(rayRad)}
+                            stroke={flashRay.ok ? '#34d399' : '#fb7185'}
+                            strokeWidth="4.5"
+                            strokeLinecap="round"
+                          />
+                          <circle
+                            cx={100 + 74 * Math.cos(rayRad)}
+                            cy={100 - 74 * Math.sin(rayRad)}
+                            r="5"
+                            fill={flashRay.ok ? '#fde047' : '#fb7185'}
+                          />
+                        </g>
+                      )}
+                    </svg>
+
+                    {quadButtons.map(item => (
+                      <button
+                        key={item.key}
+                        onClick={() => submitSort(item.key)}
+                        className={`rounded-2xl border-2 flex flex-col items-center justify-center p-2 transition-all active:scale-95 ${
+                          wrongTargetKey === item.key
+                            ? 'bg-red-500/80 border-red-200 text-white btn-wrong-flash'
+                            : hoverTarget === item.key
+                            ? 'bg-teal-400 border-white text-slate-950 scale-[1.03] shadow-[0_0_20px_rgba(45,212,191,0.85)]'
+                            : 'bg-indigo-900/50 border-teal-400/35 text-teal-50 hover:bg-indigo-800/65'
+                        }`}
+                      >
+                        <span className="text-lg sm:text-xl font-serif font-black">{item.label}</span>
+                        <span className="text-[10px] font-bold opacity-75">{item.sub}</span>
+                        {question.phase === 0 && (
+                          <span className="mt-1 text-[10px] font-mono font-bold text-teal-200/80 bg-slate-950/40 px-1.5 py-0.5 rounded-md">
+                            {item.range}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-20">
+                      <div
+                        data-coach="lv9-card"
+                        onPointerDown={handleCardPointerDown}
+                        onPointerMove={handleCardPointerMove}
+                        onPointerUp={handleCardPointerUp}
+                        onPointerCancel={handleCardPointerUp}
+                        style={{
+                          transform: cardTransform,
+                          transition: isDragging ? 'none' : flyOutTarget ? 'transform 0.2s ease-out, opacity 0.2s ease-out' : 'transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                          opacity: flyOutTarget ? 0 : 1
+                        }}
+                        className="pointer-events-auto min-w-[146px] max-w-[200px] rounded-2xl bg-white border-4 border-teal-400 px-4 py-3 shadow-2xl flex flex-col items-center justify-center text-center cursor-grab active:cursor-grabbing touch-none"
+                      >
+                        <div className="text-[10px] font-black text-teal-600 uppercase tracking-widest">θ</div>
+                        <div className="text-3xl sm:text-4xl font-mono font-black text-indigo-950 leading-tight">{question.deg}°</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {question.phase >= 2 && (
+                    <button
+                      onClick={() => submitSort('axis')}
+                      className={`w-full py-2.5 rounded-2xl border-2 font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all active:scale-95 shrink-0 animate-jelly ${
+                        wrongTargetKey === 'axis'
+                          ? 'bg-red-500/80 border-red-200 text-white btn-wrong-flash'
+                          : 'bg-amber-400/20 hover:bg-amber-400/30 border-amber-300/70 text-amber-200 shadow'
+                      }`}
+                    >
+                      <span>✦</span>
+                      <span>落在坐標軸上（不屬任一象限）</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {gameState === 'ended' && (
+            <LevelResultScreen
+              score={finalScore}
+              baseScore={baseScore}
+              earnedStars={earnedStars}
+              correctCount={correctCount}
+              wrongCount={wrongCount}
+              lives={lives}
+              progress={progress}
+              targetTotal={starsThreshold[2]}
+              elapsedSec={elapsedSec}
+              lifeBonus={lifeBonus}
+              accuracyBonus={accuracyBonus}
+              speedBonus={speedBonus}
+              accentClass="text-teal-600"
+              onCompleteLevel={onCompleteLevel}
+              onRestart={startGame}
+              onBackToMap={onBackToMap}
+            />
+          )}
+
+          <CoachOverlay
+            containerRef={containerRef}
+            active={showGuide && gameState === 'playing'}
+            onDismiss={dismissGuide}
+            steps={[
+              {
+                target: 'lv9-card',
+                text: '拖曳角度卡到對應象限，或直接點擊象限',
+                shape: 'ellipse',
+                pad: 10,
+                tap: false
+              },
+              {
+                target: 'lv9-board',
+                text: '正角逆時針、負角順時針判斷終邊位置',
+                shape: 'rect',
+                pad: 4,
+                tap: false
+              }
+            ]}
+          />
+        </div>
+      );
+    };
+
     // ==================== 第 8 關組件：動徑星標 ====================
     const Level6VectorCompassMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap, hasSeenGuide = false, onMarkGuideSeen }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
@@ -5554,6 +6175,17 @@
 
       const containerRef = useRef(null);
       const questionMissedRef = useRef(false);
+      const confirmTimerRef = useRef(null);
+      const pendingNextRef = useRef(null);
+      const handleConfirmSkip = () => {
+        if (!pendingNextRef.current) return;
+        clearTimeout(confirmTimerRef.current);
+        const fn = pendingNextRef.current;
+        pendingNextRef.current = null;
+        audio.sfxClick();
+        fn();
+      };
+      useEffect(() => () => clearTimeout(confirmTimerRef.current), []);
       const dismissGuide = () => {
         setShowGuide(false);
         if (onMarkGuideSeen) onMarkGuideSeen();
@@ -5610,12 +6242,16 @@
             setConceptTip(null);
             triggerFloat('定義正確!', "text-cyan-400");
             setFeedbackAnim('animate-correct');
-            const { completed, nextProgress } = recordCorrect({ wasMissed: questionMissedRef.current, delayEndMs: 1100 });
-            setTimeout(() => {
+            const confirmDur = 1200;
+            const { completed, nextProgress } = recordCorrect({ wasMissed: questionMissedRef.current, delayEndMs: confirmDur });
+            const advanceFn = () => {
+              pendingNextRef.current = null;
               setIsLockedSuccess(false);
               setFeedbackAnim('');
               if (!completed) nextQuestion(nextProgress);
-            }, 1100);
+            };
+            pendingNextRef.current = advanceFn;
+            confirmTimerRef.current = setTimeout(advanceFn, confirmDur);
           } else {
             audio.sfxError();
             questionMissedRef.current = true;
@@ -5666,6 +6302,7 @@
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${isLockedSuccess ? 'ring-4 ring-emerald-400/75' : ''}`}>
+                <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['第 I～II 象限 • (x, y, r) 定義', '全四象限正負坐標推導', '廣義坐標綜合與縮放比值']} />
                 <div data-coach="lv10-prompt" className="bg-gradient-to-r from-cyan-600 to-indigo-700 py-1.5 px-3.5 flex justify-between items-center text-white border-b-2 border-indigo-900 shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="text-lg sm:text-2xl font-serif font-black shrink-0">{question.targetFunc}(θ) =</span>
@@ -5701,7 +6338,7 @@
                   <span className="text-xs font-black bg-white/20 px-2.5 py-1 rounded-xl border border-white/40 whitespace-nowrap">第 {['I', 'II', 'III', 'IV'][question.quad - 1]} 象限</span>
                 </div>
 
-                <div className="relative w-full flex-1 min-h-0 bg-white flex items-center justify-center overflow-hidden">
+                <div onClick={handleConfirmSkip} className="relative w-full flex-1 min-h-0 bg-white flex items-center justify-center overflow-hidden">
                   <HintBanner tip={conceptTip} />
                   {isLockedSuccess && <div className="absolute inset-0 bg-amber-400/25 z-30 pointer-events-none animate-ping"></div>}
                   <svg data-coach="lv10-tri" viewBox="0 0 540 540" preserveAspectRatio="xMidYMid meet" className="w-full h-full object-contain select-none">
@@ -5717,16 +6354,16 @@
                     <text x={question.thetaLabelPt.x} y={question.thetaLabelPt.y} fill="#b45309" fontSize="22" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-serif pointer-events-none">θ</text>
                     <line x1={270} y1={270} x2={480} y2={270} stroke="#ef4444" strokeWidth="8" strokeLinecap="round" />
                     <line x1={270} y1={270} x2={question.ptP.x} y2={question.ptP.y} stroke="#f59e0b" strokeWidth="9" strokeLinecap="round" className="cursor-pointer" onClick={() => handleInputKey('r')} />
-                    <g transform={`translate(${(270 + question.ptP.x) / 2}, ${(270 + question.ptP.y) / 2})`} className="cursor-pointer" onClick={() => handleInputKey('r')}>
-                      <rect x="-35" y="-17" width="70" height="34" fill="white" stroke="#f59e0b" strokeWidth="2.5" rx="10" />
+                    <g transform={`translate(${(270 + question.ptP.x) / 2}, ${(270 + question.ptP.y) / 2})`} className={`cursor-pointer ${isLockedSuccess && (question.correctNumeratorKey === 'r' || question.correctDenominatorKey === 'r') ? 'animate-pulse' : ''}`} onClick={() => handleInputKey('r')}>
+                      <rect x="-35" y="-17" width="70" height="34" fill={isLockedSuccess && (question.correctNumeratorKey === 'r' || question.correctDenominatorKey === 'r') ? '#ecfdf5' : 'white'} stroke={isLockedSuccess && (question.correctNumeratorKey === 'r' || question.correctDenominatorKey === 'r') ? '#10b981' : '#f59e0b'} strokeWidth={isLockedSuccess && (question.correctNumeratorKey === 'r' || question.correctDenominatorKey === 'r') ? '4' : '2.5'} rx="10" />
                       <text x="0" y="2" fill="#b45309" fontSize="18" fontWeight="900" textAnchor="middle" dominantBaseline="middle">r={question.rVal}</text>
                     </g>
-                    <g transform={`translate(${question.ptFootX.x}, ${270 + (question.yVal >= 0 ? 25 : -25)})`} className="cursor-pointer" onClick={() => handleInputKey('x')}>
-                      <rect x="-40" y="-17" width="80" height="34" fill="white" stroke="#2563eb" strokeWidth="2.5" rx="10" />
+                    <g transform={`translate(${question.ptFootX.x}, ${270 + (question.yVal >= 0 ? 25 : -25)})`} className={`cursor-pointer ${isLockedSuccess && (question.correctNumeratorKey === 'x' || question.correctDenominatorKey === 'x') ? 'animate-pulse' : ''}`} onClick={() => handleInputKey('x')}>
+                      <rect x="-40" y="-17" width="80" height="34" fill={isLockedSuccess && (question.correctNumeratorKey === 'x' || question.correctDenominatorKey === 'x') ? '#ecfdf5' : 'white'} stroke={isLockedSuccess && (question.correctNumeratorKey === 'x' || question.correctDenominatorKey === 'x') ? '#10b981' : '#2563eb'} strokeWidth={isLockedSuccess && (question.correctNumeratorKey === 'x' || question.correctDenominatorKey === 'x') ? '4' : '2.5'} rx="10" />
                       <text x="0" y="2" fill="#1d4ed8" fontSize="18" fontWeight="900" textAnchor="middle" dominantBaseline="middle">x={question.xVal}</text>
                     </g>
-                    <g transform={`translate(${270 + (question.xVal >= 0 ? -42 : 42)}, ${question.ptFootY.y})`} className="cursor-pointer" onClick={() => handleInputKey('y')}>
-                      <rect x="-40" y="-17" width="80" height="34" fill="white" stroke="#ef4444" strokeWidth="2.5" rx="10" />
+                    <g transform={`translate(${270 + (question.xVal >= 0 ? -42 : 42)}, ${question.ptFootY.y})`} className={`cursor-pointer ${isLockedSuccess && (question.correctNumeratorKey === 'y' || question.correctDenominatorKey === 'y') ? 'animate-pulse' : ''}`} onClick={() => handleInputKey('y')}>
+                      <rect x="-40" y="-17" width="80" height="34" fill={isLockedSuccess && (question.correctNumeratorKey === 'y' || question.correctDenominatorKey === 'y') ? '#ecfdf5' : 'white'} stroke={isLockedSuccess && (question.correctNumeratorKey === 'y' || question.correctDenominatorKey === 'y') ? '#10b981' : '#ef4444'} strokeWidth={isLockedSuccess && (question.correctNumeratorKey === 'y' || question.correctDenominatorKey === 'y') ? '4' : '2.5'} rx="10" />
                       <text x="0" y="2" fill="#b91c1c" fontSize="18" fontWeight="900" textAnchor="middle" dominantBaseline="middle">y={question.yVal}</text>
                     </g>
                     <g transform={`translate(${question.ptP.x}, ${question.ptP.y})`}>
@@ -5837,6 +6474,17 @@
       const dwellTimerRef = useRef(null);
       const stageLockedRef = useRef(false);
       const questionMissedRef = useRef(false);
+      const confirmTimerRef = useRef(null);
+      const pendingNextRef = useRef(null);
+      const handleConfirmSkip = () => {
+        if (!pendingNextRef.current) return;
+        clearTimeout(confirmTimerRef.current);
+        const fn = pendingNextRef.current;
+        pendingNextRef.current = null;
+        audio.sfxClick();
+        fn();
+      };
+      useEffect(() => () => clearTimeout(confirmTimerRef.current), []);
       const dismissGuide = () => {
         setShowGuide(false);
         if (onMarkGuideSeen) onMarkGuideSeen();
@@ -5972,11 +6620,15 @@
             setConceptTip(null);
             triggerFloat('完美解算！', "text-amber-300");
             setFeedbackAnim('animate-correct');
-            const { completed, nextProgress } = recordCorrect({ wasMissed: questionMissedRef.current, delayEndMs: 1100 });
-            setTimeout(() => {
+            const confirmDur = 1250;
+            const { completed, nextProgress } = recordCorrect({ wasMissed: questionMissedRef.current, delayEndMs: confirmDur });
+            const advanceFn = () => {
+              pendingNextRef.current = null;
               setFeedbackAnim('');
               if (!completed) nextQuestion(nextProgress, question.targetAngle);
-            }, 1100);
+            };
+            pendingNextRef.current = advanceFn;
+            confirmTimerRef.current = setTimeout(advanceFn, confirmDur);
           } else {
             audio.sfxError();
             questionMissedRef.current = true;
@@ -6030,6 +6682,7 @@
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${isLockedSuccess ? 'ring-4 ring-emerald-400/75' : ''}`}>
+                <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['第 I～II 象限 • 轉角定位求值', '全象限 ＋ 負角與軸上角定位', '多圈廣義特殊角綜合推導']} />
                 <div data-coach="lv12-target" className="bg-gradient-to-r from-violet-600 to-indigo-700 py-1.5 px-3.5 flex justify-between items-center text-white min-h-[52px] border-b-2 border-indigo-950 shrink-0">
                   <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
                     <span className="text-lg sm:text-2xl font-serif font-black shrink-0">{question.targetFunc}({question.targetAngle}°) =</span>
@@ -6076,7 +6729,7 @@
                   </span>
                 </div>
 
-                <div className="relative w-full flex-1 min-h-0 bg-white flex items-center justify-center overflow-hidden">
+                <div onClick={handleConfirmSkip} className="relative w-full flex-1 min-h-0 bg-white flex items-center justify-center overflow-hidden">
                   <HintBanner tip={conceptTip} />
                   <svg ref={dialSvgRef} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" className={`w-full h-full object-contain select-none ${stage === 'rotate' ? 'cursor-grab active:cursor-grabbing' : ''}`} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp}>
                     <line x1={30} y1={270} x2={510} y2={270} stroke="#94a3b8" strokeWidth="2.5" />
@@ -6099,16 +6752,16 @@
                     ) : (
                       <g className="animate-jelly">
                         <line x1={270} y1={270} x2={question.ptP.x} y2={question.ptP.y} stroke="#f59e0b" strokeWidth="9" strokeLinecap="round" onClick={() => handleInputKey('r')} />
-                        <g transform={`translate(${(270 + question.ptP.x) / 2 - 24}, ${(270 + question.ptP.y) / 2})`} onClick={() => handleInputKey('r')}>
-                          <rect x="-34" y="-16" width="68" height="32" fill="white" stroke="#f59e0b" strokeWidth="2.5" rx="10" />
+                        <g transform={`translate(${(270 + question.ptP.x) / 2 - 24}, ${(270 + question.ptP.y) / 2})`} className={isLockedSuccess && (question.correctNumeratorKey === 'r' || question.correctDenominatorKey === 'r') ? 'animate-pulse' : ''} onClick={() => handleInputKey('r')}>
+                          <rect x="-34" y="-16" width="68" height="32" fill={isLockedSuccess && (question.correctNumeratorKey === 'r' || question.correctDenominatorKey === 'r') ? '#ecfdf5' : 'white'} stroke={isLockedSuccess && (question.correctNumeratorKey === 'r' || question.correctDenominatorKey === 'r') ? '#10b981' : '#f59e0b'} strokeWidth={isLockedSuccess && (question.correctNumeratorKey === 'r' || question.correctDenominatorKey === 'r') ? '4' : '2.5'} rx="10" />
                           <text x="0" y="2" fill="#b45309" fontSize="17" fontWeight="900" textAnchor="middle" dominantBaseline="middle">r={question.rStr}</text>
                         </g>
-                        <g transform={`translate(${question.xNum === 0 ? 316 : question.ptFootX.x}, ${270 + (question.yNum >= 0 ? 28 : -28)})`} onClick={() => handleInputKey('x')}>
-                          <rect x="-38" y="-16" width="76" height="32" fill="white" stroke="#2563eb" strokeWidth="2.5" rx="10" />
+                        <g transform={`translate(${question.xNum === 0 ? 316 : question.ptFootX.x}, ${270 + (question.yNum >= 0 ? 28 : -28)})`} className={isLockedSuccess && (question.correctNumeratorKey === 'x' || question.correctDenominatorKey === 'x') ? 'animate-pulse' : ''} onClick={() => handleInputKey('x')}>
+                          <rect x="-38" y="-16" width="76" height="32" fill={isLockedSuccess && (question.correctNumeratorKey === 'x' || question.correctDenominatorKey === 'x') ? '#ecfdf5' : 'white'} stroke={isLockedSuccess && (question.correctNumeratorKey === 'x' || question.correctDenominatorKey === 'x') ? '#10b981' : '#2563eb'} strokeWidth={isLockedSuccess && (question.correctNumeratorKey === 'x' || question.correctDenominatorKey === 'x') ? '4' : '2.5'} rx="10" />
                           <text x="0" y="2" fill="#1d4ed8" fontSize="17" fontWeight="900" textAnchor="middle" dominantBaseline="middle">x={question.xStr}</text>
                         </g>
-                        <g transform={`translate(${270 + (question.xNum >= 0 ? -46 : 46)}, ${question.yNum === 0 ? 232 : question.ptFootY.y})`} onClick={() => handleInputKey('y')}>
-                          <rect x="-38" y="-16" width="76" height="32" fill="white" stroke="#ef4444" strokeWidth="2.5" rx="10" />
+                        <g transform={`translate(${270 + (question.xNum >= 0 ? -46 : 46)}, ${question.yNum === 0 ? 232 : question.ptFootY.y})`} className={isLockedSuccess && (question.correctNumeratorKey === 'y' || question.correctDenominatorKey === 'y') ? 'animate-pulse' : ''} onClick={() => handleInputKey('y')}>
+                          <rect x="-38" y="-16" width="76" height="32" fill={isLockedSuccess && (question.correctNumeratorKey === 'y' || question.correctDenominatorKey === 'y') ? '#ecfdf5' : 'white'} stroke={isLockedSuccess && (question.correctNumeratorKey === 'y' || question.correctDenominatorKey === 'y') ? '#10b981' : '#ef4444'} strokeWidth={isLockedSuccess && (question.correctNumeratorKey === 'y' || question.correctDenominatorKey === 'y') ? '4' : '2.5'} rx="10" />
                           <text x="0" y="2" fill="#b91c1c" fontSize="17" fontWeight="900" textAnchor="middle" dominantBaseline="middle">y={question.yStr}</text>
                         </g>
                         <g transform={`translate(${question.ptP.x}, ${question.ptP.y})`}>
@@ -6273,6 +6926,17 @@
       const dragStartRef = useRef(null);
       const nextPreviewRef = useRef(null);
       const questionErrorsRef = useRef(0);
+      const confirmTimerRef = useRef(null);
+      const pendingNextRef = useRef(null);
+      const handleConfirmSkip = () => {
+        if (!pendingNextRef.current) return;
+        clearTimeout(confirmTimerRef.current);
+        const fn = pendingNextRef.current;
+        pendingNextRef.current = null;
+        audio.sfxClick();
+        fn();
+      };
+      useEffect(() => () => clearTimeout(confirmTimerRef.current), []);
       const dismissGuide = () => {
         setShowGuide(false);
         if (onMarkGuideSeen) onMarkGuideSeen();
@@ -6458,21 +7122,20 @@
                   ? 'bg-gradient-to-b from-indigo-950 via-purple-950 to-slate-950 border-sky-400 ring-2 ring-sky-400/50'
                   : 'bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-950 border-indigo-950'
               }`}>
-                <div className={`py-2 px-3.5 flex justify-between items-center text-white border-b-2 shrink-0 ${
-                  isFever ? 'bg-amber-500/20 border-amber-400/50' : 'bg-slate-900/85 border-indigo-800/70'
+                <div className={`h-6 px-3.5 flex justify-between items-center text-white border-b shrink-0 ${
+                  isFever ? 'bg-amber-500/20 border-amber-400/50' : 'bg-slate-900/90 border-white/10'
                 }`}>
-                  <span className="text-xs font-black tracking-wide text-indigo-100">
-                    {question.phase < 2 ? '正負分流' : '四象限判別'}
-                  </span>
-                  {isFever ? (
-                    <span className="text-[11px] font-black bg-amber-400 text-amber-950 px-2.5 py-0.5 rounded-full animate-pulse shadow">🔥 FEVER ×1.5</span>
-                  ) : isWarm ? (
-                    <span className="text-[11px] font-black bg-sky-500 text-white px-2 py-0.5 rounded-full">⚡ 加速 ×1.2</span>
-                  ) : (
-                    <span className="text-[11px] font-black bg-white/15 text-indigo-200 px-2 py-0.5 rounded-full">
-                      {question.phase === 0 ? '階段 1/3' : question.phase === 1 ? '階段 2/3' : '階段 3/3'}
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${question.phase === 0 ? 'bg-emerald-400' : question.phase === 1 ? 'bg-sky-400' : 'bg-amber-400'}`} />
+                    <span className="text-[11px] font-bold text-slate-200 truncate">
+                      {question.phase === 0 ? '單一三角比 • 左右正負聖壇分流' : question.phase === 1 ? '進階角度與複合正負判別' : '四象限條件交集判別'}
                     </span>
-                  )}
+                  </div>
+                  {isFever ? (
+                    <span className="text-[10px] font-black bg-amber-400 text-amber-950 px-2 py-0.5 rounded-full animate-pulse shadow shrink-0">🔥 FEVER ×1.5</span>
+                  ) : isWarm ? (
+                    <span className="text-[10px] font-black bg-sky-500 text-white px-2 py-0.5 rounded-full shrink-0">⚡ 加速 ×1.2</span>
+                  ) : null}
                 </div>
 
                 {feverBanner && (
@@ -6655,9 +7318,9 @@
     };
 
 
-    // ==================== 雙欄波次配對引擎 (Lv.18 & 修行幻境共用) ====================
-    const LevelLightingCardGame = ({ levelData, isDojo, currentStars, onUpdateStars, onCompleteLevel, onBackToMap, hasSeenGuide = false, onMarkGuideSeen }) => {
-      const levelConfig = levelData?.config || { maxTime: 60, stars: [750, 1600, 2500], quadrants: ['q1'], funcs: ['sin', 'cos', 'tan'] };
+    // ==================== 雙欄波次配對引擎 (Lv.18) ====================
+    const LevelLightingCardGame = ({ levelData, currentStars, onUpdateStars, onCompleteLevel, onBackToMap, hasSeenGuide = false, onMarkGuideSeen }) => {
+      const levelConfig = levelData?.config || { quadrants: ['q1'], funcs: ['sin', 'cos', 'tan'] };
       const livesSession = useLivesLevelSession({
         starThresholds: [2, 4, 6],
         maxLives: 4,
@@ -6666,17 +7329,10 @@
         currentStars,
         onUpdateStars
       });
-      const [dojoGameState, setDojoGameState] = useState('settings');
-      const gameState = isDojo ? dojoGameState : livesSession.gameState;
-      const [timeLeft, setTimeLeft] = useState(levelConfig.maxTime || 60);
-      const [score, setScore] = useState(0);
-      const [baseScore, setBaseScore] = useState(0);
-      const [combo, setCombo] = useState(0);
-      const [maxCombo, setMaxCombo] = useState(0);
-      const [wrongCount, setWrongCount] = useState(0);
+      const gameState = livesSession.gameState;
       const [wrongCardUids, setWrongCardUids] = useState([]);
       const [conceptTip, setConceptTip] = useState(null);
-      const [showGuide, setShowGuide] = useState(() => !isDojo && !hasSeenGuide && currentStars === 0);
+      const [showGuide, setShowGuide] = useState(() => !hasSeenGuide && currentStars === 0);
 
       const containerRef = useRef(null);
       const dismissGuide = () => {
@@ -6694,56 +7350,29 @@
       const [selLeft, setSelLeft] = useState(null);
       const [selRight, setSelRight] = useState(null);
       const [isProcessing, setIsProcessing] = useState(false);
-      const [totalSolved, setTotalSolved] = useState(0);
-      const [floatingText, setFloatingText] = useState(null);
 
-      const waveStartTimeRef = useRef(Date.now());
       const waveErrorsRef = useRef(0);
       const recentPairsRef = useRef([]);
-      const timerRef = useRef(null);
-
-      const [dojoConfig, setDojoConfig] = useState({
-        time: 90,
-        funcs: { sin: true, cos: true, tan: true },
-        quads: { q1: true, q2: true, q3: true, q4: true, axis: true },
-        angleMode: 'degree'
-      });
-
-      const activeMaxTime = isDojo ? dojoConfig.time : levelConfig.maxTime;
-
-      const triggerFloat = (text, color) => {
-        const id = Date.now() + Math.random();
-        setFloatingText({ text, color, id });
-        setTimeout(() => setFloatingText(prev => prev?.id === id ? null : prev), 850);
-      };
 
       const formatQuestionLabel = (funcId, angleId) => {
-        const mode = isDojo ? dojoConfig.angleMode : 'degree';
-        if (mode === 'radian') {
-          return `${TEXT_MAP['func'][funcId]}(${TEXT_MAP['angle_rad'][angleId]})`;
-        }
         return `${TEXT_MAP['func'][funcId]} ${TEXT_MAP['angle_deg'][angleId]}`;
       };
 
-      // 依波次漸進解鎖象限（Lv.13~16：第 1 波 I~II 象限、第 2 波 I~IV 象限、第 3 波起納入象限角）
+      // 依波次漸進解鎖象限（第 1 波 I~II 象限、第 2 波 I~IV 象限、第 3 波起納入象限角）
       const getWaveQuadrants = useCallback((waveIdx) => {
-        if (isDojo) {
-          return Object.keys(dojoConfig.quads).filter(k => dojoConfig.quads[k]);
-        }
         if (levelData && levelData.id >= 13 && levelData.id <= 18) {
           if (waveIdx === 1) return ['q1', 'q2'];
           if (waveIdx === 2) return ['q1', 'q2', 'q3', 'q4'];
           return ['q1', 'q2', 'q3', 'q4', 'axis'];
         }
         return levelConfig.quadrants || ['q1'];
-      }, [isDojo, dojoConfig.quads, levelData, levelConfig.quadrants]);
+      }, [levelData, levelConfig.quadrants]);
 
       const getWaveScopeLabel = (waveIdx) => {
-        if (isDojo) return '自訂幻境題庫';
         if (levelData && levelData.id >= 13 && levelData.id <= 18) {
-          if (waveIdx === 1) return '第 I~II 象限';
-          if (waveIdx === 2) return '第 I~IV 象限';
-          return '全象限＋象限角';
+          if (waveIdx === 1) return '第 I~II 象限特殊角配對';
+          if (waveIdx === 2) return '第 I~IV 象限特殊角配對';
+          return '全象限 ＋ 象限角配對';
         }
         return levelData?.subtitle || '題庫範圍';
       };
@@ -6751,9 +7380,7 @@
       // 象限分桶平均抽樣 ＋ 跨波防重複 ＋ 右欄多 1 張相反數干擾項發牌器
       const spawnWave = useCallback((targetPairs, waveIdx) => {
         const quads = getWaveQuadrants(waveIdx);
-        const funcs = isDojo
-          ? FUNC_TYPES.filter(f => dojoConfig.funcs[f])
-          : (levelConfig.funcs || FUNC_TYPES);
+        const funcs = levelConfig.funcs || FUNC_TYPES;
 
         const recentSet = new Set(recentPairsRef.current);
         const buckets = {};
@@ -6781,9 +7408,7 @@
           ];
         });
 
-        const stageQuads = isDojo
-          ? Object.keys(dojoConfig.quads).filter(k => dojoConfig.quads[k])
-          : levelConfig.quadrants;
+        const stageQuads = levelConfig.quadrants;
         const stageValSet = new Set();
         stageQuads.forEach(q => {
           (ANGLE_GROUPS[q] || []).forEach(a => {
@@ -6795,7 +7420,7 @@
         const maxLeftByPool = Math.min(waveUniqueValCount, Math.max(2, stageValSet.size - 1));
         const actualPairs = Math.max(2, Math.min(5, targetPairs, maxLeftByPool));
 
-        const isGradualBroadLevel = !isDojo && levelData && levelData.id >= 13 && levelData.id <= 16;
+        const isGradualBroadLevel = levelData && levelData.id >= 13 && levelData.id <= 16;
         let bucketOrder = shuffle([...quads]);
         if (isGradualBroadLevel && waveIdx === 1 && quads.includes('q2') && quads.includes('q1')) {
           bucketOrder = ['q2', 'q1'];
@@ -6892,9 +7517,8 @@
         setWrongCardUids([]);
         setConceptTip(null);
         setIsProcessing(false);
-        waveStartTimeRef.current = Date.now();
         waveErrorsRef.current = 0;
-      }, [getWaveQuadrants, isDojo, dojoConfig.funcs, dojoConfig.quads, levelConfig.funcs, levelConfig.quadrants, levelData]);
+      }, [getWaveQuadrants, levelConfig.funcs, levelConfig.quadrants, levelData]);
 
       const startAdventureGame = () => {
         recentPairsRef.current = [];
@@ -6904,80 +7528,13 @@
       };
 
       useEffect(() => {
-        if (!isDojo) startAdventureGame();
-      }, [isDojo]);
-
-      useEffect(() => {
-        if (isDojo && dojoGameState === 'playing') {
-          recentPairsRef.current = [];
-          setScore(0);
-          setBaseScore(0);
-          setCombo(0);
-          setMaxCombo(0);
-          setTotalSolved(0);
-          setWrongCount(0);
-          setWaveNumber(1);
-          setTimeLeft(activeMaxTime);
-          spawnWave(3, 1);
-        }
-      }, [isDojo, dojoGameState]);
-
-      useEffect(() => {
-        if (!isDojo) return;
-        if (dojoGameState === 'playing') {
-          timerRef.current = setInterval(() => {
-            setTimeLeft(prev => {
-              if (prev <= 0.1) {
-                clearInterval(timerRef.current);
-                audio.sfxTimeUp();
-                setDojoGameState('ended');
-                return 0;
-              }
-              return +(prev - 0.1).toFixed(1);
-            });
-          }, 100);
-        } else clearInterval(timerRef.current);
-        return () => clearInterval(timerRef.current);
-      }, [isDojo, dojoGameState]);
-
-      // 依回答速度與正確率動態評估下一波張數（修行幻境用；左欄 3 起跳，下限 3 張、上限 5 張；右欄恆多 1 張為 4→5→6 張）
-      const evaluateNextPairCount = (currentCount, elapsedSec, errors) => {
-        const speedThreshold = 3.1 + currentCount * 0.15;
-        const avgSecPerPair = elapsedSec / Math.max(1, currentCount);
-
-        if (errors === 0 && avgSecPerPair <= speedThreshold) {
-          const next = Math.min(5, currentCount + 1);
-          return {
-            nextCount: next,
-            msg: next > currentCount
-              ? `⚡ 疾風全對 (${avgSecPerPair.toFixed(1)}s/題) → 左 ${next} / 右 ${next + 1} 張`
-              : `👑 滿階左 5 / 右 6 張制霸 (${avgSecPerPair.toFixed(1)}s/題)！`,
-            tone: 'up'
-          };
-        }
-
-        if (errors >= 2 || avgSecPerPair > 6.2) {
-          const next = Math.max(3, currentCount - 1);
-          return {
-            nextCount: next,
-            msg: next < currentCount
-              ? `🌿 調整節奏 → 左 ${next} / 右 ${next + 1} 張`
-              : `🌿 穩住節奏 → 左 ${next} / 右 ${next + 1} 張`,
-            tone: 'down'
-          };
-        }
-
-        return {
-          nextCount: currentCount,
-          msg: `🛡️ 穩健過關 (${avgSecPerPair.toFixed(1)}s/題) → 左 ${currentCount} / 右 ${currentCount + 1} 張`,
-          tone: 'stay'
-        };
-      };
+        startAdventureGame();
+      }, []);
 
       const checkPairMatch = (lCard, rCard) => {
         setIsProcessing(true);
         if (lCard.valId === rCard.valId) {
-          if (!isDojo && showGuide) dismissGuide();
+          if (showGuide) dismissGuide();
           audio.sfxMatch();
           setConceptTip(null);
 
@@ -6989,73 +7546,27 @@
           const isWaveCleared = solvedInWave >= leftCards.length;
           setAnimatingOut([lCard.uid, rCard.uid]);
 
-          if (!isDojo) {
-            if (isWaveCleared) {
-              const hadErrors = waveErrorsRef.current > 0;
-              audio.sfxBonus();
-              const { completed, nextProgress } = livesSession.recordCorrect({ wasMissed: hadErrors, delayEndMs: 460 });
-              const nextPairs = nextProgress >= 4 ? 5 : nextProgress >= 2 ? 4 : 3;
-              setTimeout(() => {
-                setMatchedUids(nextMatched);
-                setAnimatingOut([]);
-                setSelLeft(null);
-                setSelRight(null);
-                if (!completed) {
-                  const nextWave = waveNumber + 1;
-                  setWaveNumber(nextWave);
-                  setConceptTip({
-                    text: `${hadErrors ? '🛡️ 穩健清波' : '✨ 完美清波'} → 左 ${nextPairs} / 右 ${nextPairs + 1} 張`,
-                    id: Date.now()
-                  });
-                  spawnWave(nextPairs, nextWave);
-                }
-              }, 300);
-            } else {
-              setTimeout(() => {
-                setMatchedUids(nextMatched);
-                setAnimatingOut([]);
-                setSelLeft(null);
-                setSelRight(null);
-                setIsProcessing(false);
-              }, 260);
-            }
-            return;
-          }
-
-          const mult = combo >= 6 ? 1.5 : combo >= 3 ? 1.2 : 1.0;
-          const earned = Math.floor(100 * mult);
-          const nextCombo = combo + 1;
-          setCombo(nextCombo);
-          if (nextCombo > maxCombo) setMaxCombo(nextCombo);
-          setBaseScore(b => b + 100);
-          setTotalSolved(t => t + 1);
-
           if (isWaveCleared) {
-            const elapsedSec = Math.max(0.5, (Date.now() - waveStartTimeRef.current) / 1000);
-            const errors = waveErrorsRef.current;
-            const waveBonus = errors === 0 ? 120 : 60;
-            const evalRes = evaluateNextPairCount(pairCount, elapsedSec, errors);
-
-            setScore(s => s + earned + waveBonus);
+            const hadErrors = waveErrorsRef.current > 0;
             audio.sfxBonus();
-            triggerFloat(
-              errors === 0 ? `+${earned}！完美清波 +${waveBonus}` : `+${earned}！清波 +${waveBonus}`,
-              evalRes.tone === 'up' ? 'text-amber-500' : evalRes.tone === 'down' ? 'text-emerald-500' : 'text-sky-500'
-            );
-
+            const { completed, nextProgress } = livesSession.recordCorrect({ wasMissed: hadErrors, delayEndMs: 460 });
+            const nextPairs = nextProgress >= 4 ? 5 : nextProgress >= 2 ? 4 : 3;
             setTimeout(() => {
               setMatchedUids(nextMatched);
               setAnimatingOut([]);
               setSelLeft(null);
               setSelRight(null);
-              const nextWave = waveNumber + 1;
-              setWaveNumber(nextWave);
-              setConceptTip({ text: evalRes.msg, id: Date.now() });
-              spawnWave(evalRes.nextCount, nextWave);
+              if (!completed) {
+                const nextWave = waveNumber + 1;
+                setWaveNumber(nextWave);
+                setConceptTip({
+                  text: `${hadErrors ? '🛡️ 穩健清波' : '✨ 完美清波'} → 左 ${nextPairs} / 右 ${nextPairs + 1} 張`,
+                  id: Date.now()
+                });
+                spawnWave(nextPairs, nextWave);
+              }
             }, 300);
           } else {
-            setScore(s => s + earned);
-            triggerFloat(`+${earned} 分!`, "text-amber-500");
             setTimeout(() => {
               setMatchedUids(nextMatched);
               setAnimatingOut([]);
@@ -7080,38 +7591,15 @@
             id: Date.now()
           });
 
-          if (!isDojo) {
-            const { gameOver } = livesSession.recordWrong({ delayEndMs: 450 });
-            if (!gameOver) {
-              setTimeout(() => {
-                setSelLeft(null);
-                setSelRight(null);
-                setWrongCardUids([]);
-                setIsProcessing(false);
-              }, 360);
-            }
-            return;
+          const { gameOver } = livesSession.recordWrong({ delayEndMs: 450 });
+          if (!gameOver) {
+            setTimeout(() => {
+              setSelLeft(null);
+              setSelRight(null);
+              setWrongCardUids([]);
+              setIsProcessing(false);
+            }, 360);
           }
-
-          setCombo(0);
-          setWrongCount(w => w + 1);
-          const timePenalty = +(activeMaxTime * 0.03).toFixed(2);
-          setTimeLeft(prev => {
-            const nextT = Math.max(0, +(prev - timePenalty).toFixed(2));
-            if (nextT <= 0) {
-              clearInterval(timerRef.current);
-              audio.sfxTimeUp();
-              setDojoGameState('ended');
-            }
-            return nextT;
-          });
-          triggerFloat(`-${timePenalty} 秒! 配對錯誤`, "text-red-500");
-          setTimeout(() => {
-            setSelLeft(null);
-            setSelRight(null);
-            setWrongCardUids([]);
-            setIsProcessing(false);
-          }, 360);
         }
       };
 
@@ -7133,116 +7621,14 @@
         }
       }, [selLeft, selRight]);
 
-      const handleManualReshuffle = () => {
-        if (isProcessing) return;
-        audio.play(420, 'sine', 0.25, 0.06);
-        setIsProcessing(true);
-        const activeUids = [...leftCards, ...rightCards]
-          .filter(c => !matchedUids.has(c.uid))
-          .map(c => c.uid);
-        setAnimatingOut(activeUids);
-        setTimeout(() => {
-          spawnWave(pairCount, waveNumber);
-          triggerFloat("已重新發牌!", "text-indigo-500");
-        }, 280);
-      };
-
-      const waveStatusExtra = (
-        <div className="flex flex-col items-center bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-xl shrink-0">
-          <span className="text-[8px] font-black text-indigo-400 uppercase leading-none">WAVE {waveNumber}</span>
-          <span className="text-xs font-black font-mono text-indigo-900 leading-tight">{pairCount} vs {pairCount + 1}</span>
-        </div>
-      );
-
       const solvedInCurrentWave = matchedUids.size / 2;
 
       return (
         <div ref={containerRef} className="w-full h-full flex flex-col pt-0.5 pb-1 relative animate-jelly min-h-0">
 
-          {gameState === 'settings' && (
-            <div className="flex-1 bg-white/95 rounded-3xl border-4 border-indigo-950 p-4 shadow-2xl flex flex-col gap-3 overflow-y-auto">
-              <div className="flex items-center justify-center gap-2 border-b-2 border-slate-100 pb-2 shrink-0">
-                <span className="text-2xl animate-bounce">⚙️</span>
-                <h2 className="text-2xl font-black text-indigo-950">修行幻境</h2>
-              </div>
-              <div className="space-y-3 flex-1 overflow-y-auto pr-1 no-scrollbar pb-2">
-                <div className="bg-indigo-50 border-2 border-indigo-100 p-3 rounded-2xl shadow-sm">
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="text-xs font-black text-indigo-900 uppercase tracking-wider">⏱️ 挑戰時間</label>
-                    <span className="bg-indigo-600 text-white px-2 py-0.5 rounded-lg text-xs font-black shadow">{dojoConfig.time} 秒</span>
-                  </div>
-                  <input type="range" min="60" max="180" step="30" value={dojoConfig.time} onChange={e => { audio.sfxClick(); setDojoConfig({ ...dojoConfig, time: parseInt(e.target.value) }); }} className="w-full h-2 bg-indigo-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" />
-                </div>
-                <div className="bg-sky-50 border-2 border-sky-100 p-3 rounded-2xl shadow-sm">
-                  <label className="text-xs font-black text-sky-900 uppercase tracking-wider mb-2 block">📐 角度單位</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button onClick={() => { audio.sfxClick(); setDojoConfig({ ...dojoConfig, angleMode: 'degree' }); }} className={`py-2.5 rounded-xl font-black text-sm border-b-4 transition-all ${dojoConfig.angleMode === 'degree' ? 'bg-sky-500 border-sky-700 text-white shadow-md' : 'bg-white border-slate-300 text-slate-400'}`}>度數 (150°)</button>
-                    <button onClick={() => { audio.sfxClick(); setDojoConfig({ ...dojoConfig, angleMode: 'radian' }); }} className={`py-2.5 rounded-xl font-black text-sm border-b-4 transition-all ${dojoConfig.angleMode === 'radian' ? 'bg-sky-500 border-sky-700 text-white shadow-md' : 'bg-white border-slate-300 text-slate-400'}`}>弧度 (5π/6)</button>
-                  </div>
-                </div>
-                <div className="bg-pink-50 border-2 border-pink-100 p-3 rounded-2xl shadow-sm">
-                  <label className="text-xs font-black text-pink-900 uppercase tracking-wider mb-2 block">🧮 出題函數</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {FUNC_TYPES.map(f => {
-                      const isActive = dojoConfig.funcs[f];
-                      return (
-                        <button key={f} onClick={() => {
-                          const next = { ...dojoConfig.funcs, [f]: !isActive };
-                          if (!Object.values(next).some(Boolean)) { audio.sfxError(); return; }
-                          setDojoConfig({ ...dojoConfig, funcs: next }); audio.sfxClick();
-                        }} className={`py-2.5 rounded-xl font-black text-sm border-b-4 transition-all ${isActive ? 'bg-pink-500 border-pink-700 text-white shadow-md' : 'bg-white border-slate-300 text-slate-400'}`}>{f}</button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="bg-emerald-50 border-2 border-emerald-100 p-3 rounded-2xl shadow-sm">
-                  <label className="text-xs font-black text-emerald-900 uppercase tracking-wider mb-2 block">🧭 挑戰象限區間</label>
-                  <div className="flex flex-wrap gap-2">
-                    {[{ id: 'q1', l: 'I' }, { id: 'q2', l: 'II' }, { id: 'q3', l: 'III' }, { id: 'q4', l: 'IV' }, { id: 'axis', l: '象限角' }].map(q => {
-                      const isActive = dojoConfig.quads[q.id];
-                      return (
-                        <button key={q.id} onClick={() => {
-                          const next = { ...dojoConfig.quads, [q.id]: !isActive };
-                          if (!Object.values(next).some(Boolean)) { audio.sfxError(); return; }
-                          setDojoConfig({ ...dojoConfig, quads: next }); audio.sfxClick();
-                        }} className={`flex-1 min-w-[30%] py-2 rounded-xl font-black text-xs border-b-4 transition-all ${isActive ? 'bg-emerald-500 border-emerald-700 text-white shadow-md' : 'bg-white border-slate-300 text-slate-400'}`}>{q.l}</button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-1 space-y-2 shrink-0">
-                <button onClick={() => { audio.init(); audio.sfxBonus(); setDojoGameState('playing'); }} className="w-full py-3.5 btn-3d-yellow text-amber-950 font-black text-base rounded-2xl shadow-xl tracking-wide flex items-center justify-center gap-2">🚀 創建幻境，開始修行！</button>
-                <button onClick={onBackToMap} className="w-full py-2 text-xs font-bold text-slate-500 bg-slate-100 rounded-xl">返回聖域地圖</button>
-              </div>
-            </div>
-          )}
-
-          {gameState === 'idle' && !isDojo && (
-            <div className="flex-1 my-3 bg-white/95 rounded-3xl border-4 border-indigo-950 p-5 shadow-2xl flex flex-col justify-between text-center items-center animate-jelly">
-              <div className="w-full space-y-3 pt-2">
-                <div className="w-20 h-20 mx-auto rounded-3xl bg-blue-100 border-4 border-blue-500 flex items-center justify-center text-4xl shadow-inner animate-bounce">{levelData?.icon || '🌟'}</div>
-                <h2 className="text-2xl font-black text-indigo-950 tracking-wide">{levelData?.title || '關卡挑戰'}</h2>
-                <p className="text-xs text-slate-500 font-bold leading-relaxed max-w-xs mx-auto">
-                  點選左側<span className="text-indigo-600 font-black">三角比題目</span>與右側<span className="text-amber-600 font-black">對應數值</span>完成配對（右側恆多 <span className="text-rose-600 font-black">1 張干擾卡</span>）！<br/>
-                  從 <span className="text-indigo-700 font-black">左 3 / 右 4</span> 起跳，隨進度升至 <span className="text-emerald-600 font-black">左 5 / 右 6</span>，不限時、配對錯誤扣愛心，連續完美清波可補心！
-                </p>
-              </div>
-              <CompactStarPills starsThreshold={[2, 4, 6]} livesMode maxLives={4} unitLabel="波" />
-              <div className="w-full space-y-2">
-                <button onClick={() => { audio.init(); startAdventureGame(); }} className="w-full py-4 btn-3d-blue text-white font-black text-lg rounded-2xl shadow-xl tracking-wider active:scale-95">🚀 開始挑戰！</button>
-                <button onClick={onBackToMap} className="w-full py-2 text-xs font-bold text-slate-400 hover:text-slate-600">返回聖域地圖</button>
-              </div>
-            </div>
-          )}
-
           {gameState === 'playing' && (
             <div className="flex-1 min-h-0 flex flex-col justify-between gap-2 overflow-hidden pb-0.5">
-              {isDojo ? (
-                <GameHUD score={score} combo={combo} timeLeft={timeLeft} maxTime={activeMaxTime} starsThreshold={levelConfig.stars} isDojo={true} extraRight={waveStatusExtra} onManualEnd={() => { clearInterval(timerRef.current); setDojoGameState('ended'); }} />
-              ) : (
-                <GameHUD livesMode progress={livesSession.progress} starThresholds={[2, 4, 6]} lives={livesSession.lives} maxLives={4} healStreak={livesSession.healStreak} healTarget={2} unitLabel="波" extraRight={waveStatusExtra} onManualEnd={livesSession.finishNow} onOpenGuide={() => setShowGuide(true)} />
-              )}
+              <GameHUD livesMode progress={livesSession.progress} starThresholds={[2, 4, 6]} lives={livesSession.lives} maxLives={4} healStreak={livesSession.healStreak} healTarget={2} unitLabel="波" onManualEnd={livesSession.finishNow} onOpenGuide={() => setShowGuide(true)} />
 
               <div className="flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150">
                 <div className="bg-slate-800 h-[48px] px-3 flex justify-center items-center gap-2 text-base sm:text-xl font-serif text-white border-b-2 border-slate-700 shrink-0">
@@ -7255,12 +7641,8 @@
                   </div>
                 </div>
 
-                <div className="bg-slate-100 border-b border-slate-200 flex justify-between items-center py-1 px-3 shrink-0">
-                  <div className="flex items-center gap-1.5 text-[11px] font-black text-slate-600">
-                    <span>第 <span className="text-indigo-700">{waveNumber}</span> 波 ({solvedInCurrentWave}/{leftCards.length})</span>
-                    <span className="text-[10px] font-bold bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-md border border-indigo-200">{getWaveScopeLabel(waveNumber)}</span>
-                  </div>
-                  <button onClick={handleManualReshuffle} disabled={isProcessing} className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all border-b-2 ${!isProcessing ? 'bg-indigo-100 text-indigo-700 border-indigo-300 shadow-sm active:translate-y-0.5' : 'bg-slate-200 text-slate-400 border-slate-300'}`}>🔄 換一組</button>
+                <div className="bg-slate-100 border-b border-slate-200 h-6 px-3 flex items-center justify-between text-[11px] font-black text-slate-600 shrink-0">
+                  <span>{getWaveScopeLabel(waveNumber)}（第 {waveNumber} 波・{solvedInCurrentWave}/{leftCards.length}）</span>
                 </div>
 
                 <div className="relative grid grid-cols-2 gap-2.5 flex-1 min-h-0 overflow-hidden p-2.5 bg-slate-50">
@@ -7343,56 +7725,37 @@
           )}
 
           {gameState === 'ended' && (
-            isDojo ? (
-              <LevelResultScreen
-                score={score}
-                baseScore={baseScore}
-                earnedStars={0}
-                maxCombo={maxCombo}
-                correctCount={totalSolved}
-                wrongCount={wrongCount}
-                maxTime={activeMaxTime}
-                isDojo={true}
-                accentClass="text-amber-600"
-                onCompleteLevel={onCompleteLevel}
-                onRestart={() => setDojoGameState('settings')}
-                onBackToMap={onBackToMap}
-              />
-            ) : (
-              <LevelResultScreen
-                livesMode
-                score={livesSession.finalScore}
-                baseScore={livesSession.baseScore}
-                lifeBonus={livesSession.lifeBonus}
-                accuracyBonus={livesSession.accuracyBonus}
-                speedBonus={livesSession.speedBonus}
-                earnedStars={livesSession.earnedStars}
-                lives={livesSession.lives}
-                maxLives={4}
-                elapsedSec={livesSession.elapsedSec}
-                correctCount={livesSession.correctCount}
-                wrongCount={livesSession.wrongCount}
-                starThresholds={[2, 4, 6]}
-                unitLabel="波"
-                accentClass="text-amber-600"
-                onCompleteLevel={onCompleteLevel}
-                onRestart={startAdventureGame}
-                onBackToMap={onBackToMap}
-              />
-            )
-          )}
-
-          {!isDojo && (
-            <CoachOverlay
-              containerRef={containerRef}
-              active={showGuide && gameState === 'playing'}
-              onDismiss={dismissGuide}
-              steps={[
-                { target: 'lv18-left', text: '先點選左側一張三角比題目卡', shape: 'ellipse', pad: 6, tap: true },
-                { target: 'lv18-right', text: '再點選右側對應的數值卡配對', shape: 'ellipse', pad: 6, tap: true }
-              ]}
+            <LevelResultScreen
+              livesMode
+              score={livesSession.finalScore}
+              baseScore={livesSession.baseScore}
+              lifeBonus={livesSession.lifeBonus}
+              accuracyBonus={livesSession.accuracyBonus}
+              speedBonus={livesSession.speedBonus}
+              earnedStars={livesSession.earnedStars}
+              lives={livesSession.lives}
+              maxLives={4}
+              elapsedSec={livesSession.elapsedSec}
+              correctCount={livesSession.correctCount}
+              wrongCount={livesSession.wrongCount}
+              starThresholds={[2, 4, 6]}
+              unitLabel="波"
+              accentClass="text-amber-600"
+              onCompleteLevel={onCompleteLevel}
+              onRestart={startAdventureGame}
+              onBackToMap={onBackToMap}
             />
           )}
+
+          <CoachOverlay
+            containerRef={containerRef}
+            active={showGuide && gameState === 'playing'}
+            onDismiss={dismissGuide}
+            steps={[
+              { target: 'lv18-left', text: '先點選左側一張三角比題目卡', shape: 'ellipse', pad: 6, tap: true },
+              { target: 'lv18-right', text: '再點選右側對應的數值卡配對', shape: 'ellipse', pad: 6, tap: true }
+            ]}
+          />
         </div>
       );
     };
@@ -7437,16 +7800,16 @@
       },
       { id: 7,  kind: 'level', x: -6.8, y: 4.8, z: 2.6,   pillarH: 3.1, radScale: 1.00, sides: 6, rot: Math.PI / 6, baseColor: 0x1d4ed8, trimColor: 0xe0f2fe, color: 0x60a5fa, sea: 2 },
       { id: 8,  kind: 'level', x: -3.8, y: 5.6, z: 0.0,   pillarH: 4.6, radScale: 1.08, sides: 6, rot: Math.PI / 6, baseColor: 0x701a75, trimColor: 0xf5d0fe, color: 0xe879f9, sea: 2 },
-      { id: 9,  kind: 'level', x: -0.8, y: 6.4, z: -2.6,  pillarH: 3.3, radScale: 1.02, sides: 6, rot: Math.PI / 6, baseColor: 0x334155, trimColor: 0xcbd5e1, color: 0x64748b, sea: 2, isPlaceholder: true },
+      { id: 9,  kind: 'level', x: -0.8, y: 6.4, z: -2.6,  pillarH: 3.3, radScale: 1.02, sides: 6, rot: Math.PI / 6, baseColor: 0x0f766e, trimColor: 0x5eead4, color: 0x14b8a6, sea: 2 },
       { id: 10, kind: 'level', x: 2.2,  y: 7.2, z: -5.2,  pillarH: 4.5, radScale: 1.04, sides: 6, rot: Math.PI / 6, baseColor: 0x0e7490, trimColor: 0xcffafe, color: 0x22d3ee, sea: 2 },
       { id: 11, kind: 'level', x: 5.2,  y: 8.0, z: -7.8,  pillarH: 3.6, radScale: 1.02, sides: 6, rot: Math.PI / 6, baseColor: 0x881337, trimColor: 0xffe4e6, color: 0xfb7185, sea: 2 },
       { id: 12, kind: 'level', x: 8.2,  y: 8.8, z: -10.4, pillarH: 5.0, radScale: 1.10, sides: 6, rot: Math.PI / 6, baseColor: 0x4c1d95, trimColor: 0xede9fe, color: 0xa78bfa, sea: 2 },
 
       // === 第三聖域｜幻夜王座尖塔（正八邊形 sides: 8，Lv.13~18） ===
       {
-        id: 'shrine_3', kind: 'shrine', title: '修行幻境', seaLabel: '👑 第三聖域：幻夜尖塔',
-        subtitle: '第三聖域試煉道場 • 自訂時間、度數/弧度與象限特訓',
-        actionLabel: '創建修行幻境', actionIcon: '⚙️',
+        id: 'shrine_3', kind: 'shrine', title: '對稱與弧度聖典', seaLabel: '👑 第三聖域：幻夜尖塔',
+        subtitle: '第三聖域知識聖所（建置中，敬請期待）',
+        actionLabel: '聖典建置中', actionIcon: '📖',
         ...SHRINE_CENTERS_3D[3], pillarH: 5.6, radScale: 1.28, sides: 8, rot: Math.PI / 8,
         baseColor: 0xe2e8f0, trimColor: 0xf3e8ff, color: 0xc084fc, badgeColor: '#9333ea', sea: 3
       },
@@ -7546,7 +7909,6 @@
       onStartLevel,
       onOpenShrine1,
       onOpenShrine2,
-      onOpenDojo,
       onOpenStatus,
       onLockedAttempt
     }) => {
@@ -7596,7 +7958,6 @@
         onStartLevel,
         onOpenShrine1,
         onOpenShrine2,
-        onOpenDojo,
         gameMode,
         adventureTotalStars,
         userProgress
@@ -7608,7 +7969,6 @@
         onStartLevel,
         onOpenShrine1,
         onOpenShrine2,
-        onOpenDojo,
         gameMode,
         adventureTotalStars,
         userProgress
@@ -9791,7 +10151,7 @@
         audio.sfxSelect();
         if (focusedShrineObj.id === 'shrine_1') onOpenShrine1();
         else if (focusedShrineObj.id === 'shrine_2') onOpenShrine2();
-        else if (focusedShrineObj.id === 'shrine_3') onOpenDojo();
+        else if (focusedShrineObj.id === 'shrine_3') onLockedAttempt('第三聖域聖典建置中，敬請期待！');
       };
 
       const handleReturnToMainline = () => {
@@ -9914,7 +10274,6 @@
               </div>
             </div>
           )}
-
           <div className="absolute top-2.5 right-2.5 z-20 flex items-center justify-end pointer-events-none">
             <button
               onClick={() => handleFocusSea('all')}
@@ -10026,6 +10385,7 @@
                 </button>
                 <button
                   onClick={handleEnterFocusedShrine}
+                  className="flex-1 py-3 btn-3d-yellow text-amber-950 font-black text-sm rounded-xl shadow-lg tracking-wide flex items-center justify-center gap-1.5 truncate px-2"
                   className="flex-1 py-3 btn-3d-yellow text-amber-950 font-black text-sm rounded-xl shadow-lg tracking-wide flex items-center justify-center gap-1.5 truncate px-2"
                 >
                   <span>{focusedShrineObj.actionIcon}</span>
@@ -10291,29 +10651,41 @@
       const transitionToStage = useCallback((nextStage, beforeSwitch, opts = {}) => {
         clearTimeout(curtainTimerRef.current);
         const mode = opts.mode || (opts.isMist ? 'mist-in' : 'fade');
-        const inMs = opts.inMs || 150;
+        const inMs = opts.inMs || 180;
         const durationMs = opts.durationMs || 280;
         const holdMs = opts.holdMs || 0;
         const settleMs = mode === 'mist-in' ? 180 : 30;
+        const startPhase = mode === 'fade' ? 'prep' : 'in';
         setCurtainState({
-          phase: 'in',
+          phase: startPhase,
           mode,
           icon: opts.icon || '',
           title: opts.title || '',
           sub: opts.sub || '',
+          inMs,
           durationMs,
           holdMs
         });
-        curtainTimerRef.current = setTimeout(() => {
-          if (beforeSwitch) beforeSwitch();
-          setCurrentStage(nextStage);
+        const runSwitch = () => {
           curtainTimerRef.current = setTimeout(() => {
-            setCurtainState(prev => ({ ...prev, phase: 'out' }));
+            if (beforeSwitch) beforeSwitch();
+            setCurrentStage(nextStage);
             curtainTimerRef.current = setTimeout(() => {
-              setCurtainState(prev => ({ ...prev, phase: 'hidden' }));
-            }, durationMs + 60);
-          }, settleMs);
-        }, inMs);
+              setCurtainState(prev => ({ ...prev, phase: 'out' }));
+              curtainTimerRef.current = setTimeout(() => {
+                setCurtainState(prev => ({ ...prev, phase: 'hidden' }));
+              }, durationMs + 60);
+            }, settleMs);
+          }, inMs);
+        };
+        if (startPhase === 'prep') {
+          curtainTimerRef.current = setTimeout(() => {
+            setCurtainState(prev => ({ ...prev, phase: 'in' }));
+            runSwitch();
+          }, 20);
+        } else {
+          runSwitch();
+        }
       }, []);
 
       const returnToMapFromLevel = useCallback(() => {
@@ -10420,7 +10792,7 @@
           mapViewSnapshotRef.current = mapCtrlRef.current.getSnapshot();
         }
         audio.init();
-        transitionToStage('playing', () => setSelectedLevel(lvlId), { mode: 'fade', inMs: 140, durationMs: 220 });
+        transitionToStage('playing', () => setSelectedLevel(lvlId), { mode: 'fade', inMs: 180, durationMs: 280 });
       }, [transitionToStage]);
 
       const adventureTotalStars = useMemo(() => Object.values(userProgress.stars || {}).reduce((acc, cur) => acc + (cur || 0), 0), [userProgress.stars]);
@@ -10681,7 +11053,7 @@
         if (e.target.hasPointerCapture(e.pointerId)) e.target.releasePointerCapture(e.pointerId);
       };
 
-      const activeLevelObj = selectedLevel !== 'dojo' ? LEVELS.find(l => l.id === selectedLevel) : null;
+      const activeLevelObj = LEVELS.find(l => l.id === selectedLevel) || null;
       const titleStarsBg = useMemo(() => (
         Array.from({ length: 24 }, (_, i) => ({
           id: i,
@@ -10722,10 +11094,10 @@
                   </button>
                   <div className="min-w-0 flex-1">
                     <div className="text-[10px] font-black text-indigo-500 leading-none">
-                      {selectedLevel === 'dojo' ? 'FREE DOJO' : selectedLevel === 19 ? '👑 FINAL BOSS' : `STAGE Lv.${selectedLevel}`}
+                      {selectedLevel === 19 ? '👑 FINAL BOSS' : `STAGE Lv.${selectedLevel}`}
                     </div>
                     <div className="text-sm sm:text-base font-black text-indigo-950 leading-tight whitespace-nowrap truncate">
-                      {selectedLevel === 'dojo' ? '修行幻境' : activeLevelObj?.title}
+                      {activeLevelObj?.title}
                     </div>
                   </div>
                 </div>
@@ -11080,7 +11452,6 @@
                 onStartLevel={(lvlId) => enterLevelFromMap(lvlId)}
                 onOpenShrine1={() => setShowUnifiedShrine(true)}
                 onOpenShrine2={() => setShowAngleDialModal(true)}
-                onOpenDojo={() => enterLevelFromMap('dojo')}
                 onOpenStatus={() => { setStatusSlot(activeSlot); setShowStatusModal(true); }}
                 onLockedAttempt={(reason) => { setLockedNotice(reason); setTimeout(() => setLockedNotice(null), 1900); }}
               />
@@ -11109,6 +11480,8 @@
                     <Level5AngleSteeringMaster currentStars={activeStarsMap[7] || 0} hasSeenGuide={hasSeenGuide(7)} onMarkGuideSeen={() => markGuideSeen(7)} onUpdateStars={(c, s) => handleUpdateStars(7, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 8 ? (
                     <LevelCoterminalPopMaster currentStars={activeStarsMap[8] || 0} hasSeenGuide={hasSeenGuide(8)} onMarkGuideSeen={() => markGuideSeen(8)} onUpdateStars={(c, s) => handleUpdateStars(8, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
+                  ) : selectedLevel === 9 ? (
+                    <Level9QuadrantNavigator currentStars={activeStarsMap[9] || 0} hasSeenGuide={hasSeenGuide(9)} onMarkGuideSeen={() => markGuideSeen(9)} onUpdateStars={(c, s) => handleUpdateStars(9, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 10 ? (
                     <Level6VectorCompassMaster currentStars={activeStarsMap[10] || 0} hasSeenGuide={hasSeenGuide(10)} onMarkGuideSeen={() => markGuideSeen(10)} onUpdateStars={(c, s) => handleUpdateStars(10, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 11 ? (
@@ -11118,10 +11491,9 @@
                   ) : (
                     <LevelLightingCardGame
                       levelData={LEVELS.find(l => l.id === selectedLevel)}
-                      isDojo={selectedLevel === 'dojo'}
                       currentStars={activeStarsMap[selectedLevel] || 0}
-                      hasSeenGuide={selectedLevel !== 'dojo' && hasSeenGuide(selectedLevel)}
-                      onMarkGuideSeen={() => selectedLevel !== 'dojo' && markGuideSeen(selectedLevel)}
+                      hasSeenGuide={hasSeenGuide(selectedLevel)}
+                      onMarkGuideSeen={() => markGuideSeen(selectedLevel)}
                       onUpdateStars={(c, s) => handleUpdateStars(selectedLevel, c, s)}
                       onCompleteLevel={handleCompleteLevel}
                       onBackToMap={returnToMapFromLevel}
@@ -11836,7 +12208,7 @@
 
           {/* 主畫面 ↔ 地圖 景深對焦切換（聖域由模糊漸清、故事文字由清晰轉模糊消失）/ 關卡輕轉場 */}
           {curtainState.phase !== 'hidden' && (() => {
-            const { phase, mode, durationMs, holdMs } = curtainState;
+            const { phase, mode, inMs, durationMs, holdMs } = curtainState;
             const isOut = phase === 'out';
             const isPrep = phase === 'prep';
             const isMistIn = mode === 'mist-in';
@@ -11846,7 +12218,7 @@
               ? { transitionDuration: isOut ? '320ms' : '600ms' }
               : isMistIn
               ? { transitionDuration: isOut ? '900ms' : '160ms' }
-              : { transitionDuration: isOut ? `${durationMs}ms` : '150ms' };
+              : { transitionDuration: isOut ? `${durationMs}ms` : `${inMs || 180}ms` };
 
             const textFadeMs = Math.max(450, durationMs - (holdMs || 0));
             const textStyle = {
@@ -11857,9 +12229,7 @@
               transform: isOut ? 'scale(1.04)' : 'scale(1)'
             };
 
-            const bgOpacityClass = isMistOut
-              ? (isPrep || isOut ? 'opacity-0' : 'opacity-100')
-              : (isOut ? 'opacity-0' : 'opacity-100');
+            const bgOpacityClass = isPrep || isOut ? 'opacity-0' : 'opacity-100';
 
             return (
               <div
