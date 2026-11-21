@@ -861,6 +861,7 @@
       const [elapsedSec, setElapsedSec] = useState(0);
       const startTimeRef = useRef(Date.now());
       const endTimerRef = useRef(null);
+      const questionMissedRef = useRef(false);
 
       useEffect(() => () => { if (endTimerRef.current) clearTimeout(endTimerRef.current); }, []);
 
@@ -912,11 +913,13 @@
         setWrongCount(0);
         setElapsedSec(0);
         startTimeRef.current = Date.now();
+        questionMissedRef.current = false;
         setGameState('playing');
         return initProg;
       }, [maxLives, debugPhase, starThresholds]);
 
       const recordCorrect = useCallback(({ wasMissed = false, delayEndMs = 460 } = {}) => {
+        questionMissedRef.current = false;
         const nextProg = progress + 1;
         setProgress(nextProg);
         setCorrectCount(c => c + 1);
@@ -945,7 +948,11 @@
         return { completed: false, nextProgress: nextProg };
       }, [progress, healStreak, healTarget, lives, maxLives, isRelaxMode, starThresholds, finishNow]);
 
-      const recordWrong = useCallback(({ delayEndMs = 450 } = {}) => {
+      const recordWrong = useCallback(({ delayEndMs = 450, capPerQuestion = true } = {}) => {
+        if (capPerQuestion && questionMissedRef.current) {
+          return { gameOver: false, nextLives: lives, capped: true };
+        }
+        questionMissedRef.current = true;
         setWrongCount(w => w + 1);
         setHealStreak(0);
         if (isRelaxMode) return { gameOver: false, nextLives: maxLives };
@@ -2971,9 +2978,9 @@
     // ==================== 第 1 關組件：直角三角神之眼（餘命進度制） ====================
     const Level1EdgeMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
-      const starsThreshold = [4, 8, 12];
-      const maxLives = 4;
-      const healTarget = 4;
+      const starsThreshold = [3, 6, 9];
+      const maxLives = 3;
+      const healTarget = 3;
       const {
         gameState, progress, lives, healStreak, correctCount, wrongCount, elapsedSec,
         earnedStars, baseScore, lifeBonus, accuracyBonus, speedBonus, finalScore,
@@ -3293,9 +3300,9 @@
     // ==================== 第 2 關組件：比值之密碼（餘命進度制） ====================
     const Level2RatioMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
-      const starsThreshold = [4, 8, 12];
-      const maxLives = 4;
-      const healTarget = 4;
+      const starsThreshold = [3, 6, 9];
+      const maxLives = 3;
+      const healTarget = 3;
       const {
         gameState, progress, lives, healStreak, correctCount, wrongCount, elapsedSec,
         earnedStars, baseScore, lifeBonus, accuracyBonus, speedBonus, finalScore,
@@ -3578,9 +3585,9 @@
     // ==================== 第 3 關組件：未知邊獵人（比例狙擊｜餘命進度制） ====================
     const Level3MissingSideMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
-      const starsThreshold = [4, 8, 12];
-      const maxLives = 4;
-      const healTarget = 4;
+      const starsThreshold = [2, 5, 9];
+      const maxLives = 3;
+      const healTarget = 3;
       const {
         gameState, progress, lives, healStreak, correctCount, wrongCount, elapsedSec,
         earnedStars, baseScore, lifeBonus, accuracyBonus, speedBonus, finalScore,
@@ -4047,7 +4054,7 @@
     const Level4SpecialAnglesMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
       const starsThreshold = [2, 4, 6];
-      const maxLives = 4;
+      const maxLives = 3;
       const healTarget = 2;
       const {
         gameState, progress, lives, healStreak, correctCount, wrongCount, elapsedSec,
@@ -4586,7 +4593,7 @@
     const Level5TrigRelationsMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
       const starsThreshold = [2, 4, 6];
-      const maxLives = 4;
+      const maxLives = 3;
       const healTarget = 2;
       const {
         gameState, progress, lives, healStreak, correctCount, wrongCount, elapsedSec,
@@ -5529,9 +5536,9 @@
     };
     const Level5AngleSteeringMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
-      const starsThreshold = [4, 8, 12];
-      const maxLives = 4;
-      const healTarget = 4;
+      const starsThreshold = [2, 5, 9];
+      const maxLives = 3;
+      const healTarget = 3;
       const {
         gameState, progress, lives, healStreak, correctCount, wrongCount, elapsedSec,
         earnedStars, baseScore, lifeBonus, accuracyBonus, speedBonus, finalScore,
@@ -6035,7 +6042,7 @@
     const LevelCoterminalPopMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
       const starsThreshold = [2, 4, 6];
-      const maxLives = 4;
+      const maxLives = 3;
       const healTarget = 2;
       const {
         gameState, progress, lives, healStreak, correctCount, wrongCount, elapsedSec,
@@ -6633,9 +6640,9 @@
 
     const Level9QuadrantNavigator = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap, hasSeenGuide = false, onMarkGuideSeen }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
-      const starsThreshold = [4, 8, 12];
-      const maxLives = 4;
-      const healTarget = 4;
+      const starsThreshold = [2, 5, 9];
+      const maxLives = 3;
+      const healTarget = 3;
       const {
         gameState, progress, lives, healStreak, correctCount, wrongCount, elapsedSec,
         earnedStars, baseScore, lifeBonus, accuracyBonus, speedBonus, finalScore,
@@ -7871,7 +7878,7 @@
     const Level7AstroCompassMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap, hasSeenGuide = false, onMarkGuideSeen }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
       const starsThreshold = [2, 4, 6];
-      const maxLives = 4;
+      const maxLives = 3;
       const healTarget = 2;
       const {
         gameState, progress, lives, healStreak, correctCount, wrongCount, elapsedSec,
@@ -8332,9 +8339,9 @@
 
     const Level8QuadrantSignMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap, hasSeenGuide = false, onMarkGuideSeen }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
-      const starsThreshold = [4, 8, 12];
-      const maxLives = 4;
-      const healTarget = 4;
+      const starsThreshold = [2, 5, 9];
+      const maxLives = 3;
+      const healTarget = 3;
       const {
         gameState, progress, lives, healStreak, correctCount, wrongCount, elapsedSec,
         earnedStars, baseScore, lifeBonus, accuracyBonus, speedBonus, finalScore,
@@ -8748,7 +8755,7 @@
       const levelConfig = levelData?.config || { quadrants: ['q1'], funcs: ['sin', 'cos', 'tan'] };
       const livesSession = useLivesLevelSession({
         starThresholds: [2, 4, 6],
-        maxLives: 4,
+        maxLives: 3,
         healTarget: 2,
         unitLabel: '波',
         currentStars,
@@ -9049,7 +9056,7 @@
 
           {gameState === 'playing' && (
             <div className="flex-1 min-h-0 flex flex-col justify-between gap-2 overflow-hidden pb-0.5">
-              <GameHUD livesMode progress={livesSession.progress} starThresholds={[2, 4, 6]} lives={livesSession.lives} maxLives={4} healStreak={livesSession.healStreak} healTarget={2} unitLabel="波" onManualEnd={livesSession.finishNow} onOpenGuide={openGuide} />
+              <GameHUD livesMode progress={livesSession.progress} starThresholds={[2, 4, 6]} lives={livesSession.lives} maxLives={livesSession.maxLives} healStreak={livesSession.healStreak} healTarget={2} unitLabel="波" onManualEnd={livesSession.finishNow} onOpenGuide={openGuide} />
 
               <div className="flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150">
                 <div className="bg-slate-800 h-[48px] px-3 flex justify-center items-center gap-2 text-base sm:text-xl font-serif text-white border-b-2 border-slate-700 shrink-0">
