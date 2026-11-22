@@ -3,6 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="勇闖三角比聖域">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0f172a">
   <title>勇闖三角比聖域</title>
   
   <!-- 載入 Tailwind CSS -->
@@ -201,6 +206,48 @@
     }
     .animate-coach-drag {
       animation: coachDragGlide 2.8s cubic-bezier(0.37, 0, 0.63, 1) infinite;
+    }
+    @keyframes coachDragArcRotate {
+      0%, 22% { transform: rotate(0deg); }
+      72%, 100% { transform: rotate(var(--arc-deg, -42deg)); }
+    }
+    @keyframes coachDragPress {
+      0% { transform: scale(1.18); opacity: 0; }
+      12% { transform: scale(1); opacity: 0.95; }
+      22%, 72% { transform: scale(0.8); opacity: 1; }
+      84% { transform: scale(1.08); opacity: 0.92; }
+      100% { transform: scale(1.18); opacity: 0; }
+    }
+    .animate-coach-arc-rotate {
+      animation: coachDragArcRotate 2.8s cubic-bezier(0.37, 0, 0.63, 1) infinite;
+    }
+    .animate-coach-arc-press {
+      animation: coachDragPress 2.8s cubic-bezier(0.37, 0, 0.63, 1) infinite;
+    }
+    @keyframes lightSlotBreath {
+      0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 2px rgba(217, 119, 6, 0.35));
+      }
+      50% {
+        transform: scale(1.06);
+        filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.85));
+      }
+    }
+    .animate-light-breath {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: lightSlotBreath 1.45s ease-in-out infinite;
+    }
+    @keyframes resultStarSlam {
+      0% { transform: scale(0.2) rotate(-28deg) translateY(10px); opacity: 0; }
+      62% { transform: scale(1.24) rotate(6deg) translateY(-3px); opacity: 1; }
+      82% { transform: scale(0.94) rotate(-2deg) translateY(0); opacity: 1; }
+      100% { transform: scale(1) rotate(0deg) translateY(0); opacity: 1; }
+    }
+    .animate-result-star {
+      opacity: 0;
+      animation: resultStarSlam 0.56s cubic-bezier(0.22, 1.25, 0.36, 1) forwards;
     }
 
     /* Lv.10 動徑平滑生長與三角形淡入動畫 */
@@ -1016,6 +1063,65 @@
       );
     };
 
+    const ResultStarsShowcase = ({ earnedStars = 0 }) => {
+      const [litCount, setLitCount] = useState(0);
+      useEffect(() => {
+        setLitCount(0);
+        if (earnedStars <= 0) return;
+        const timers = [];
+        for (let i = 1; i <= earnedStars; i++) {
+          timers.push(setTimeout(() => {
+            setLitCount(i);
+            if (i === earnedStars) audio.sfxBonus();
+            else audio.sfxSelect();
+          }, 180 + (i - 1) * 240));
+        }
+        return () => timers.forEach(clearTimeout);
+      }, [earnedStars]);
+
+      const slots = [
+        { idx: 1, sizeCls: 'w-11 h-11', posCls: '-rotate-6 translate-y-1' },
+        { idx: 2, sizeCls: 'w-14 h-14', posCls: '-translate-y-1.5' },
+        { idx: 3, sizeCls: 'w-11 h-11', posCls: 'rotate-6 translate-y-1' }
+      ];
+
+      return (
+        <div className={`relative flex flex-col items-center justify-center rounded-2xl py-2.5 px-4 mb-3 border ${
+          earnedStars >= 3
+            ? 'bg-gradient-to-b from-amber-50 via-yellow-50/70 to-white border-amber-300/80 shadow-inner'
+            : earnedStars >= 1
+            ? 'bg-gradient-to-b from-amber-50/70 to-white border-amber-200/70'
+            : 'bg-slate-50/70 border-slate-200'
+        }`}>
+          {earnedStars >= 1 && (
+            <div className={`text-[10px] font-black tracking-widest uppercase px-3 py-0.5 rounded-full mb-2 border shadow-sm ${
+              earnedStars >= 3
+                ? 'bg-gradient-to-r from-amber-400 to-yellow-300 text-amber-950 border-amber-500'
+                : 'bg-amber-100 text-amber-800 border-amber-300'
+            }`}>
+              {earnedStars >= 3 ? '★ PERFECT CLEAR! ★' : 'STAGE CLEAR!'}
+            </div>
+          )}
+          <div className="flex items-end justify-center gap-3 py-1">
+            {slots.map(({ idx, sizeCls, posCls }) => {
+              const isFilled = earnedStars >= idx;
+              const isLit = litCount >= idx;
+              return (
+                <div key={idx} className={`relative flex items-center justify-center ${posCls}`}>
+                  {isFilled && isLit && (
+                    <span className="pointer-events-none absolute left-1/2 top-1/2 w-10 h-10 rounded-full border-2 border-amber-400 animate-star-ring" />
+                  )}
+                  <div className={isFilled ? (isLit ? 'animate-result-star drop-shadow-[0_4px_10px_rgba(245,158,11,0.5)]' : 'opacity-0 scale-50') : 'opacity-80'}>
+                    <StarBadge filled={isFilled && isLit} className={sizeCls} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    };
+
     const LevelResultScreen = ({
       score,
       baseScore = 0,
@@ -1038,13 +1144,49 @@
       onRestart,
       onBackToMap
     }) => {
-      const { isRelaxMode } = React.useContext(GameModeContext);
+      const { isRelaxMode, getNextLevelForResult } = React.useContext(GameModeContext);
       const relaxActive = isRelaxMode && !isDojo;
       const isLivesMode = lives !== undefined;
       const bonusScore = isLivesMode ? (lifeBonus + speedBonus) : Math.max(0, score - baseScore);
       const totalAttempts = correctCount + wrongCount;
       const accuracy = totalAttempts > 0 ? Math.round((correctCount / totalAttempts) * 100) : 0;
       const avgSec = correctCount > 0 ? (maxTime / correctCount).toFixed(1) : '--';
+      const nextLevelObj = !isDojo && earnedStars >= 1 && getNextLevelForResult ? getNextLevelForResult(earnedStars) : null;
+
+      const renderActionButtons = () => (
+        <div className="w-full space-y-2 mt-auto pt-2">
+          {!isDojo && earnedStars >= 1 ? (
+            nextLevelObj ? (
+              <>
+                <button
+                  onClick={() => onCompleteLevel(earnedStars, score, true)}
+                  className="w-full py-3.5 btn-3d-yellow text-amber-950 font-black text-base rounded-2xl shadow-xl"
+                >
+                  ▶ 下一關：Lv.{nextLevelObj.id} {nextLevelObj.title}
+                </button>
+                <button
+                  onClick={() => onCompleteLevel(earnedStars, score, false)}
+                  className="w-full py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl"
+                >
+                  🗺️ 返回聖域地圖
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => onCompleteLevel(earnedStars, score, false)}
+                className="w-full py-3.5 btn-3d-yellow text-amber-950 font-black text-base rounded-2xl shadow-xl"
+              >
+                🏆 結算並返回地圖
+              </button>
+            )
+          ) : (
+            <>
+              <button onClick={onRestart} className="w-full py-3.5 btn-3d-green text-white font-black text-base rounded-2xl shadow-xl">🔄 再挑戰一次！</button>
+              <button onClick={onBackToMap} className="w-full py-2 text-xs font-bold text-slate-500 bg-slate-100 rounded-xl">返回聖域地圖</button>
+            </>
+          )}
+        </div>
+      );
 
       if (isLivesMode) {
         const outOfLives = !relaxActive && lives <= 0;
@@ -1058,13 +1200,9 @@
                   ? (earnedStars >= 1 ? '💔 餘命耗盡（保留星等）' : '💔 餘命耗盡，再接再厲')
                   : '👑 達成三星完美通關！'}
               </div>
-              <h3 className="text-2xl font-black text-indigo-950 mb-2.5">{relaxActive ? '休閒練習結算' : '試煉結算'}</h3>
+              <h3 className="text-2xl font-black text-indigo-950 mb-2">{relaxActive ? '休閒練習結算' : '試煉結算'}</h3>
 
-              <div className="flex justify-center gap-2 mb-3">
-                <StarBadge filled={earnedStars >= 1} className="w-9 h-9" />
-                <StarBadge filled={earnedStars >= 2} className="w-9 h-9" />
-                <StarBadge filled={earnedStars >= 3} className="w-9 h-9" />
-              </div>
+              <ResultStarsShowcase earnedStars={earnedStars} />
 
               <div className="bg-slate-100 rounded-2xl p-3 border-2 border-slate-200 w-full mb-2.5">
                 <div className="text-[11px] text-slate-500 font-bold">榮譽榜總分（星等僅看答對{unitLabel}數）</div>
@@ -1108,14 +1246,7 @@
               <div className="text-[11px] font-bold text-slate-500">正確率 {accuracy}%（{correctCount} 對 / {wrongCount} 錯）</div>
             </div>
 
-            <div className="w-full space-y-2 mt-auto pt-2">
-              {earnedStars >= 1 ? (
-                <button onClick={() => onCompleteLevel(earnedStars, score)} className="w-full py-3.5 btn-3d-yellow text-amber-950 font-black text-base rounded-2xl shadow-xl animate-bounce">🏆 結算並通關！</button>
-              ) : (
-                <button onClick={onRestart} className="w-full py-3.5 btn-3d-green text-white font-black text-base rounded-2xl shadow-xl">🔄 再挑戰一次！</button>
-              )}
-              <button onClick={onBackToMap} className="w-full py-2 text-xs font-bold text-slate-500 bg-slate-100 rounded-xl">返回聖域地圖</button>
-            </div>
+            {renderActionButtons()}
           </div>
         );
       }
@@ -1126,15 +1257,9 @@
             <div className={`text-xs font-black uppercase tracking-widest mb-1 ${accentClass}`}>
               {relaxActive ? (earnedStars >= 3 ? '★ 達成三星畢業！' : '🌱 休閒練習結束') : 'TIME UP! 時間到'}
             </div>
-            <h3 className="text-2xl font-black text-indigo-950 mb-2.5">{isDojo ? '修行結算' : relaxActive ? '休閒練習結算' : '挑戰結算'}</h3>
+            <h3 className="text-2xl font-black text-indigo-950 mb-2">{isDojo ? '修行結算' : relaxActive ? '休閒練習結算' : '挑戰結算'}</h3>
 
-            {!isDojo && (
-              <div className="flex justify-center gap-2 mb-3">
-                <StarBadge filled={earnedStars >= 1} className="w-9 h-9" />
-                <StarBadge filled={earnedStars >= 2} className="w-9 h-9" />
-                <StarBadge filled={earnedStars >= 3} className="w-9 h-9" />
-              </div>
-            )}
+            {!isDojo && <ResultStarsShowcase earnedStars={earnedStars} />}
 
             <div className="bg-slate-100 rounded-2xl p-3 border-2 border-slate-200 w-full mb-2.5">
               <div className="text-[11px] text-slate-500 font-bold">最終總分</div>
@@ -1175,14 +1300,7 @@
             </div>
           </div>
 
-          <div className="w-full space-y-2 mt-auto pt-1">
-            {!isDojo && earnedStars >= 1 ? (
-              <button onClick={() => onCompleteLevel(earnedStars, score)} className="w-full py-3.5 btn-3d-yellow text-amber-950 font-black text-base rounded-2xl shadow-xl animate-bounce">🏆 結算並通關！</button>
-            ) : (
-              <button onClick={onRestart} className="w-full py-3.5 btn-3d-green text-white font-black text-base rounded-2xl shadow-xl">🔄 再挑戰一次！</button>
-            )}
-            <button onClick={onBackToMap} className="w-full py-2 text-xs font-bold text-slate-500 bg-slate-100 rounded-xl">返回聖域地圖</button>
-          </div>
+          {renderActionButtons()}
         </div>
       );
     };
@@ -1204,23 +1322,24 @@
     };
 
     // ==================== 多步驟關卡共用：分段接力實機引導 Hook（Just-in-Time） ====================
-    const useStagedLevelGuide = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen = null, activeStageKey = null, enabled = true, finalStageKey = null }) => {
+    const useStagedLevelGuide = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen = null, activeStageKey = null, phase = 0, enabled = true, finalStageKey = null }) => {
       const [guideMode, setGuideMode] = useState(null); // 'spotlight' | 'manual' | null
       const guidedStagesRef = useRef({});
-      const dismissedAllRef = useRef(hasSeenGuide || currentStars > 0);
+      const skippedPhasesRef = useRef({});
+      const skipAllOnMountRef = useRef(hasSeenGuide || currentStars > 0);
 
+      // 「跳過」僅跳過同 Phase 的其他引導；「開始 ✓」僅關閉當下這一步氣泡
       const dismissGuide = useCallback((isSkip = false) => {
         setGuideMode(null);
         if (isSkip) {
-          dismissedAllRef.current = true;
-          if (onMarkGuideSeen) onMarkGuideSeen();
+          skippedPhasesRef.current[phase] = true;
         }
-      }, [onMarkGuideSeen]);
+      }, [phase]);
 
       const openGuide = useCallback(() => setGuideMode('manual'), []);
 
       useEffect(() => {
-        if (!enabled || !activeStageKey || dismissedAllRef.current || guideMode === 'manual') return;
+        if (!enabled || !activeStageKey || skipAllOnMountRef.current || skippedPhasesRef.current[phase] || guideMode === 'manual') return;
         if (!guidedStagesRef.current[activeStageKey]) {
           guidedStagesRef.current[activeStageKey] = true;
           setGuideMode('spotlight');
@@ -1228,7 +1347,7 @@
             onMarkGuideSeen();
           }
         }
-      }, [enabled, activeStageKey, guideMode, finalStageKey, onMarkGuideSeen]);
+      }, [enabled, activeStageKey, phase, guideMode, finalStageKey, onMarkGuideSeen]);
 
       return {
         showGuide: guideMode === 'spotlight',
@@ -1268,7 +1387,7 @@
           return;
         }
         setSecondaryReady(false);
-        const t = setTimeout(() => setSecondaryReady(true), 450);
+        const t = setTimeout(() => setSecondaryReady(true), 220);
         return () => clearTimeout(t);
       }, [ready, stepIdx, mode]);
 
@@ -1312,8 +1431,17 @@
           if (rr.width === 0 || rr.height === 0) return;
 
           const curIdx = Math.min(stepIdx, steps.length - 1);
-          const boxes = collectBoxes(steps[curIdx], root, rr);
-          setLayout({ boxes, rootW: rr.width, rootH: rr.height });
+          const cur = steps[curIdx];
+          const boxes = collectBoxes(cur, root, rr);
+          let pivot = null;
+          if (cur?.arcPivot) {
+            const pvEl = root.querySelector(`[data-coach="${cur.arcPivot}"]`);
+            if (pvEl) {
+              const pr = pvEl.getBoundingClientRect();
+              pivot = { cx: pr.left - rr.left + pr.width / 2, cy: pr.top - rr.top + pr.height / 2 };
+            }
+          }
+          setLayout({ boxes, pivot, rootW: rr.width, rootH: rr.height });
         };
 
         const raf = requestAnimationFrame(measure);
@@ -1427,9 +1555,7 @@
                       ? { left: primary.cx - 24, top: primary.cy - 24, width: 48, height: 48, shape: b.shape }
                       : b;
                     const transStyle = {
-                      transition: i > 0
-                        ? 'all 1.25s cubic-bezier(0.22, 1, 0.36, 1)'
-                        : 'all 0.9s cubic-bezier(0.22, 1, 0.36, 1)'
+                      transition: 'all 0.55s cubic-bezier(0.22, 1, 0.36, 1)'
                     };
                     return (drawBox.shape === 'circle' || drawBox.shape === 'ellipse') ? (
                       <ellipse
@@ -1466,7 +1592,7 @@
                 fill="rgba(15, 23, 42, 0.72)"
                 mask="url(#coachSpotlightMask)"
               />
-              {curStep.drag && primary && secondary && (
+              {curStep.drag && primary && secondary && secondaryReady && (
                 <line
                   x1={primary.cx}
                   y1={primary.cy}
@@ -1481,26 +1607,44 @@
             </svg>
           )}
 
-          {/* 蘋果風格觸控圓點（Touch Puck：支援輕點脈衝與壓下拖曳滑動） */}
-          {primary && curStep.tap !== false && (
+          {/* 蘋果風格觸控圓點（Touch Puck：聚光就位後再從起點啟動拖曳／圓弧拖曳／脈衝） */}
+          {primary && curStep.tap !== false && (!curStep.drag || !secondary || secondaryReady) && (
             <div
               className="pointer-events-none absolute top-0 left-0 z-20 will-change-transform"
               style={{
                 transform: `translate3d(${primary.cx}px, ${primary.cy}px, 0)`,
-                transition: 'transform 0.85s cubic-bezier(0.22, 1, 0.36, 1)'
+                transition: 'transform 0.55s cubic-bezier(0.22, 1, 0.36, 1)'
               }}
             >
-              <div
-                style={curStep.drag && secondary ? { '--dx': `${secondary.cx - primary.cx}px`, '--dy': `${secondary.cy - primary.cy}px` } : undefined}
-                className={`-translate-x-1/2 -translate-y-1/2 relative w-11 h-11 flex items-center justify-center ${curStep.drag && secondary ? 'animate-coach-drag' : ''}`}
-              >
-                {!(curStep.drag && secondary) && (
-                  <span className="absolute inset-0 rounded-full border-2 border-white/75 animate-ping opacity-75" />
-                )}
-                <div className={`w-10 h-10 rounded-full bg-white/25 border-2 border-white/90 backdrop-blur-[2px] shadow-[0_4px_16px_rgba(15,23,42,0.5)] flex items-center justify-center ${curStep.drag && secondary ? '' : 'animate-coach-tap'}`}>
-                  <div className="w-4 h-4 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.95)]" />
+              {curStep.arcPivot && layout?.pivot ? (
+                <div
+                  key={`arc-${curIdx}`}
+                  style={{
+                    transformOrigin: `${layout.pivot.cx - primary.cx}px ${layout.pivot.cy - primary.cy}px`,
+                    '--arc-deg': `${curStep.arcDeg ?? -42}deg`
+                  }}
+                  className="w-0 h-0 animate-coach-arc-rotate"
+                >
+                  <div className="-translate-x-1/2 -translate-y-1/2 relative w-11 h-11 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-white/25 border-2 border-white/90 backdrop-blur-[2px] shadow-[0_4px_16px_rgba(15,23,42,0.5)] flex items-center justify-center animate-coach-arc-press">
+                      <div className="w-4 h-4 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.95)]" />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div
+                  key={`${curIdx}-${secondaryReady ? 1 : 0}`}
+                  style={curStep.drag && secondary ? { '--dx': `${secondary.cx - primary.cx}px`, '--dy': `${secondary.cy - primary.cy}px` } : undefined}
+                  className={`-translate-x-1/2 -translate-y-1/2 relative w-11 h-11 flex items-center justify-center ${curStep.drag && secondary ? 'animate-coach-drag' : ''}`}
+                >
+                  {!(curStep.drag && secondary) && (
+                    <span className="absolute inset-0 rounded-full border-2 border-white/75 animate-ping opacity-75" />
+                  )}
+                  <div className={`w-10 h-10 rounded-full bg-white/25 border-2 border-white/90 backdrop-blur-[2px] shadow-[0_4px_16px_rgba(15,23,42,0.5)] flex items-center justify-center ${curStep.drag && secondary ? '' : 'animate-coach-tap'}`}>
+                    <div className="w-4 h-4 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.95)]" />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1527,13 +1671,13 @@
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <button
-                    onClick={onDismiss}
+                    onClick={() => onDismiss && onDismiss(true)}
                     className="text-[11px] font-bold text-slate-400 hover:text-white transition-colors"
                   >
                     跳過
                   </button>
                   <button
-                    onClick={() => isLast ? onDismiss() : setStepIdx(i => i + 1)}
+                    onClick={() => isLast ? (onDismiss && onDismiss(false)) : setStepIdx(i => i + 1)}
                     className="px-3 py-1 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-white text-[11px] font-black active:scale-95 transition-all"
                   >
                     {isLast ? '開始 ✓' : '下一步 ▶'}
@@ -1558,8 +1702,8 @@
       { id: 8, title: "同界角星爆", subtitle: "同界角星座一筆連", island: "星雲高台", sea: 2, icon: "🫧", color: "from-fuchsia-500 to-indigo-700", borderColor: "border-indigo-900" },
       { id: 9, title: "四象限領航員", subtitle: "廣義角象限與軸上角空間滑卡", island: "星圖分流站", sea: 2, icon: "🗺️", color: "from-teal-500 to-indigo-700", borderColor: "border-indigo-900" },
       { id: 10, title: "坐標網格建築師", subtitle: "(x, y, r) 拖曳建構廣義角", island: "星象群礁", sea: 2, icon: "🎯", color: "from-cyan-400 to-blue-600", borderColor: "border-blue-800" },
-      { id: 11, title: "正負傳送帶", subtitle: "三角比正負與無意義分流", island: "四象限祭壇", sea: 2, icon: "⚡", color: "from-rose-500 to-indigo-700", borderColor: "border-indigo-900" },
-      { id: 12, title: "星象羅盤師", subtitle: "廣義特殊角旋轉推導", island: "星軌聖壇", sea: 2, icon: "🔭", color: "from-violet-500 to-indigo-700", borderColor: "border-indigo-900" },
+      { id: 11, title: "星象羅盤師", subtitle: "廣義特殊角與象限角旋轉推導", island: "星軌聖壇", sea: 2, icon: "🔭", color: "from-violet-500 to-indigo-700", borderColor: "border-indigo-900" },
+      { id: 12, title: "正負傳送帶", subtitle: "三角比正負與無意義分流", island: "四象限祭壇", sea: 2, icon: "⚡", color: "from-rose-500 to-indigo-700", borderColor: "border-indigo-900" },
       { id: 13, title: "幻夜秘境", subtitle: "廣義角知一求一推導（設計中）", island: "烈日火山", sea: 3, icon: "🌋", color: "from-slate-500 to-slate-700", borderColor: "border-slate-800", isPlaceholder: true },
       { id: 14, title: "鏡像對稱陣", subtitle: "108 課綱對稱角度變換（設計中）", island: "幽暗密林", sea: 3, icon: "🪞", color: "from-slate-500 to-slate-700", borderColor: "border-slate-800", isPlaceholder: true },
       { id: 15, title: "廣義特殊角密碼輪", subtitle: "符號鎖＋絕對值輪求值（設計中）", island: "紫晶礦洞", sea: 3, icon: "🔐", color: "from-slate-500 to-slate-700", borderColor: "border-slate-800", isPlaceholder: true },
@@ -2795,9 +2939,50 @@
     };
 
     // ==================== 第 10 關隨機題目生成器：坐標網格建築師 ====================
-    const generateLevel6Question = (phase, bagState = null) => {
-      // 強制遠離原點（|x| >= 2 且 |y| >= 2），並只選整數或最簡根式動徑
+    const generateLevel6Question = (phase, bagState = null, allowAxisPoint = false) => {
+      // P1 最後一題有機會出現軸上點（不涉及象限角角度，純從 (x, y, r) 定義感受 0 與 ±1）
+      if (allowAxisPoint && Math.random() < 0.65) {
+        const axisPool = [
+          { xVal: 3, yVal: 0, rVal: '3', rNum: 3, r2: 9, funcs: ['sin', 'cos', 'tan'] },
+          { xVal: -4, yVal: 0, rVal: '4', rNum: 4, r2: 16, funcs: ['sin', 'cos', 'tan'] },
+          { xVal: 0, yVal: 3, rVal: '3', rNum: 3, r2: 9, funcs: ['sin', 'cos'] },
+          { xVal: 0, yVal: -4, rVal: '4', rNum: 4, r2: 16, funcs: ['sin', 'cos'] }
+        ];
+        const ap = axisPool[Math.floor(Math.random() * axisPool.length)];
+        const targetFunc = ap.funcs[Math.floor(Math.random() * ap.funcs.length)];
+        const correctNumeratorKey = targetFunc === 'cos' ? 'x' : 'y';
+        const correctDenominatorKey = targetFunc === 'tan' ? 'x' : 'r';
+        const k = Math.max(Math.abs(ap.xVal), Math.abs(ap.yVal));
+        const rOptions = [{ label: ap.rVal, isCorrect: true }];
+        const used = new Set([ap.rVal]);
+        for (const d of ['0', String(ap.r2), `√${k}`, String(k + 1), String(k * 2)]) {
+          if (rOptions.length >= 4) break;
+          if (!used.has(d)) { used.add(d); rOptions.push({ label: d, isCorrect: false }); }
+        }
+        rOptions.sort(() => Math.random() - 0.5);
+        const coordTipMap = {
+          sin: '廣義角定義：sin(θ) = y / r（縱坐標 ÷ 動徑長）',
+          cos: '廣義角定義：cos(θ) = x / r（橫坐標 ÷ 動徑長）',
+          tan: '廣義角定義：tan(θ) = y / x（縱坐標 ÷ 橫坐標）'
+        };
+        return {
+          phase, quad: 0, isAxis: true,
+          xVal: ap.xVal, yVal: ap.yVal, rVal: ap.rVal, rNum: ap.rNum, r2: ap.r2,
+          key: `axis,${ap.xVal},${ap.yVal},${targetFunc},${Date.now()}`,
+          targetFunc, correctNumeratorKey, correctDenominatorKey,
+          rOptions,
+          conceptTip: coordTipMap[targetFunc]
+        };
+      }
+
+      // 涵蓋 45° 對稱與經典小根式（配合 -4..4 52px 動態縮放保持寬敞）
       const triples = [
+        { x: 1, y: 2, r2: 5, rLabel: '√5', rNum: Math.sqrt(5), group: '1-2' },
+        { x: 2, y: 1, r2: 5, rLabel: '√5', rNum: Math.sqrt(5), group: '1-2' },
+        { x: 1, y: 3, r2: 10, rLabel: '√10', rNum: Math.sqrt(10), group: '1-3' },
+        { x: 3, y: 1, r2: 10, rLabel: '√10', rNum: Math.sqrt(10), group: '1-3' },
+        { x: 2, y: 2, r2: 8, rLabel: '2√2', rNum: Math.SQRT2 * 2, group: '2-2' },
+        { x: 3, y: 3, r2: 18, rLabel: '3√2', rNum: Math.SQRT2 * 3, group: '3-3' },
         { x: 3, y: 4, r2: 25, rLabel: '5', rNum: 5, group: '3-4' },
         { x: 4, y: 3, r2: 25, rLabel: '5', rNum: 5, group: '3-4' },
         { x: 2, y: 3, r2: 13, rLabel: '√13', rNum: Math.sqrt(13), group: '2-3' },
@@ -2809,7 +2994,7 @@
         { x: 4, y: 5, r2: 41, rLabel: '√41', rNum: Math.sqrt(41), group: '4-5' },
         { x: 5, y: 4, r2: 41, rLabel: '√41', rNum: Math.sqrt(41), group: '4-5' }
       ];
-      const groups = ['3-4', '2-3', '2-5', '3-5', '4-5'];
+      const groups = ['1-2', '1-3', '2-2', '3-3', '3-4', '2-3', '2-5', '3-5', '4-5'];
       const funcList = ['sin', 'cos', 'tan'];
 
       let chosenGroup;
@@ -2845,12 +3030,27 @@
         targetFunc = funcList[Math.floor(Math.random() * funcList.length)];
       }
 
-      let q = phase === 0 ? (Math.random() > 0.5 ? 1 : 2) : (Math.floor(Math.random() * 4) + 1);
-      if (bagState && phase >= 1 && bagState.lastQuad === q) {
-        const otherQuads = [1, 2, 3, 4].filter(n => n !== q);
-        q = otherQuads[Math.floor(Math.random() * otherQuads.length)];
+      let q;
+      if (bagState) {
+        if (phase === 0) {
+          if (!bagState.p0QuadBag || bagState.p0QuadBag.length === 0) {
+            bagState.p0QuadBag = [1, 2].sort(() => Math.random() - 0.5);
+          }
+          q = bagState.p0QuadBag.shift();
+        } else {
+          if (!bagState.quadBag || bagState.quadBag.length === 0) {
+            bagState.quadBag = [1, 2, 3, 4].sort(() => Math.random() - 0.5);
+            if (bagState.lastQuad && bagState.quadBag[0] === bagState.lastQuad && bagState.quadBag.length > 1) {
+              const swapIdx = 1 + Math.floor(Math.random() * (bagState.quadBag.length - 1));
+              [bagState.quadBag[0], bagState.quadBag[swapIdx]] = [bagState.quadBag[swapIdx], bagState.quadBag[0]];
+            }
+          }
+          q = bagState.quadBag.shift();
+        }
+        bagState.lastQuad = q;
+      } else {
+        q = phase === 0 ? (Math.random() > 0.5 ? 1 : 2) : (Math.floor(Math.random() * 4) + 1);
       }
-      if (bagState) bagState.lastQuad = q;
 
       const signX = (q === 2 || q === 3) ? -1 : 1;
       const signY = (q === 3 || q === 4) ? -1 : 1;
@@ -2867,16 +3067,21 @@
       else if (targetFunc === 'cos') { correctNumeratorKey = 'x'; correctDenominatorKey = 'r'; }
       else { correctNumeratorKey = 'y'; correctDenominatorKey = 'x'; }
 
-      // Phase 1/2 針對性迷思誘答（3-4-5 陷阱、加減號記反、忘記開根號、直接相加）
+      // Phase 1/2 針對性迷思誘答（3-4-5 陷阱、45° 誤認、加減號記反、忘記開根號、直接相加）
       const ax = Math.abs(xVal), ay = Math.abs(yVal);
       const diff2 = Math.abs(ax * ax - ay * ay);
       const diffSqrtInt = Math.round(Math.sqrt(diff2));
-      const diffLabel = diffSqrtInt * diffSqrtInt === diff2 ? String(diffSqrtInt) : `√${diff2}`;
+      const diffLabel = diff2 === 0 ? '√2' : (diffSqrtInt * diffSqrtInt === diff2 ? String(diffSqrtInt) : `√${diff2}`);
       const targetedDistractors = [];
       if ((ax === 3 && ay === 5) || (ax === 5 && ay === 3)) targetedDistractors.push('4');
       if ((ax === 4 && ay === 5) || (ax === 5 && ay === 4)) targetedDistractors.push('3');
-      targetedDistractors.push(diffLabel, String(r2), String(ax + ay), `√${ax + ay}`);
-      const fallbackPool = ['5', '√13', '√29', '√34', '√41', '7', '13', '25'];
+      if (ax === ay) targetedDistractors.push(String(ax), String(r2), String(ax + ay), '√2');
+      else {
+        const sumSqrtInt = Math.round(Math.sqrt(ax + ay));
+        targetedDistractors.push(diffLabel, String(r2), String(ax + ay));
+        if (sumSqrtInt * sumSqrtInt !== ax + ay) targetedDistractors.push(`√${ax + ay}`);
+      }
+      const fallbackPool = ['5', '√5', '√10', '√13', '2√2', '3√2', '√29', '√34', '√41', '7', '13', '25'];
 
       const rOptions = [{ label: rLabel, isCorrect: true }];
       const usedLabels = new Set([rLabel]);
@@ -2903,24 +3108,64 @@
       };
     };
 
-    // ==================== 第 8 關隨機題目生成器：星象羅盤師 ====================
-    const generateLevel7Question = (phase, prevAngle = null) => {
-      let anglePool = [];
-      if (phase === 0) anglePool = [30, 45, 60, 120, 135, 150, 210, 225, 240, 300, 315, 330];
-      else if (phase === 1) anglePool = [-30, -45, -60, -120, -135, -150, -210, -240, -300, -315, 0, 90, 180, 270];
-      else anglePool = [390, 405, 420, 480, 495, 510, 570, 600, 660, 675, -390, -405, -420];
+    // ==================== 第 11 關隨機題目生成器：星象羅盤師（單圈正特殊角＋象限角） ====================
+    const generateLevel7Question = (phase, bagState = null, forceAxis = false) => {
+      const specialAngles = [30, 45, 60, 120, 135, 150, 210, 225, 240, 300, 315, 330];
+      const axisAngles = [0, 90, 180, 270];
+      const funcList = ['sin', 'cos', 'tan'];
 
-      let targetAngle = anglePool[Math.floor(Math.random() * anglePool.length)];
-      while (targetAngle === prevAngle && anglePool.length > 1) {
-        targetAngle = anglePool[Math.floor(Math.random() * anglePool.length)];
+      let targetAngle;
+      if (phase === 0) {
+        if (bagState) {
+          if (!bagState.specialBag || bagState.specialBag.length === 0) {
+            bagState.specialBag = [...specialAngles].sort(() => Math.random() - 0.5);
+            if (bagState.lastAngle !== undefined && bagState.specialBag[0] === bagState.lastAngle) {
+              const sIdx = 1 + Math.floor(Math.random() * (bagState.specialBag.length - 1));
+              [bagState.specialBag[0], bagState.specialBag[sIdx]] = [bagState.specialBag[sIdx], bagState.specialBag[0]];
+            }
+          }
+          targetAngle = bagState.specialBag.shift();
+        } else {
+          targetAngle = specialAngles[Math.floor(Math.random() * specialAngles.length)];
+        }
+      } else {
+        const pickAxis = forceAxis || (Math.random() < 0.45);
+        if (pickAxis) {
+          const avail = axisAngles.filter(a => a !== bagState?.lastAngle);
+          targetAngle = avail[Math.floor(Math.random() * avail.length)];
+        } else {
+          if (bagState) {
+            if (!bagState.specialBag || bagState.specialBag.length === 0) {
+              bagState.specialBag = [...specialAngles].sort(() => Math.random() - 0.5);
+              if (bagState.lastAngle !== undefined && bagState.specialBag[0] === bagState.lastAngle) {
+                const sIdx = 1 + Math.floor(Math.random() * (bagState.specialBag.length - 1));
+                [bagState.specialBag[0], bagState.specialBag[sIdx]] = [bagState.specialBag[sIdx], bagState.specialBag[0]];
+              }
+            }
+            targetAngle = bagState.specialBag.shift();
+          } else {
+            targetAngle = specialAngles[Math.floor(Math.random() * specialAngles.length)];
+          }
+        }
       }
+      if (bagState) bagState.lastAngle = targetAngle;
 
       const principal = ((targetAngle % 360) + 360) % 360;
+      const isAxis = principal % 90 === 0;
       const isTanUndefined = principal === 90 || principal === 270;
-      const funcPool = isTanUndefined ? ['sin', 'cos'] : ['sin', 'cos', 'tan'];
-      const targetFunc = funcPool[Math.floor(Math.random() * funcPool.length)];
+      const allowedFuncs = isTanUndefined ? ['sin', 'cos'] : funcList;
+      let targetFunc;
+      if (bagState) {
+        if (!bagState.funcBag || bagState.funcBag.length === 0) {
+          bagState.funcBag = [...funcList].sort(() => Math.random() - 0.5);
+        }
+        const idx = bagState.funcBag.findIndex(f => allowedFuncs.includes(f));
+        targetFunc = idx >= 0 ? bagState.funcBag.splice(idx, 1)[0] : allowedFuncs[Math.floor(Math.random() * allowedFuncs.length)];
+      } else {
+        targetFunc = allowedFuncs[Math.floor(Math.random() * allowedFuncs.length)];
+      }
 
-      let xStr = '1', yStr = '0', rStr = '1', xNum = 1, yNum = 0, rNum = 1, locationLabel = '';
+      let xStr = '1', yStr = '0', rStr = '1', xNum = 1, yNum = 0, rNum = 1, locationLabel = '', refAngle = 0;
       if (principal === 0) { xStr = '1'; yStr = '0'; rStr = '1'; xNum = 1; yNum = 0; rNum = 1; locationLabel = '正向 X 軸'; }
       else if (principal === 90) { xStr = '0'; yStr = '1'; rStr = '1'; xNum = 0; yNum = 1; rNum = 1; locationLabel = '正向 Y 軸'; }
       else if (principal === 180) { xStr = '-1'; yStr = '0'; rStr = '1'; xNum = -1; yNum = 0; rNum = 1; locationLabel = '負向 X 軸'; }
@@ -2929,10 +3174,10 @@
         const rad = (principal * Math.PI) / 180;
         const cosPos = Math.cos(rad) > 0;
         const sinPos = Math.sin(rad) > 0;
-        if (cosPos && sinPos) locationLabel = '第 I 象限';
-        else if (!cosPos && sinPos) locationLabel = '第 II 象限';
-        else if (!cosPos && !sinPos) locationLabel = '第 III 象限';
-        else locationLabel = '第 IV 象限';
+        if (cosPos && sinPos) { locationLabel = '第 I 象限'; refAngle = principal; }
+        else if (!cosPos && sinPos) { locationLabel = '第 II 象限'; refAngle = 180 - principal; }
+        else if (!cosPos && !sinPos) { locationLabel = '第 III 象限'; refAngle = principal - 180; }
+        else { locationLabel = '第 IV 象限'; refAngle = 360 - principal; }
 
         if (principal % 45 === 0) {
           rStr = '√2'; rNum = Math.SQRT2;
@@ -2950,7 +3195,7 @@
       }
 
       const origin = { x: 270, y: 270 };
-      const R = 195;
+      const R = 190;
       const ptP = { x: origin.x + (xNum / rNum) * R, y: origin.y - (yNum / rNum) * R };
       const ptFootX = { x: ptP.x, y: origin.y };
       const ptFootY = { x: origin.x, y: ptP.y };
@@ -2958,20 +3203,22 @@
       const dirX = xNum >= 0 ? -1 : 1;
       const dirY = yNum >= 0 ? -1 : 1;
       const rightAngleSquareX = `${ptFootX.x},${ptFootX.y} ${ptFootX.x + dirX * sqSize},${ptFootX.y} ${ptFootX.x + dirX * sqSize},${ptFootX.y + dirY * sqSize} ${ptFootX.x},${ptFootX.y + dirY * sqSize}`;
-      const rightAngleSquareY = `${ptFootY.x},${ptFootY.y} ${ptFootY.x + dirX * sqSize},${ptFootY.y} ${ptFootY.x + dirX * sqSize},${ptFootY.y + dirY * sqSize} ${ptFootY.x},${ptFootY.y + dirY * sqSize}`;
 
       const correctNumeratorKey = targetFunc === 'cos' ? 'x' : 'y';
       const correctDenominatorKey = targetFunc === 'tan' ? 'x' : 'r';
       const exactValText = TEXT_MAP['val'][EVAL_MAP[targetFunc][String(principal)]];
-      const rawVal = targetFunc === 'sin' ? yNum / rNum : targetFunc === 'cos' ? xNum / rNum : yNum / xNum;
-      const signText = Math.abs(rawVal) < 1e-6 ? '= 0' : rawVal > 0 ? '> 0' : '< 0';
+
+      const assignTip = isAxis
+        ? `觀察 ${principal}° 落在哪條坐標軸正負向，單位圓軸上點座標為 0 或 ±1，動徑 r = 1`
+        : `先確認該象限的 x、y 正負號，再依 ${refAngle}° 直角三角形邊長比填入對應數值`;
 
       return {
-        targetAngle, principal, targetFunc, locationLabel,
+        phase, targetAngle, principal, isAxis, refAngle, targetFunc, locationLabel,
         xStr, yStr, rStr, xNum, yNum, rNum,
-        ptP, ptFootX, ptFootY, rightAngleSquareX, rightAngleSquareY,
-        correctNumeratorKey, correctDenominatorKey, exactValText, signText,
-        conceptTip: `${targetFunc}(θ) = ${correctNumeratorKey} / ${correctDenominatorKey}（請先點 ${correctNumeratorKey}，再點 ${correctDenominatorKey}）`
+        ptP, ptFootX, ptFootY, rightAngleSquareX,
+        correctNumeratorKey, correctDenominatorKey, exactValText,
+        assignTip,
+        conceptTip: `廣義角定義：${targetFunc}(θ) = ${correctNumeratorKey} / ${correctDenominatorKey}`
       };
     };
 
@@ -3886,8 +4133,15 @@
       const [lockedBump, setLockedBump] = useState(false);
       const dragStartYRef = useRef(null);
       const draggedRef = useRef(false);
+      const isDraggingRef = useRef(false);
       const bumpTimerRef = useRef(null);
       useEffect(() => () => clearTimeout(bumpTimerRef.current), []);
+      useEffect(() => { isDraggingRef.current = isDragging; }, [isDragging]);
+      useEffect(() => {
+        const preventTouchScroll = (e) => { if (isDraggingRef.current) e.preventDefault(); };
+        document.addEventListener('touchmove', preventTouchScroll, { passive: false });
+        return () => document.removeEventListener('touchmove', preventTouchScroll);
+      }, []);
       const idx = options.indexOf(value);
       const prevOpt = options[(idx - 1 + options.length) % options.length];
       const nextOpt = options[(idx + 1) % options.length];
@@ -3906,6 +4160,7 @@
           return;
         }
         if (disabled) return;
+        e.preventDefault();
         dragStartYRef.current = e.clientY;
         draggedRef.current = false;
         setIsDragging(true);
@@ -3967,7 +4222,7 @@
 
       return (
         <div
-          className={`relative h-[108px] rounded-[16px] overflow-hidden flex flex-col select-none transition-transform ${
+          className={`relative h-[108px] rounded-[16px] overflow-hidden flex flex-col select-none touch-none transition-transform ${
             locked
               ? 'border border-stone-600/90 shadow-[0_6px_12px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.15)]'
               : 'border border-amber-300/90 shadow-[0_8px_16px_rgba(120,53,15,0.45),inset_0_1px_0_rgba(255,255,255,0.7)]'
@@ -4352,7 +4607,7 @@
                     </div>
 
                     {/* 中央雙滾筒（上下微凸出金屬軸心） */}
-                    <div data-coach="lv4-wheel" className="relative z-20 flex-1 grid grid-cols-2 gap-1.5 px-1">
+                    <div data-coach="lv4-wheel" className="relative z-20 flex-1 grid grid-cols-2 gap-1.5 px-1 touch-none">
                       <TempleDrumWheel
                         label="函數"
                         options={LV4_FUNCS}
@@ -5065,6 +5320,7 @@
         hasSeenGuide,
         onMarkGuideSeen,
         activeStageKey: question ? (edgesReady ? 'select' : 'place') : null,
+        phase: question ? question.phase : 0,
         enabled: gameState === 'playing',
         finalStageKey: 'select'
       });
@@ -5506,7 +5762,7 @@
                 active={guideMode === 'manual' || (gameState === 'playing' && showGuide && !solvedOpt)}
                 mode={guideMode || 'spotlight'}
                 steps={lv6CoachSteps}
-                onDismiss={() => dismissGuide(true)}
+                onDismiss={dismissGuide}
               />
             </div>
           )}
@@ -7050,6 +7306,7 @@
         hasSeenGuide,
         onMarkGuideSeen,
         activeStageKey: question ? stage : null,
+        phase: question ? question.phase : 0,
         enabled: gameState === 'playing',
         finalStageKey: 'pickR'
       });
@@ -7061,7 +7318,7 @@
       const denSlotRef = useRef(null);
       const questionMissedRef = useRef(false);
       const justSolvedAtRef = useRef(0);
-      const bagRef = useRef({ groupBag: [], funcBag: [], lastGroup: null, lastFunc: null, lastQuad: null });
+      const bagRef = useRef({ groupBag: [], funcBag: [], p0QuadBag: [], quadBag: [], lastGroup: null, lastFunc: null, lastQuad: null });
       const [rSnapFlash, setRSnapFlash] = useState(false);
       const confirmTimerRef = useRef(null);
       const pendingNextRef = useRef(null);
@@ -7084,7 +7341,8 @@
 
       const nextQuestion = (curProg) => {
         const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
-        const nextQ = generateLevel6Question(phase, bagRef.current);
+        const isLastOfP1 = phase === 1 && curProg === starsThreshold[1] - 1;
+        const nextQ = generateLevel6Question(phase, bagRef.current, isLastOfP1);
         questionMissedRef.current = false;
         setQuestion(nextQ);
         setStage('drag');
@@ -7103,7 +7361,7 @@
       const startGame = (order = pickOrder) => {
         setPickOrder(order);
         questionMissedRef.current = false;
-        bagRef.current = { groupBag: [], funcBag: [], lastGroup: null, lastFunc: null, lastQuad: null };
+        bagRef.current = { groupBag: [], funcBag: [], p0QuadBag: [], quadBag: [], lastGroup: null, lastFunc: null, lastQuad: null };
         setFeedbackAnim('');
         setSelectedNumerator(null); setSelectedDenominator(null);
         setIsLockedSuccess(false); setWrongBtnKey(null); setConceptTip(null);
@@ -7275,7 +7533,8 @@
           return;
         }
         if (gameState !== 'playing' || !question || stage !== 'drag' || (!isRelaxMode && lives <= 0)) return;
-        const pt = getGridFromPointer(e.clientX, e.clientY);
+        const offsetY = e.pointerType === 'touch' ? 42 : 0;
+        const pt = getGridFromPointer(e.clientX, e.clientY - offsetY);
         if (!pt) return;
         setIsDraggingP(true);
         setCurP(pt);
@@ -7286,7 +7545,8 @@
 
       const handleGridPointerMove = (e) => {
         if (!isDraggingP || isLockedSuccess || stage !== 'drag') return;
-        const pt = getGridFromPointer(e.clientX, e.clientY);
+        const offsetY = e.pointerType === 'touch' ? 42 : 0;
+        const pt = getGridFromPointer(e.clientX, e.clientY - offsetY);
         if (!pt) return;
         if (pt.x !== curP.x || pt.y !== curP.y) {
           setCurP(pt);
@@ -7303,26 +7563,29 @@
         commitGridP(curP);
       };
 
-      // 從頂部題目坐標膠囊直接拖曳進網格
+      // 從頂部題目坐標膠囊直接拖曳進網格（觸控自動往上偏移 46px 避開手指遮擋）
       const handleCoordChipDown = (e) => {
         if (gameState !== 'playing' || !question || stage !== 'drag' || isLockedSuccess || (!isRelaxMode && lives <= 0)) return;
         e.preventDefault();
         if (showGuide) dismissGuide(false);
         audio.init();
-        const startPt = getGridFromPointer(e.clientX, e.clientY, true);
+        const touchOffsetY = e.pointerType === 'touch' ? 46 : 0;
+        const startPt = getGridFromPointer(e.clientX, e.clientY - touchOffsetY, true);
         if (startPt) setCurP(startPt);
-        setDragCoordChip({ clientX: e.clientX, clientY: e.clientY, overGrid: Boolean(startPt) });
+        setDragCoordChip({ clientX: e.clientX, clientY: e.clientY, touchOffsetY, overGrid: Boolean(startPt) });
       };
 
       useEffect(() => {
         if (!dragCoordChip) return;
         const onMove = (e) => {
-          const pt = getGridFromPointer(e.clientX, e.clientY, true);
+          const offsetY = e.pointerType === 'touch' ? 46 : dragCoordChip.touchOffsetY || 0;
+          const pt = getGridFromPointer(e.clientX, e.clientY - offsetY, true);
           if (pt) setCurP(pt);
-          setDragCoordChip({ clientX: e.clientX, clientY: e.clientY, overGrid: Boolean(pt) });
+          setDragCoordChip({ clientX: e.clientX, clientY: e.clientY, touchOffsetY: offsetY, overGrid: Boolean(pt) });
         };
         const onUp = (e) => {
-          const pt = getGridFromPointer(e.clientX, e.clientY, true);
+          const offsetY = e.pointerType === 'touch' ? 46 : dragCoordChip.touchOffsetY || 0;
+          const pt = getGridFromPointer(e.clientX, e.clientY - offsetY, true);
           setDragCoordChip(null);
           if (pt) {
             setCurP(pt);
@@ -7469,21 +7732,44 @@
       const svgFootY = { x: GRID_ORIGIN, y: svgP.y };
       const curR2 = activeCoord.x * activeCoord.x + activeCoord.y * activeCoord.y;
       const curRInt = Math.round(Math.sqrt(curR2));
-      const curRLabel = stage === 'pickR' ? '?' : (curRInt * curRInt === curR2 ? String(curRInt) : `√${curR2}`);
+      const curRLabel = stage === 'pickR' ? '?' : (pLocked && question?.rVal ? question.rVal : (curRInt * curRInt === curR2 ? String(curRInt) : `√${curR2}`));
       let thetaRad = hasVector ? Math.atan2(activeCoord.y, activeCoord.x) : 0;
-      if (thetaRad <= 0 && hasVector) thetaRad += Math.PI * 2;
+      if (thetaRad < 0 && hasVector) thetaRad += Math.PI * 2;
+      const isPosXAxis = hasVector && activeCoord.x > 0 && activeCoord.y === 0;
       const rPxLen = Math.hypot(svgP.x - GRID_ORIGIN, svgP.y - GRID_ORIGIN);
       const arcR = Math.min(34, Math.max(18, rPxLen * 0.26));
       const arcEnd = { x: GRID_ORIGIN + arcR * Math.cos(thetaRad), y: GRID_ORIGIN - arcR * Math.sin(thetaRad) };
       const largeArc = thetaRad > Math.PI ? 1 : 0;
-      const angleArcPath = hasVector ? `M ${GRID_ORIGIN + arcR} ${GRID_ORIGIN} A ${arcR} ${arcR} 0 ${largeArc} 0 ${arcEnd.x} ${arcEnd.y}` : '';
-      const angleSectorPath = hasVector ? `M ${GRID_ORIGIN} ${GRID_ORIGIN} L ${GRID_ORIGIN + arcR} ${GRID_ORIGIN} A ${arcR} ${arcR} 0 ${largeArc} 0 ${arcEnd.x} ${arcEnd.y} Z` : '';
-      const thetaLabelPt = hasVector ? {
-        x: GRID_ORIGIN + (arcR + 14) * Math.cos(thetaRad / 2),
-        y: GRID_ORIGIN - (arcR + 14) * Math.sin(thetaRad / 2)
-      } : null;
+      const angleArcPath = (hasVector && !isPosXAxis) ? `M ${GRID_ORIGIN + arcR} ${GRID_ORIGIN} A ${arcR} ${arcR} 0 ${largeArc} 0 ${arcEnd.x} ${arcEnd.y}` : '';
+      const angleSectorPath = (hasVector && !isPosXAxis) ? `M ${GRID_ORIGIN} ${GRID_ORIGIN} L ${GRID_ORIGIN + arcR} ${GRID_ORIGIN} A ${arcR} ${arcR} 0 ${largeArc} 0 ${arcEnd.x} ${arcEnd.y} Z` : '';
+      const thetaLabelPt = hasVector ? (
+        isPosXAxis
+          ? { x: GRID_ORIGIN + arcR + 8, y: GRID_ORIGIN - 14 }
+          : { x: GRID_ORIGIN + (arcR + 14) * Math.cos(thetaRad / 2), y: GRID_ORIGIN - (arcR + 14) * Math.sin(thetaRad / 2) }
+      ) : null;
       const isPureSym = Boolean(question && question.phase === 2 && !isLockedSuccess);
       const isSuccessKey = (k) => Boolean(isLockedSuccess && question && (question.correctNumeratorKey === k || question.correctDenominatorKey === k));
+      const simplifiedVal = useMemo(() => {
+        if (!question) return null;
+        const { xVal, yVal, rVal, correctNumeratorKey, correctDenominatorKey } = question;
+        const num = correctNumeratorKey === 'x' ? xVal : yVal;
+        if (correctDenominatorKey === 'r') {
+          if (num === 0) return '0';
+          if (question.isAxis) return num > 0 ? '1' : '-1';
+          if (Math.abs(xVal) === Math.abs(yVal) && rVal.includes('√2')) {
+            return num < 0 ? '-√2/2' : '√2/2';
+          }
+          return `${num}/${rVal}`;
+        }
+        // tan = y / x
+        if (yVal === 0) return '0';
+        const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
+        const ay = Math.abs(yVal), ax = Math.abs(xVal);
+        const g = gcd(ay, ax);
+        const neg = (yVal * xVal) < 0;
+        const sn = ay / g, sd = ax / g;
+        return sd === 1 ? `${neg ? '-' : ''}${sn}` : `${neg ? '-' : ''}${sn}/${sd}`;
+      }, [question]);
       const targetSvgP = question ? toSvgPt(question.xVal, question.yVal) : null;
       const showTargetRing = stage === 'drag' && question && question.phase === 0;
       // P(x, y) 膠囊永遠朝遠離原點的外側偏移並夾在畫板邊界內
@@ -7551,8 +7837,8 @@
                     </div>
                   )}
                   {stage === 'ratio' && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg sm:text-2xl font-serif font-black shrink-0">{question.targetFunc}(θ) =</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-base sm:text-xl font-serif font-black shrink-0">{question.targetFunc}(θ) =</span>
                       <div data-coach="lv10-ratio-box" className="flex flex-col items-center shrink-0">
                         <div
                           ref={numSlotRef}
@@ -7586,10 +7872,18 @@
                           <span>{selectedDenominator ? (isPureSym ? selectedDenominator : <SqrtText text={`${selectedDenominator} (${getDisplayVal(selectedDenominator)})`} />) : '分母'}</span>
                         </div>
                       </div>
+                      {isLockedSuccess && simplifiedVal && (
+                        <div className="inline-flex items-center gap-1.5 text-amber-200 font-black animate-jelly shrink-0">
+                          <span className="text-base sm:text-lg">=</span>
+                          <FracText value={simplifiedVal} size="xs" barClass="bg-amber-200" className="text-amber-200" />
+                        </div>
+                      )}
                       <SuccessBadge show={isLockedSuccess} />
                     </div>
                   )}
-                  <span className="text-xs font-black bg-white/20 px-2.5 py-1 rounded-xl border border-white/40 whitespace-nowrap">第 {['I', 'II', 'III', 'IV'][question.quad - 1]} 象限</span>
+                  <span className="text-xs font-black bg-white/20 px-2.5 py-1 rounded-xl border border-white/40 whitespace-nowrap">
+                    {question.quad === 0 ? '坐標軸上' : `第 ${['I', 'II', 'III', 'IV'][question.quad - 1]} 象限`}
+                  </span>
                 </div>
 
                 <div onClick={handleConfirmSkip} className="relative w-full flex-1 min-h-0 bg-white flex items-center justify-center overflow-hidden">
@@ -7612,14 +7906,22 @@
                         <line x1={GRID_ORIGIN - gridExtent} y1={GRID_ORIGIN - i * GRID_STEP} x2={GRID_ORIGIN + gridExtent} y2={GRID_ORIGIN - i * GRID_STEP} stroke={i === 0 ? '#64748b' : '#e2e8f0'} strokeWidth={i === 0 ? '2.5' : '1.2'} />
                         {i !== 0 && (
                           <>
-                            <text x={GRID_ORIGIN + i * GRID_STEP} y={GRID_ORIGIN + 15} fill="#94a3b8" fontSize="11.5" fontWeight="bold" textAnchor="middle">{i}</text>
-                            <text x={GRID_ORIGIN - 13} y={GRID_ORIGIN - i * GRID_STEP + 4} fill="#94a3b8" fontSize="11.5" fontWeight="bold" textAnchor="end">{i}</text>
+                            <text x={GRID_ORIGIN + i * GRID_STEP} y={GRID_ORIGIN + 15} fill={(isDraggingP || dragCoordChip?.overGrid) && curP.x === i ? '#0284c7' : '#94a3b8'} fontSize={(isDraggingP || dragCoordChip?.overGrid) && curP.x === i ? '14' : '11.5'} fontWeight="bold" textAnchor="middle">{i}</text>
+                            <text x={GRID_ORIGIN - 13} y={GRID_ORIGIN - i * GRID_STEP + 4} fill={(isDraggingP || dragCoordChip?.overGrid) && curP.y === i ? '#0284c7' : '#94a3b8'} fontSize={(isDraggingP || dragCoordChip?.overGrid) && curP.y === i ? '14' : '11.5'} fontWeight="bold" textAnchor="end">{i}</text>
                           </>
                         )}
                       </React.Fragment>
                     ))}
                     <text x={GRID_ORIGIN + gridExtent + 14} y={GRID_ORIGIN + 5} fill="#64748b" fontSize="20" fontWeight="bold">x</text>
                     <text x={GRID_ORIGIN + 6} y={GRID_ORIGIN - gridExtent - 12} fill="#64748b" fontSize="20" fontWeight="bold">y</text>
+
+                    {/* 拖曳對位十字準線（手機觸控防指腹遮擋輔助） */}
+                    {(isDraggingP || dragCoordChip?.overGrid) && stage === 'drag' && (
+                      <g className="pointer-events-none">
+                        <line x1={svgP.x} y1={GRID_ORIGIN - gridExtent} x2={svgP.x} y2={GRID_ORIGIN + gridExtent} stroke="#38bdf8" strokeWidth="1.8" strokeDasharray="4 4" opacity="0.7" />
+                        <line x1={GRID_ORIGIN - gridExtent} y1={svgP.y} x2={GRID_ORIGIN + gridExtent} y2={svgP.y} stroke="#38bdf8" strokeWidth="1.8" strokeDasharray="4 4" opacity="0.7" />
+                      </g>
+                    )}
 
                     {/* Phase 0 目標瞄準圈（Phase 1/2 隱藏） */}
                     {showTargetRing && targetSvgP && (
@@ -7675,13 +7977,23 @@
                           />
                           {isPureSym && stage !== 'pickR' ? (
                             <text x="0" y="1" fill={isSuccessKey('r') ? '#ffffff' : '#b45309'} fontSize="16" fontWeight="900" fontFamily="serif" fontStyle="italic" textAnchor="middle" dominantBaseline="middle">r</text>
-                          ) : stage !== 'pickR' && curRLabel.startsWith('√') ? (
-                            <g>
-                              <text x="-17" y="1" fill={isSuccessKey('r') || rSnapFlash ? '#ffffff' : '#b45309'} fontSize="14" fontWeight="900" textAnchor="middle" dominantBaseline="middle">r=</text>
-                              <path d="M -5 1.5 L -2.8 0 L -0.4 6.5 L 3.8 -6.5 L 25 -6.5" fill="none" stroke={isSuccessKey('r') || rSnapFlash ? '#ffffff' : '#b45309'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                              <text x="14.5" y="2" fill={isSuccessKey('r') || rSnapFlash ? '#ffffff' : '#b45309'} fontSize="13.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">{curRLabel.slice(1)}</text>
-                            </g>
-                          ) : (
+                          ) : stage !== 'pickR' && curRLabel.includes('√') ? (() => {
+                            const sqrtIdx = curRLabel.indexOf('√');
+                            const coef = curRLabel.slice(0, sqrtIdx);
+                            const rad = curRLabel.slice(sqrtIdx + 1);
+                            const fg = isSuccessKey('r') || rSnapFlash ? '#ffffff' : '#b45309';
+                            const prefixX = coef ? -19 : -17;
+                            const tickOffset = coef ? -4 : -5;
+                            const radX = rad.length > 1 ? tickOffset + 19.5 : tickOffset + 15.5;
+                            const lineEnd = rad.length > 1 ? tickOffset + 30 : tickOffset + 21;
+                            return (
+                              <g>
+                                <text x={prefixX} y="1" fill={fg} fontSize="14" fontWeight="900" textAnchor="middle" dominantBaseline="middle">r={coef}</text>
+                                <path d={`M ${tickOffset} 1.5 L ${tickOffset + 2.2} 0 L ${tickOffset + 4.6} 6.5 L ${tickOffset + 8.8} -6.5 L ${lineEnd} -6.5`} fill="none" stroke={fg} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                                <text x={radX} y="2" fill={fg} fontSize="13.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">{rad}</text>
+                              </g>
+                            );
+                          })() : (
                             <text x="0" y="1" fill={isSuccessKey('r') || rSnapFlash ? '#ffffff' : '#b45309'} fontSize="14.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">
                               {stage === 'pickR' ? 'r = ?' : `r=${curRLabel}`}
                             </text>
@@ -7752,7 +8064,7 @@
               {dragCoordChip && question && (
                 <div
                   className="fixed z-[150] pointer-events-none -translate-x-1/2 -translate-y-1/2 px-3 py-1 rounded-xl bg-slate-900/95 border-2 border-cyan-300 text-cyan-200 font-mono font-black text-sm shadow-2xl"
-                  style={{ left: dragCoordChip.clientX, top: dragCoordChip.clientY }}
+                  style={{ left: dragCoordChip.clientX, top: dragCoordChip.clientY - (dragCoordChip.touchOffsetY || 0) }}
                 >
                   P({question.xVal}, {question.yVal})
                 </div>
@@ -7810,7 +8122,7 @@
             containerRef={containerRef}
             active={guideMode === 'manual' || (showGuide && gameState === 'playing')}
             mode={guideMode || 'spotlight'}
-            onDismiss={() => dismissGuide(true)}
+            onDismiss={dismissGuide}
             steps={guideMode === 'manual' ? (
               question?.phase === 0 ? [
                 { text: '拖曳題目上的 (x, y) 坐標膠囊（或直接在網格上）至綠色瞄準圈放開。' },
@@ -7874,7 +8186,9 @@
       );
     };
 
-    // ==================== 第 8 關組件：星象羅盤師 ====================
+    // ==================== 第 11 關組件：星象羅盤師（Lv.7 轉角 ＋ Lv.10 貼邊填定義） ====================
+    const LV11_NUM_CAPSULES = ['-√3', '-1', '0', '1', '√3', '√2', '2'];
+
     const Level7AstroCompassMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap, hasSeenGuide = false, onMarkGuideSeen }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
       const starsThreshold = [2, 4, 6];
@@ -7888,47 +8202,63 @@
 
       const [pickOrder, setPickOrder] = useState('num');
       const [question, setQuestion] = useState(null);
-      const [stage, setStage] = useState('rotate');
+      const [stage, setStage] = useState('rotate'); // 'rotate' | 'assign' | 'define'
       const [currentAngle, setCurrentAngle] = useState(0);
       const [isDragging, setIsDragging] = useState(false);
+
+      // Step 2 (assign): 7 膠囊個別對應 x, y, r（支援預設 x→y→r 自動推進＋自行點框切換＋拖曳）
+      const [assignedVals, setAssignedVals] = useState({ x: null, y: null, r: null });
+      const [activeAssignSlot, setActiveAssignSlot] = useState('x');
+      const [wrongSlotKey, setWrongSlotKey] = useState(null);
+      const [dragAssignChip, setDragAssignChip] = useState(null);
+
+      // Step 3 (define): 從圖上拖曳／點擊 x, y, r 進分子／分母框
       const [selectedNumerator, setSelectedNumerator] = useState(null);
       const [selectedDenominator, setSelectedDenominator] = useState(null);
+      const [dragRatioKey, setDragRatioKey] = useState(null);
+
       const [isLockedSuccess, setIsLockedSuccess] = useState(false);
       const [feedbackAnim, setFeedbackAnim] = useState('');
-      const [floatingText, setFloatingText] = useState(null);
-      const [wrongBtnKey, setWrongBtnKey] = useState(null);
       const [conceptTip, setConceptTip] = useState(null);
       const { showGuide, guideMode, openGuide, dismissGuide } = useStagedLevelGuide({
         currentStars,
         hasSeenGuide,
         onMarkGuideSeen,
         activeStageKey: question ? stage : null,
+        phase: question ? question.phase : 0,
         enabled: gameState === 'playing',
-        finalStageKey: 'ratio'
+        finalStageKey: 'define'
       });
 
       const containerRef = useRef(null);
       const dialSvgRef = useRef(null);
+      const assignXRef = useRef(null);
+      const assignYRef = useRef(null);
+      const assignRRef = useRef(null);
+      const numSlotRef = useRef(null);
+      const denSlotRef = useRef(null);
       const lastTickAngleRef = useRef(0);
       const lastAtanRef = useRef(0);
       const exactAngleRef = useRef(0);
       const isDraggingRef = useRef(false);
-      const dwellTimerRef = useRef(null);
-      const stageLockedRef = useRef(false);
-      const questionMissedRef = useRef(false);
-      const confirmTimerRef = useRef(null);
+      const didDragRef = useRef(false);
+      const dragStartPtRef = useRef(null);
+      const justSolvedAtRef = useRef(0);
+      const bagRef = useRef({ specialBag: [], funcBag: [], lastAngle: undefined, p1AxisDone: false });
       const pendingNextRef = useRef(null);
+      const preferredAssignOrderRef = useRef(['x', 'y', 'r']);
+      const currentAssignOrderRef = useRef([]);
+
       const handleConfirmSkip = () => {
         if (!pendingNextRef.current) return;
-        clearTimeout(confirmTimerRef.current);
+        if (Date.now() - justSolvedAtRef.current < 260) return;
         const fn = pendingNextRef.current;
         pendingNextRef.current = null;
         audio.sfxClick();
         fn();
       };
-      useEffect(() => () => clearTimeout(confirmTimerRef.current), []);
 
-      const width = 540, height = 540, origin = { x: 270, y: 270 }, R = 195;
+      const width = 540, height = 540, origin = { x: 270, y: 270 }, R = 190;
 
       useEffect(() => { isDraggingRef.current = isDragging; }, [isDragging]);
       useEffect(() => {
@@ -7937,60 +8267,57 @@
         return () => document.removeEventListener('touchmove', preventTouchScroll);
       }, []);
 
-      const triggerFloat = (text, color) => {
-        const id = Date.now();
-        setFloatingText({ text, color, id });
-        setTimeout(() => setFloatingText(prev => prev?.id === id ? null : prev), 850);
-      };
-
-      const nextQuestion = (curProg, prevAng = null) => {
+      const nextQuestion = (curProg) => {
         const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
-        const q = generateLevel7Question(phase, prevAng);
-        questionMissedRef.current = false;
-        setQuestion(q); setStage('rotate'); setCurrentAngle(0);
-        exactAngleRef.current = 0; lastTickAngleRef.current = 0;
-        setSelectedNumerator(null); setSelectedDenominator(null);
-        setIsLockedSuccess(false); stageLockedRef.current = false; setConceptTip(null);
-        if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current);
+        const forceAxis = phase === 1 && curProg === starsThreshold[1] - 1 && !bagRef.current.p1AxisDone;
+        const q = generateLevel7Question(phase, bagRef.current, forceAxis);
+        if (phase === 1 && q.isAxis) bagRef.current.p1AxisDone = true;
+        setQuestion(q);
+        setStage('rotate');
+        setCurrentAngle(0);
+        exactAngleRef.current = 0;
+        lastTickAngleRef.current = 0;
+        setAssignedVals({ x: null, y: null, r: null });
+        currentAssignOrderRef.current = [];
+        setActiveAssignSlot(preferredAssignOrderRef.current[0] || 'x');
+        setWrongSlotKey(null);
+        setDragAssignChip(null);
+        setSelectedNumerator(null);
+        setSelectedDenominator(null);
+        setDragRatioKey(null);
+        setIsLockedSuccess(false);
+        pendingNextRef.current = null;
+        setConceptTip(null);
       };
 
       const startGame = (order = pickOrder) => {
         setPickOrder(order);
-        questionMissedRef.current = false;
+        bagRef.current = { specialBag: [], funcBag: [], lastAngle: undefined, p1AxisDone: false };
         setFeedbackAnim('');
-        setSelectedNumerator(null); setSelectedDenominator(null);
-        setWrongBtnKey(null); setConceptTip(null);
+        setSelectedNumerator(null);
+        setSelectedDenominator(null);
+        setConceptTip(null);
         const initProg = startSession();
-        nextQuestion(initProg, null);
+        nextQuestion(initProg);
         audio.init();
       };
 
       useEffect(() => { startGame('num'); }, []);
 
-      const lockRotationStage = () => {
-        if (stageLockedRef.current) return;
-        stageLockedRef.current = true;
-        if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current);
-        setIsDragging(false);
-        audio.sfxBonus();
-        triggerFloat("角度鎖定！請選分子與分母", "text-amber-300");
-        setFeedbackAnim('animate-correct');
-        setStage('define');
-        setTimeout(() => setFeedbackAnim(''), 300);
-      };
+      const applyPenalty = (delayEndMs = 480) => recordWrong({ delayEndMs }).gameOver;
 
-      const checkDwellHover = (angleVal) => {
-        if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current);
-        if (stage !== 'rotate' || stageLockedRef.current || !question) return;
-        if (angleVal === question.targetAngle) {
-          dwellTimerRef.current = setTimeout(() => { if (!stageLockedRef.current) lockRotationStage(); }, 300);
+      // ==================== Step 1: 5° 拖曳終邊（轉到目標角自動鎖定） ====================
+      const handleDialPointerDown = (e) => {
+        if (isLockedSuccess) {
+          handleConfirmSkip();
+          return;
         }
-      };
-
-      const handlePointerDown = (e) => {
-        if (stage !== 'rotate' || stageLockedRef.current || !dialSvgRef.current) return;
+        if (gameState !== 'playing' || stage !== 'rotate' || !dialSvgRef.current || (!isRelaxMode && lives <= 0)) return;
+        if (showGuide) dismissGuide(false);
         setIsDragging(true);
-        e.target.setPointerCapture(e.pointerId);
+        didDragRef.current = false;
+        dragStartPtRef.current = { x: e.clientX, y: e.clientY };
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
         const ctm = dialSvgRef.current.getScreenCTM();
         if (!ctm) return;
         const inv = ctm.inverse();
@@ -8000,8 +8327,11 @@
         exactAngleRef.current = currentAngle;
       };
 
-      const handlePointerMove = (e) => {
-        if (!isDragging || stage !== 'rotate' || stageLockedRef.current || !dialSvgRef.current) return;
+      const handleDialPointerMove = (e) => {
+        if (!isDragging || stage !== 'rotate' || !dialSvgRef.current) return;
+        if (dragStartPtRef.current && Math.hypot(e.clientX - dragStartPtRef.current.x, e.clientY - dragStartPtRef.current.y) >= 6) {
+          didDragRef.current = true;
+        }
         const ctm = dialSvgRef.current.getScreenCTM();
         if (!ctm) return;
         const inv = ctm.inverse();
@@ -8013,30 +8343,216 @@
         if (diff < -180) diff += 360;
         exactAngleRef.current += diff;
         lastAtanRef.current = currentAtan;
-        const snapped = Math.round(exactAngleRef.current / 5) * 5;
-        if (snapped !== lastTickAngleRef.current) { audio.sfxTick(); lastTickAngleRef.current = snapped; }
+        const clamped = Math.max(-15, Math.min(360, exactAngleRef.current));
+        const snapped = ((Math.round(clamped / 5) * 5) % 360 + 360) % 360;
+        if (snapped !== lastTickAngleRef.current) {
+          audio.sfxTick();
+          lastTickAngleRef.current = snapped;
+        }
         setCurrentAngle(snapped);
-        checkDwellHover(snapped);
       };
 
-      const handlePointerUp = (e) => {
+      const handleDialPointerUp = (e) => {
         if (!isDragging) return;
         setIsDragging(false);
-        if (e?.target?.hasPointerCapture?.(e.pointerId)) e.target.releasePointerCapture(e.pointerId);
-        if (stage === 'rotate' && question && !stageLockedRef.current && currentAngle === question.targetAngle) lockRotationStage();
+        try { e?.currentTarget?.releasePointerCapture?.(e.pointerId); } catch (_) {}
+        const clamped = Math.max(-15, Math.min(360, exactAngleRef.current));
+        const finalAngle = didDragRef.current ? ((Math.round(clamped / 5) * 5) % 360 + 360) % 360 : currentAngle;
+        if (stage === 'rotate' && question && finalAngle === question.targetAngle) {
+          if (showGuide) dismissGuide(false);
+          audio.sfxBonus();
+          setConceptTip(null);
+          setFeedbackAnim('animate-correct');
+          setStage('assign');
+          setTimeout(() => setFeedbackAnim(''), 280);
+        }
       };
 
-      const stepAngle = (delta) => {
-        if (stage !== 'rotate' || stageLockedRef.current || !question) return;
-        const next = currentAngle + delta;
-        audio.sfxTick();
-        exactAngleRef.current = next; lastTickAngleRef.current = next;
-        setCurrentAngle(next); checkDwellHover(next);
-        if (next === question.targetAngle) lockRotationStage();
+      const handleDialClick = () => {
+        if (isLockedSuccess) {
+          handleConfirmSkip();
+          return;
+        }
+        if (gameState !== 'playing' || stage !== 'rotate' || !question || didDragRef.current || (!isRelaxMode && lives <= 0)) return;
+        if (showGuide) dismissGuide(false);
+        if (currentAngle === question.targetAngle) {
+          audio.sfxBonus();
+          setConceptTip(null);
+          setFeedbackAnim('animate-correct');
+          setStage('assign');
+          setTimeout(() => setFeedbackAnim(''), 280);
+        } else {
+          audio.sfxError();
+          const gameOver = applyPenalty(460);
+          setConceptTip({
+            text: `目標 ${question.targetAngle}° 在${question.locationLabel}（目前停在 ${currentAngle}°），調好後再輕點鎖定！`,
+            id: Date.now()
+          });
+          setFeedbackAnim('animate-shake');
+          if (!gameOver) setTimeout(() => setFeedbackAnim(''), 340);
+        }
+      };
+
+      // ==================== Step 2: 7 膠囊個別對應 x, y, r ====================
+      const getExpectedSlotVal = (slot) => !question ? '' : slot === 'x' ? question.xStr : slot === 'y' ? question.yStr : question.rStr;
+
+      const attemptAssignSlot = (slot, val) => {
+        if (gameState !== 'playing' || stage !== 'assign' || !question || assignedVals[slot] || (!isRelaxMode && lives <= 0)) return;
+        if (showGuide) dismissGuide(false);
+        if (val === getExpectedSlotVal(slot)) {
+          audio.sfxSelect();
+          setConceptTip(null);
+          setWrongSlotKey(null);
+          if (!currentAssignOrderRef.current.includes(slot)) {
+            currentAssignOrderRef.current.push(slot);
+          }
+          const nextAssigned = { ...assignedVals, [slot]: val };
+          setAssignedVals(nextAssigned);
+          if (nextAssigned.x && nextAssigned.y && nextAssigned.r) {
+            if (currentAssignOrderRef.current.length === 3) {
+              preferredAssignOrderRef.current = [...currentAssignOrderRef.current];
+            }
+            audio.sfxBonus();
+            setStage('define');
+          } else {
+            const nextEmpty = preferredAssignOrderRef.current.find(k => !nextAssigned[k]);
+            if (nextEmpty) setActiveAssignSlot(nextEmpty);
+          }
+        } else {
+          audio.sfxError();
+          setWrongSlotKey(slot);
+          setConceptTip({ text: question.assignTip, id: Date.now() });
+          setFeedbackAnim('animate-shake');
+          setTimeout(() => { setFeedbackAnim(''); setWrongSlotKey(null); }, 360);
+        }
+      };
+
+      const findAssignSlot = (clientX, clientY) => {
+        const hit = (el, slot) => {
+          if (!el || assignedVals[slot]) return Infinity;
+          const r = el.getBoundingClientRect();
+          const cx = r.left + r.width / 2;
+          const cy = r.top + r.height / 2;
+          const d = Math.hypot(clientX - cx, clientY - cy);
+          return d <= 56 ? d : Infinity;
+        };
+        const cands = [
+          { slot: 'x', d: hit(assignXRef.current, 'x') },
+          { slot: 'y', d: hit(assignYRef.current, 'y') },
+          { slot: 'r', d: hit(assignRRef.current, 'r') }
+        ].sort((a, b) => a.d - b.d);
+        return cands[0].d < Infinity ? cands[0].slot : null;
+      };
+
+      const handleAssignChipDown = (e, val) => {
+        if (gameState !== 'playing' || stage !== 'assign' || !question || (!isRelaxMode && lives <= 0)) return;
+        if (showGuide) dismissGuide(false);
+        e.preventDefault();
+        audio.init();
+        const touchOffsetY = e.pointerType === 'touch' ? 46 : 0;
+        setDragAssignChip({
+          val,
+          startX: e.clientX,
+          startY: e.clientY,
+          clientX: e.clientX,
+          clientY: e.clientY,
+          touchOffsetY,
+          moved: false,
+          hoverSlot: findAssignSlot(e.clientX, e.clientY - touchOffsetY)
+        });
+      };
+
+      useEffect(() => {
+        if (!dragAssignChip) return;
+        const onMove = (e) => {
+          const offsetY = e.pointerType === 'touch' ? 46 : dragAssignChip.touchOffsetY || 0;
+          const dist = Math.hypot(e.clientX - dragAssignChip.startX, e.clientY - dragAssignChip.startY);
+          const moved = dragAssignChip.moved || dist >= 8;
+          setDragAssignChip(prev => prev ? {
+            ...prev,
+            clientX: e.clientX,
+            clientY: e.clientY,
+            touchOffsetY: offsetY,
+            moved,
+            hoverSlot: findAssignSlot(e.clientX, e.clientY - offsetY)
+          } : null);
+        };
+        const onUp = (e) => {
+          const cur = dragAssignChip;
+          setDragAssignChip(null);
+          if (!cur) return;
+          if (!cur.moved) {
+            if (activeAssignSlot && !assignedVals[activeAssignSlot]) {
+              attemptAssignSlot(activeAssignSlot, cur.val);
+            }
+          } else {
+            const offsetY = e.pointerType === 'touch' ? 46 : cur.touchOffsetY || 0;
+            const slot = findAssignSlot(e.clientX, e.clientY - offsetY);
+            if (slot) attemptAssignSlot(slot, cur.val);
+          }
+        };
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', onUp);
+        return () => {
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('pointerup', onUp);
+          window.removeEventListener('pointercancel', onUp);
+        };
+      }, [dragAssignChip, question, stage, assignedVals, activeAssignSlot]);
+
+      // ==================== Step 3: 圖上拖曳／點擊 x, y, r 填定義 ====================
+      const triggerSuccess = () => {
+        if (showGuide) dismissGuide(false);
+        justSolvedAtRef.current = Date.now();
+        audio.sfxBonus();
+        setIsLockedSuccess(true);
+        setFeedbackAnim('animate-correct');
+        const { completed, nextProgress } = recordCorrect({ wasMissed: false, delayEndMs: null });
+        setConceptTip({
+          tone: 'success',
+          canSkip: true,
+          skipLabel: completed ? '輕點查看結算 ▸' : '輕點繼續 ▸',
+          text: completed ? '全關挑戰完成！' : '定義正確！',
+          id: Date.now()
+        });
+        pendingNextRef.current = () => {
+          pendingNextRef.current = null;
+          setIsLockedSuccess(false);
+          setFeedbackAnim('');
+          if (completed) finishNow();
+          else nextQuestion(nextProgress);
+        };
+      };
+
+      const evaluateRatioPair = (numKey, denKey) => {
+        if (numKey === question.correctNumeratorKey && denKey === question.correctDenominatorKey) {
+          triggerSuccess();
+        } else {
+          audio.sfxError();
+          const gameOver = applyPenalty(480);
+          setConceptTip({ text: question.conceptTip, id: Date.now() });
+          setFeedbackAnim('animate-shake');
+          if (!gameOver) {
+            setTimeout(() => { setFeedbackAnim(''); setSelectedNumerator(null); setSelectedDenominator(null); }, 400);
+          }
+        }
+      };
+
+      const handleDropRatioSlot = (key, slot) => {
+        if (gameState !== 'playing' || stage !== 'define' || !question || isLockedSuccess || (!isRelaxMode && lives <= 0)) return;
+        if (showGuide) dismissGuide(false);
+        const nextNum = slot === 'num' ? key : selectedNumerator;
+        const nextDen = slot === 'den' ? key : selectedDenominator;
+        audio.sfxSelect();
+        setSelectedNumerator(nextNum);
+        setSelectedDenominator(nextDen);
+        if (nextNum && nextDen) evaluateRatioPair(nextNum, nextDen);
       };
 
       const handleInputKey = (key) => {
-        if (gameState !== 'playing' || stage !== 'define' || !question || isLockedSuccess) return;
+        if (gameState !== 'playing' || stage !== 'define' || !question || isLockedSuccess || (!isRelaxMode && lives <= 0)) return;
+        if (showGuide) dismissGuide(false);
         const firstKey = pickOrder === 'num' ? selectedNumerator : selectedDenominator;
         if (!firstKey) {
           audio.sfxSelect();
@@ -8051,41 +8567,112 @@
           const denKey = pickOrder === 'num' ? key : firstKey;
           setSelectedNumerator(numKey);
           setSelectedDenominator(denKey);
-          if (numKey === question.correctNumeratorKey && denKey === question.correctDenominatorKey) {
-            if (showGuide) dismissGuide();
-            audio.sfxMatch();
-            setIsLockedSuccess(true);
-            setConceptTip(null);
-            triggerFloat('完美解算！', "text-amber-300");
-            setFeedbackAnim('animate-correct');
-            const confirmDur = 1250;
-            const { completed, nextProgress } = recordCorrect({ wasMissed: questionMissedRef.current, delayEndMs: confirmDur });
-            const advanceFn = () => {
-              pendingNextRef.current = null;
-              setFeedbackAnim('');
-              if (!completed) nextQuestion(nextProgress, question.targetAngle);
-            };
-            pendingNextRef.current = advanceFn;
-            confirmTimerRef.current = setTimeout(advanceFn, confirmDur);
-          } else {
-            audio.sfxError();
-            const gameOver = applyQuestionPenalty(480);
-            setWrongBtnKey(key);
-            setConceptTip({ text: question.conceptTip, id: Date.now() });
-            setFeedbackAnim('animate-shake');
-            if (!gameOver) {
-              setTimeout(() => { setFeedbackAnim(''); setSelectedNumerator(null); setSelectedDenominator(null); setWrongBtnKey(null); }, 400);
-            }
-          }
+          evaluateRatioPair(numKey, denKey);
         }
       };
 
+      const findRatioSlot = (clientX, clientY) => {
+        const hit = (el) => {
+          if (!el) return false;
+          const r = el.getBoundingClientRect();
+          return clientX >= r.left - 18 && clientX <= r.right + 18 && clientY >= r.top - 14 && clientY <= r.bottom + 14;
+        };
+        if (hit(numSlotRef.current)) return 'num';
+        if (hit(denSlotRef.current)) return 'den';
+        return null;
+      };
+
+      const handleTagPointerDown = (e, key) => {
+        if (stage === 'assign') {
+          if (showGuide) dismissGuide(false);
+          if (!assignedVals[key]) {
+            e.stopPropagation();
+            audio.sfxClick();
+            setActiveAssignSlot(key);
+          }
+          return;
+        }
+        if (gameState !== 'playing' || stage !== 'define' || !question || isLockedSuccess || (!isRelaxMode && lives <= 0)) return;
+        if (showGuide) dismissGuide(false);
+        e.preventDefault();
+        e.stopPropagation();
+        audio.init();
+        setDragRatioKey({
+          key,
+          startX: e.clientX,
+          startY: e.clientY,
+          clientX: e.clientX,
+          clientY: e.clientY,
+          moved: false,
+          hoverSlot: findRatioSlot(e.clientX, e.clientY)
+        });
+      };
+
+      useEffect(() => {
+        if (!dragRatioKey) return;
+        const onMove = (e) => {
+          const dist = Math.hypot(e.clientX - dragRatioKey.startX, e.clientY - dragRatioKey.startY);
+          const moved = dragRatioKey.moved || dist >= 8;
+          setDragRatioKey(prev => prev ? {
+            ...prev,
+            clientX: e.clientX,
+            clientY: e.clientY,
+            moved,
+            hoverSlot: findRatioSlot(e.clientX, e.clientY)
+          } : null);
+        };
+        const onUp = (e) => {
+          const cur = dragRatioKey;
+          setDragRatioKey(null);
+          if (!cur) return;
+          if (!cur.moved) {
+            handleInputKey(cur.key);
+          } else {
+            const slot = findRatioSlot(e.clientX, e.clientY);
+            if (slot) handleDropRatioSlot(cur.key, slot);
+          }
+        };
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', onUp);
+        return () => {
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('pointerup', onUp);
+          window.removeEventListener('pointercancel', onUp);
+        };
+      }, [dragRatioKey, question, stage, isLockedSuccess, selectedNumerator, selectedDenominator, pickOrder]);
+
       const getDisplayVal = (key) => !question ? '' : key === 'x' ? question.xStr : key === 'y' ? question.yStr : question.rStr;
+      const isSuccessKey = (k) => Boolean(isLockedSuccess && question && (question.correctNumeratorKey === k || question.correctDenominatorKey === k));
       const rayAngles = Array.from({ length: 24 }, (_, i) => i * 15);
       const currentRad = (currentAngle * Math.PI) / 180;
       const ptTerminal = { x: origin.x + R * Math.cos(currentRad), y: origin.y - R * Math.sin(currentRad) };
       const isLv8NumTurn = (pickOrder === 'num' && !selectedNumerator) || (pickOrder === 'den' && selectedDenominator && !selectedNumerator);
       const isLv8DenTurn = (pickOrder === 'den' && !selectedDenominator) || (pickOrder === 'num' && selectedNumerator && !selectedDenominator);
+
+      const renderSvgValLabel = (prefix, rawVal, fgColor) => {
+        const val = String(rawVal);
+        if (!val.includes('√')) {
+          return (
+            <text x="0" y="1" fill={fgColor} fontSize="15.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">
+              {prefix}{val}
+            </text>
+          );
+        }
+        const idx = val.indexOf('√');
+        const before = val.slice(0, idx);
+        const rad = val.slice(idx + 1);
+        const fullPrefix = `${prefix}${before}`;
+        const prefixX = fullPrefix.length >= 3 ? -18 : -15;
+        const tickX = fullPrefix.length >= 3 ? -1 : -2;
+        return (
+          <g>
+            <text x={prefixX} y="1" fill={fgColor} fontSize="15" fontWeight="900" textAnchor="middle" dominantBaseline="middle">{fullPrefix}</text>
+            <path d={`M ${tickX} 1.5 L ${tickX + 2.2} 0 L ${tickX + 4.4} 6.5 L ${tickX + 8.8} -7 L ${tickX + 21} -7`} fill="none" stroke={fgColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            <text x={tickX + 15} y="2" fill={fgColor} fontSize="15" fontWeight="900" textAnchor="middle" dominantBaseline="middle">{rad}</text>
+          </g>
+        );
+      };
 
       return (
         <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
@@ -8095,7 +8682,7 @@
               <div className="w-full space-y-2.5 pt-2">
                 <div className="w-20 h-20 mx-auto rounded-3xl bg-violet-100 border-4 border-violet-500 flex items-center justify-center text-4xl shadow-inner animate-bounce">🔭</div>
                 <h2 className="text-2xl font-black text-indigo-950 tracking-wide">星象羅盤師</h2>
-                <div className="text-xs font-black text-violet-700 bg-violet-50 border border-violet-200 rounded-full px-3 py-1 inline-block">① 轉角 ➔ ② x · y · r</div>
+                <div className="text-xs font-black text-violet-700 bg-violet-50 border border-violet-200 rounded-full px-3 py-1 inline-block">① 轉終邊 ➔ ② 填 x·y·r ➔ ③ 求比值</div>
               </div>
               <CompactStarPills starsThreshold={starsThreshold} livesMode maxLives={maxLives} />
               <div className="w-full space-y-2">
@@ -8114,115 +8701,366 @@
                 maxLives={maxLives}
                 healStreak={healStreak}
                 healTarget={healTarget}
-                onManualEnd={() => { if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current); finishNow(); }}
+                onManualEnd={finishNow}
                 onOpenGuide={openGuide}
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${isLockedSuccess ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['第 I～II 象限 • 轉角定位求值', '全象限 ＋ 負角與軸上角定位', '多圈廣義特殊角綜合推導']} />
-                <div data-coach="lv12-target" className="bg-gradient-to-r from-violet-600 to-indigo-700 py-1.5 px-3.5 flex justify-between items-center text-white min-h-[52px] border-b-2 border-indigo-950 shrink-0">
-                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-                    <span className="text-lg sm:text-2xl font-serif font-black shrink-0">{question.targetFunc}({question.targetAngle}°) =</span>
-                    {stage === 'rotate' ? (
-                      <span className="text-xs font-black bg-amber-400/20 text-amber-200 border border-amber-300/50 px-2.5 py-1 rounded-xl animate-pulse whitespace-nowrap">① 請先轉至 {question.targetAngle}°</span>
-                    ) : (
-                      <div className="flex items-center gap-2 shrink-0">
-                        <div className="flex flex-col items-center">
+                <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['單圈正特殊角 • 轉終邊 → 貼邊 → 定義', '加入象限角 • 軸上點 (x, y, r) 求值', '綜合特殊角 × 象限角 • 獨立推導比值']} />
+                <div data-coach="lv11-target" className="bg-gradient-to-r from-violet-600 to-indigo-700 h-[66px] px-3.5 flex justify-between items-center text-white border-b-2 border-indigo-950 shrink-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-base sm:text-xl font-serif font-black shrink-0">{question.targetFunc}({question.targetAngle}°) =</span>
+                    {(stage === 'rotate' || stage === 'assign') && (
+                      <span className="inline-flex items-center justify-center min-w-[30px] h-[30px] px-2 rounded-lg bg-white/15 border border-white/40 text-amber-200 font-serif font-black text-base sm:text-lg shrink-0">?</span>
+                    )}
+                    {stage === 'define' && (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <div data-coach="lv11-ratio-box" className="flex flex-col items-center">
                           <div
+                            ref={numSlotRef}
                             onClick={() => { if (selectedNumerator && !isLockedSuccess) { audio.sfxClick(); setSelectedNumerator(null); } }}
-                            className={`min-w-[50px] px-2 h-6 rounded-md border-2 flex items-center justify-center font-bold text-xs transition-all ${
-                              selectedNumerator
+                            className={`min-w-[56px] px-2 h-6 rounded-lg border-2 flex items-center justify-center font-bold text-xs transition-all ${
+                              dragRatioKey?.hoverSlot === 'num'
+                                ? 'border-emerald-300 bg-emerald-400/50 text-white scale-110 shadow-[0_0_12px_rgba(52,211,153,0.8)]'
+                                : selectedNumerator
                                 ? 'bg-emerald-400 border-emerald-200 text-emerald-950 font-black cursor-pointer active:scale-95'
                                 : isLv8NumTurn
                                 ? 'border-amber-300 bg-amber-400/30 text-amber-100 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]'
                                 : 'border-dashed border-white/40 text-violet-200/70 bg-white/5'
                             }`}
                           >
-                            {selectedNumerator ? `${selectedNumerator}(${getDisplayVal(selectedNumerator)})` : '分子'}
+                            <span>{selectedNumerator ? <SqrtText text={`${selectedNumerator} (${getDisplayVal(selectedNumerator)})`} /> : '分子'}</span>
                           </div>
                           <div className="w-full h-0.5 bg-white/70 my-0.5"></div>
                           <div
+                            ref={denSlotRef}
                             onClick={() => { if (selectedDenominator && !isLockedSuccess) { audio.sfxClick(); setSelectedDenominator(null); } }}
-                            className={`min-w-[50px] px-2 h-6 rounded-md border-2 flex items-center justify-center font-bold text-xs transition-all ${
-                              selectedDenominator
+                            className={`min-w-[56px] px-2 h-6 rounded-lg border-2 flex items-center justify-center font-bold text-xs transition-all ${
+                              dragRatioKey?.hoverSlot === 'den'
+                                ? 'border-amber-300 bg-amber-400/50 text-white scale-110 shadow-[0_0_12px_rgba(251,191,36,0.8)]'
+                                : selectedDenominator
                                 ? 'bg-amber-400 border-amber-200 text-amber-950 font-black cursor-pointer active:scale-95'
                                 : isLv8DenTurn
                                 ? 'border-amber-300 bg-amber-400/30 text-amber-100 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]'
                                 : 'border-dashed border-white/40 text-violet-200/70 bg-white/5'
                             }`}
                           >
-                            {selectedDenominator ? `${selectedDenominator}(${getDisplayVal(selectedDenominator)})` : '分母'}
+                            <span>{selectedDenominator ? <SqrtText text={`${selectedDenominator} (${getDisplayVal(selectedDenominator)})`} /> : '分母'}</span>
                           </div>
                         </div>
                         {isLockedSuccess && (
-                          <span className="text-amber-300 font-serif font-black text-base bg-indigo-950/70 px-2 py-1 rounded-xl border border-amber-300">= {question.exactValText}</span>
+                          <div className="inline-flex items-center gap-1.5 text-amber-200 font-black animate-jelly shrink-0">
+                            <span className="text-base sm:text-lg">=</span>
+                            <FracText value={question.exactValText} size="xs" barClass="bg-amber-200" className="text-amber-200" />
+                          </div>
                         )}
                         <SuccessBadge show={isLockedSuccess} />
                       </div>
                     )}
                   </div>
-                  <span className="text-xs font-black bg-white/20 px-2 py-1 rounded-xl border border-white/40 whitespace-nowrap">
-                    {stage === 'rotate' ? `${currentAngle}°` : question.locationLabel}
-                  </span>
+                  {(stage === 'rotate' || stage === 'assign') && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {stage === 'rotate' && (
+                        <>
+                          <span className="text-xs font-black bg-amber-400/20 text-amber-200 border border-amber-300/50 px-2.5 py-1 rounded-xl whitespace-nowrap">① 拖曳終邊</span>
+                          <span className="text-xs font-black bg-white/20 px-2.5 py-1 rounded-xl border border-white/40 whitespace-nowrap">
+                            {currentAngle}°
+                          </span>
+                        </>
+                      )}
+                      {stage === 'assign' && (
+                        <span className="text-xs font-black bg-sky-400/20 text-sky-100 border border-sky-300/50 px-2.5 py-1 rounded-xl whitespace-nowrap">② 填入 x, y, r 數值</span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div onClick={handleConfirmSkip} className="relative w-full flex-1 min-h-0 bg-white flex items-center justify-center overflow-hidden">
                   <HintBanner tip={conceptTip} />
-                  <svg ref={dialSvgRef} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" className={`w-full h-full object-contain select-none ${stage === 'rotate' ? 'cursor-grab active:cursor-grabbing' : ''}`} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp}>
-                    <line x1={30} y1={270} x2={510} y2={270} stroke="#94a3b8" strokeWidth="2.5" />
-                    <line x1={270} y1={30} x2={270} y2={510} stroke="#94a3b8" strokeWidth="2.5" />
-                    {rayAngles.map(deg => {
+                  <svg
+                    ref={dialSvgRef}
+                    data-coach="lv11-board"
+                    viewBox={`0 0 ${width} ${height}`}
+                    preserveAspectRatio="xMidYMid meet"
+                    className={`w-full h-full object-contain select-none ${stage === 'rotate' ? 'cursor-grab active:cursor-grabbing touch-none' : ''}`}
+                    onPointerDown={handleDialPointerDown}
+                    onPointerMove={handleDialPointerMove}
+                    onPointerUp={handleDialPointerUp}
+                    onPointerCancel={handleDialPointerUp}
+                    onClick={handleDialClick}
+                  >
+                    <circle cx={origin.x} cy={origin.y} r={R} fill="none" stroke="#e2e8f0" strokeWidth="2" />
+                    <line x1={38} y1={270} x2={502} y2={270} stroke="#64748b" strokeWidth="2.2" />
+                    <line x1={270} y1={38} x2={270} y2={502} stroke="#64748b" strokeWidth="2.2" />
+
+                    {stage === 'rotate' && rayAngles.map(deg => {
                       const rRad = (deg * Math.PI) / 180;
                       const isAxis = deg % 90 === 0;
-                      return <line key={deg} x1={270} y1={270} x2={270 + 200 * Math.cos(rRad)} y2={270 - 200 * Math.sin(rRad)} stroke="#94a3b8" strokeWidth={isAxis ? 3 : 2} strokeDasharray={isAxis ? "none" : "5 5"} />;
+                      const isSpecial = (deg % 30 === 0 || deg % 45 === 0) && !isAxis;
+                      return (
+                        <line
+                          key={deg}
+                          x1={origin.x}
+                          y1={origin.y}
+                          x2={origin.x + R * Math.cos(rRad)}
+                          y2={origin.y - R * Math.sin(rRad)}
+                          stroke={isAxis ? '#94a3b8' : isSpecial ? '#cbd5e1' : '#e2e8f0'}
+                          strokeWidth={isAxis ? 2.4 : isSpecial ? 1.8 : 1.3}
+                          strokeDasharray={isAxis ? undefined : isSpecial ? '5 5' : '4 4'}
+                          opacity={isAxis ? 0.85 : isSpecial ? 0.95 : 0.85}
+                        />
+                      );
                     })}
-                    <line x1={270} y1={270} x2={490} y2={270} stroke="#ef4444" strokeWidth="8" strokeLinecap="round" />
+                    {stage === 'rotate' ? [
+                      { deg: 0, x: 492, y: 270 },
+                      { deg: 90, x: 270, y: 52 },
+                      { deg: 180, x: 44, y: 270 },
+                      { deg: 270, x: 270, y: 492 }
+                    ].map(ax => (
+                      <text key={ax.deg} x={ax.x} y={ax.y} fill="#64748b" fontSize="14" fontWeight="900" textAnchor="middle" dominantBaseline="middle">{ax.deg}°</text>
+                    )) : (
+                      <g className="pointer-events-none">
+                        <text x="506" y="255" fill="#64748b" fontSize="20" fontWeight="bold" textAnchor="middle">x</text>
+                        <text x="285" y="48" fill="#64748b" fontSize="20" fontWeight="bold">y</text>
+                      </g>
+                    )}
+
                     {stage === 'rotate' ? (
                       <g>
-                        <line x1={270} y1={270} x2={ptTerminal.x} y2={ptTerminal.y} stroke="#7c3aed" strokeWidth="8" strokeLinecap="round" />
-                        <g data-coach="lv12-dial" transform={`translate(${ptTerminal.x}, ${ptTerminal.y})`}>
-                          <circle cx="0" cy="0" r={isDragging ? 22 : 18} fill="#7c3aed" stroke="#ffffff" strokeWidth="4" />
-                          <circle cx="0" cy="0" r="6" fill="#ffffff" />
+                        <line x1={origin.x} y1={origin.y} x2={origin.x + R} y2={origin.y} stroke="#ef4444" strokeWidth="6" strokeLinecap="round" opacity="0.7" />
+                        <g transform={`translate(${origin.x + 126}, ${origin.y + 24})`} className="pointer-events-none">
+                          <rect x="-22" y="-11" width="44" height="22" rx="7" fill="#ffffff" stroke="#ef4444" strokeWidth="1.5" />
+                          <text x="0" y="1" fill="#b91c1c" fontSize="11.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">始邊</text>
                         </g>
-                        <circle cx={270} cy={270} r={height} fill="transparent" style={{ touchAction: 'none' }} />
+                        {currentAngle > 0 && (() => {
+                          const arcR = 44;
+                          const endX = origin.x + arcR * Math.cos(currentRad);
+                          const endY = origin.y - arcR * Math.sin(currentRad);
+                          const largeArc = currentAngle > 180 ? 1 : 0;
+                          return (
+                            <g className="pointer-events-none">
+                              <path
+                                d={`M ${origin.x} ${origin.y} L ${origin.x + arcR} ${origin.y} A ${arcR} ${arcR} 0 ${largeArc} 0 ${endX} ${endY} Z`}
+                                fill="rgba(251, 191, 36, 0.14)"
+                                stroke="none"
+                              />
+                              <path
+                                d={`M ${origin.x + arcR} ${origin.y} A ${arcR} ${arcR} 0 ${largeArc} 0 ${endX} ${endY}`}
+                                fill="none"
+                                stroke="#f59e0b"
+                                strokeWidth="4"
+                                strokeLinecap="round"
+                                opacity="0.85"
+                              />
+                            </g>
+                          );
+                        })()}
+                        <line x1={origin.x} y1={origin.y} x2={ptTerminal.x} y2={ptTerminal.y} stroke="#3b82f6" strokeWidth="8" strokeLinecap="round" />
+                        <g data-coach="lv11-dial" transform={`translate(${ptTerminal.x}, ${ptTerminal.y})`}>
+                          <circle cx="0" cy="0" r={isDragging ? 22 : 18} fill="#2563eb" stroke="#ffffff" strokeWidth="4" />
+                          <circle cx="0" cy="0" r="6" fill="#ffffff" />
+                          <g transform={`translate(${Math.cos(currentRad) >= 0 ? 34 : -34}, ${Math.sin(currentRad) >= 0 ? -24 : 24})`} className="pointer-events-none">
+                            <rect x="-22" y="-11" width="44" height="22" rx="8" fill="#ffffff" stroke="#3b82f6" strokeWidth="1.6" />
+                            <text x="0" y="1" fill="#1d4ed8" fontSize="11.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">終邊</text>
+                          </g>
+                        </g>
                       </g>
                     ) : (
-                      <g className="animate-jelly">
-                        <line x1={270} y1={270} x2={question.ptP.x} y2={question.ptP.y} stroke="#f59e0b" strokeWidth="9" strokeLinecap="round" onClick={() => handleInputKey('r')} />
-                        <g transform={`translate(${(270 + question.ptP.x) / 2 - 24}, ${(270 + question.ptP.y) / 2})`} className={isLockedSuccess && (question.correctNumeratorKey === 'r' || question.correctDenominatorKey === 'r') ? 'animate-pulse' : ''} onClick={() => handleInputKey('r')}>
-                          <rect x="-34" y="-16" width="68" height="32" fill={isLockedSuccess && (question.correctNumeratorKey === 'r' || question.correctDenominatorKey === 'r') ? '#ecfdf5' : 'white'} stroke={isLockedSuccess && (question.correctNumeratorKey === 'r' || question.correctDenominatorKey === 'r') ? '#10b981' : '#f59e0b'} strokeWidth={isLockedSuccess && (question.correctNumeratorKey === 'r' || question.correctDenominatorKey === 'r') ? '4' : '2.5'} rx="10" />
-                          <text x="0" y="2" fill="#b45309" fontSize="17" fontWeight="900" textAnchor="middle" dominantBaseline="middle">r={question.rStr}</text>
-                        </g>
-                        <g transform={`translate(${question.xNum === 0 ? 316 : question.ptFootX.x}, ${270 + (question.yNum >= 0 ? 28 : -28)})`} className={isLockedSuccess && (question.correctNumeratorKey === 'x' || question.correctDenominatorKey === 'x') ? 'animate-pulse' : ''} onClick={() => handleInputKey('x')}>
-                          <rect x="-38" y="-16" width="76" height="32" fill={isLockedSuccess && (question.correctNumeratorKey === 'x' || question.correctDenominatorKey === 'x') ? '#ecfdf5' : 'white'} stroke={isLockedSuccess && (question.correctNumeratorKey === 'x' || question.correctDenominatorKey === 'x') ? '#10b981' : '#2563eb'} strokeWidth={isLockedSuccess && (question.correctNumeratorKey === 'x' || question.correctDenominatorKey === 'x') ? '4' : '2.5'} rx="10" />
-                          <text x="0" y="2" fill="#1d4ed8" fontSize="17" fontWeight="900" textAnchor="middle" dominantBaseline="middle">x={question.xStr}</text>
-                        </g>
-                        <g transform={`translate(${270 + (question.xNum >= 0 ? -46 : 46)}, ${question.yNum === 0 ? 232 : question.ptFootY.y})`} className={isLockedSuccess && (question.correctNumeratorKey === 'y' || question.correctDenominatorKey === 'y') ? 'animate-pulse' : ''} onClick={() => handleInputKey('y')}>
-                          <rect x="-38" y="-16" width="76" height="32" fill={isLockedSuccess && (question.correctNumeratorKey === 'y' || question.correctDenominatorKey === 'y') ? '#ecfdf5' : 'white'} stroke={isLockedSuccess && (question.correctNumeratorKey === 'y' || question.correctDenominatorKey === 'y') ? '#10b981' : '#ef4444'} strokeWidth={isLockedSuccess && (question.correctNumeratorKey === 'y' || question.correctDenominatorKey === 'y') ? '4' : '2.5'} rx="10" />
-                          <text x="0" y="2" fill="#b91c1c" fontSize="17" fontWeight="900" textAnchor="middle" dominantBaseline="middle">y={question.yStr}</text>
-                        </g>
-                        <g transform={`translate(${question.ptP.x}, ${question.ptP.y})`}>
-                          <circle cx="0" cy="0" r="17" fill="#7c3aed" stroke="#ffffff" strokeWidth="3.5" />
-                        </g>
+                      <g key={question.targetAngle + '_' + question.targetFunc}>
+                        {question.principal > 0 && (() => {
+                          const arcR = 38;
+                          const endRad = (question.principal * Math.PI) / 180;
+                          const endX = origin.x + arcR * Math.cos(endRad);
+                          const endY = origin.y - arcR * Math.sin(endRad);
+                          const largeArc = question.principal > 180 ? 1 : 0;
+                          const midRad = ((question.principal / 2) * Math.PI) / 180;
+                          const lblX = origin.x + (arcR + 20) * Math.cos(midRad);
+                          const lblY = origin.y - (arcR + 20) * Math.sin(midRad);
+                          return (
+                            <g className="pointer-events-none">
+                              <path
+                                d={`M ${origin.x} ${origin.y} L ${origin.x + arcR} ${origin.y} A ${arcR} ${arcR} 0 ${largeArc} 0 ${endX} ${endY} Z`}
+                                fill="rgba(251, 191, 36, 0.16)"
+                                stroke="none"
+                              />
+                              <path
+                                d={`M ${origin.x + arcR} ${origin.y} A ${arcR} ${arcR} 0 ${largeArc} 0 ${endX} ${endY}`}
+                                fill="none"
+                                stroke="#f59e0b"
+                                strokeWidth="3.5"
+                                strokeLinecap="round"
+                              />
+                              <text x={lblX} y={lblY} fill="#b45309" fontSize="14" fontWeight="900" textAnchor="middle" dominantBaseline="middle">{question.targetAngle}°</text>
+                            </g>
+                          );
+                        })()}
+                        {!question.isAxis && (
+                          <g className="animate-lv10-fade">
+                            <line x1={question.ptP.x} y1={question.ptP.y} x2={question.ptFootX.x} y2={question.ptFootX.y} stroke={isSuccessKey('y') ? '#10b981' : '#94a3b8'} strokeWidth={isSuccessKey('y') ? '4.5' : '2.5'} strokeDasharray={isSuccessKey('y') ? undefined : '5 5'} />
+                            <line x1={question.ptP.x} y1={question.ptP.y} x2={question.ptFootY.x} y2={question.ptFootY.y} stroke="#94a3b8" strokeWidth="2.5" strokeDasharray="5 5" />
+                            <line x1={origin.x} y1={origin.y} x2={question.ptFootX.x} y2={origin.y} stroke={isSuccessKey('x') ? '#10b981' : '#2563eb'} strokeWidth={isSuccessKey('x') ? '4.5' : '3'} opacity={isSuccessKey('x') ? '1' : '0.45'} />
+                            <polyline points={question.rightAngleSquareX} fill="none" stroke="#94a3b8" strokeWidth="2" />
+                          </g>
+                        )}
+
+                        <line
+                          x1={origin.x} y1={origin.y} x2={question.ptP.x} y2={question.ptP.y}
+                          stroke={isSuccessKey('r') ? '#10b981' : '#f59e0b'} strokeWidth={isSuccessKey('r') ? '8.5' : '7.5'} strokeLinecap="round"
+                          className={`animate-lv10-ray ${stage === 'define' ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                          onPointerDown={(e) => handleTagPointerDown(e, 'r')}
+                        />
+
+                        {(() => {
+                          const rVal = stage === 'assign' ? assignedVals.r : question.rStr;
+                          const isActive = stage === 'assign' && !rVal && (activeAssignSlot === 'r' || dragAssignChip?.hoverSlot === 'r');
+                          const isWrong = wrongSlotKey === 'r';
+                          const fg = isSuccessKey('r') ? '#ffffff' : '#b45309';
+                          return (
+                            <g
+                              ref={assignRRef}
+                              data-coach={stage === 'assign' ? 'lv11-assign-r' : undefined}
+                              transform={`translate(${(origin.x + question.ptP.x) / 2}, ${(origin.y + question.ptP.y) / 2})`}
+                              className={`animate-lv10-fade ${stage === 'define' ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                              onPointerDown={(e) => handleTagPointerDown(e, 'r')}
+                            >
+                              <rect x="-50" y="-24" width="100" height="48" fill="transparent" />
+                              <rect
+                                x="-42" y="-18" width="84" height="36" rx="11"
+                                fill={isSuccessKey('r') ? '#10b981' : isWrong ? '#fee2e2' : isActive ? '#fde68a' : 'white'}
+                                stroke={isSuccessKey('r') ? '#059669' : isWrong ? '#ef4444' : isActive ? '#d97706' : '#f59e0b'}
+                                strokeWidth={isSuccessKey('r') || isActive ? '3.2' : '2.5'}
+                                strokeDasharray={stage === 'assign' && !rVal ? '5 3' : undefined}
+                                className={isActive ? 'animate-light-breath' : ''}
+                              />
+                              {rVal ? renderSvgValLabel('r=', rVal, fg) : (
+                                <text x="0" y="1" fill="#b45309" fontSize="15.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">r = ?</text>
+                              )}
+                            </g>
+                          );
+                        })()}
+
+                        {(() => {
+                          const xVal = stage === 'assign' ? assignedVals.x : question.xStr;
+                          const isActive = stage === 'assign' && !xVal && (activeAssignSlot === 'x' || dragAssignChip?.hoverSlot === 'x');
+                          const isWrong = wrongSlotKey === 'x';
+                          const fg = isSuccessKey('x') ? '#ffffff' : '#1d4ed8';
+                          const xPos = question.xNum === 0 ? origin.x + 50 : question.ptFootX.x;
+                          const yPos = origin.y + (question.yNum >= 0 ? 28 : -28);
+                          return (
+                            <g
+                              ref={assignXRef}
+                              data-coach={stage === 'assign' ? 'lv11-assign-x' : 'lv11-demo-tag'}
+                              transform={`translate(${xPos}, ${yPos})`}
+                              className={`animate-lv10-fade ${stage === 'define' ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                              onPointerDown={(e) => handleTagPointerDown(e, 'x')}
+                            >
+                              <rect x="-50" y="-24" width="100" height="48" fill="transparent" />
+                              <rect
+                                x="-42" y="-18" width="84" height="36" rx="11"
+                                fill={isSuccessKey('x') ? '#10b981' : isWrong ? '#fee2e2' : isActive ? '#fde68a' : 'white'}
+                                stroke={isSuccessKey('x') ? '#059669' : isWrong ? '#ef4444' : isActive ? '#d97706' : '#2563eb'}
+                                strokeWidth={isSuccessKey('x') || isActive ? '3.2' : '2.5'}
+                                strokeDasharray={stage === 'assign' && !xVal ? '5 3' : undefined}
+                                className={isActive ? 'animate-light-breath' : ''}
+                              />
+                              {xVal ? renderSvgValLabel('x=', xVal, fg) : (
+                                <text x="0" y="1" fill="#1d4ed8" fontSize="15.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">x = ?</text>
+                              )}
+                            </g>
+                          );
+                        })()}
+
+                        {(() => {
+                          const yVal = stage === 'assign' ? assignedVals.y : question.yStr;
+                          const isActive = stage === 'assign' && !yVal && (activeAssignSlot === 'y' || dragAssignChip?.hoverSlot === 'y');
+                          const isWrong = wrongSlotKey === 'y';
+                          const fg = isSuccessKey('y') ? '#ffffff' : '#b91c1c';
+                          const xPos = origin.x + (question.xNum >= 0 ? -50 : 50);
+                          const yPos = question.yNum === 0 ? origin.y - 36 : question.ptFootY.y;
+                          return (
+                            <g
+                              ref={assignYRef}
+                              data-coach={stage === 'assign' ? 'lv11-assign-y' : undefined}
+                              transform={`translate(${xPos}, ${yPos})`}
+                              className={`animate-lv10-fade ${stage === 'define' ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                              onPointerDown={(e) => handleTagPointerDown(e, 'y')}
+                            >
+                              <rect x="-50" y="-24" width="100" height="48" fill="transparent" />
+                              <rect
+                                x="-42" y="-18" width="84" height="36" rx="11"
+                                fill={isSuccessKey('y') ? '#10b981' : isWrong ? '#fee2e2' : isActive ? '#fde68a' : 'white'}
+                                stroke={isSuccessKey('y') ? '#059669' : isWrong ? '#ef4444' : isActive ? '#d97706' : '#ef4444'}
+                                strokeWidth={isSuccessKey('y') || isActive ? '3.2' : '2.5'}
+                                strokeDasharray={stage === 'assign' && !yVal ? '5 3' : undefined}
+                                className={isActive ? 'animate-light-breath' : ''}
+                              />
+                              {yVal ? renderSvgValLabel('y=', yVal, fg) : (
+                                <text x="0" y="1" fill="#b91c1c" fontSize="15.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">y = ?</text>
+                              )}
+                            </g>
+                          );
+                        })()}
+
+                        <circle cx={question.ptP.x} cy={question.ptP.y} r="12" fill="#2563eb" stroke="#ffffff" strokeWidth="3" />
                       </g>
                     )}
                   </svg>
-                </div>
 
-                {stage === 'rotate' ? (
-                  <div data-coach="lv12-stepbtns" className="bg-slate-50 border-t-2 border-slate-200 p-2 grid grid-cols-2 gap-2 shrink-0">
-                    <button onClick={() => stepAngle(-5)} className="py-3 btn-3d-purple text-white font-mono font-black rounded-2xl shadow-md active:scale-95 text-sm flex items-center justify-center gap-1"><span>↺</span> -5° 微調</button>
-                    <button onClick={() => stepAngle(5)} className="py-3 btn-3d-purple text-white font-mono font-black rounded-2xl shadow-md active:scale-95 text-sm flex items-center justify-center gap-1"><span>↻</span> +5° 微調</button>
-                  </div>
-                ) : (
-                  <div data-coach="lv12-btns" className="bg-slate-50 border-t-2 border-slate-200 p-2 grid grid-cols-3 gap-2 shrink-0 animate-jelly">
-                    <button onClick={() => handleInputKey('x')} className={`py-3 btn-3d-blue text-white font-mono font-black rounded-2xl shadow-md active:scale-95 text-lg flex items-center justify-center gap-2 ${(selectedNumerator === 'x' || selectedDenominator === 'x') ? 'ring-4 ring-amber-300 scale-[1.03]' : ''} ${wrongBtnKey === 'x' ? 'btn-wrong-flash' : ''}`}><span className="text-xl">x</span><span className="text-sm bg-white/20 px-2 py-0.5 rounded-lg">{question.xStr}</span></button>
-                    <button onClick={() => handleInputKey('y')} className={`py-3 bg-gradient-to-b from-rose-400 to-red-600 border-b-[5px] border-red-800 text-white font-mono font-black rounded-2xl shadow-md active:scale-95 text-lg flex items-center justify-center gap-2 ${(selectedNumerator === 'y' || selectedDenominator === 'y') ? 'ring-4 ring-amber-300 scale-[1.03]' : ''} ${wrongBtnKey === 'y' ? 'btn-wrong-flash' : ''}`}><span className="text-xl">y</span><span className="text-sm bg-white/20 px-2 py-0.5 rounded-lg">{question.yStr}</span></button>
-                    <button onClick={() => handleInputKey('r')} className={`py-3 btn-3d-yellow text-amber-950 font-mono font-black rounded-2xl shadow-md active:scale-95 text-lg flex items-center justify-center gap-2 ${(selectedNumerator === 'r' || selectedDenominator === 'r') ? 'ring-4 ring-white scale-[1.03]' : ''} ${wrongBtnKey === 'r' ? 'btn-wrong-flash' : ''}`}><span className="text-xl">r</span><span className="text-sm bg-amber-950/20 px-2 py-0.5 rounded-lg">{question.rStr}</span></button>
-                  </div>
-                )}
+                  {stage === 'assign' && (
+                    <div
+                      data-coach="lv11-num-pool"
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute bottom-2 left-2 right-2 z-20 bg-slate-900/92 backdrop-blur-sm border border-white/15 rounded-2xl p-1.5 flex items-center justify-center gap-1.5 shadow-xl"
+                    >
+                      {LV11_NUM_CAPSULES.map((val) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onPointerDown={(e) => handleAssignChipDown(e, val)}
+                          className={`flex-1 min-w-0 py-2 rounded-xl bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-serif font-black text-sm sm:text-base shadow active:scale-95 touch-none select-none cursor-grab active:cursor-grabbing flex items-center justify-center transition-transform ${
+                            dragAssignChip?.val === val && dragAssignChip.moved ? 'opacity-45 scale-95' : 'hover:brightness-105'
+                          }`}
+                        >
+                          <SqrtText text={val} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
+          )}
+
+          {typeof document !== 'undefined' && ReactDOM.createPortal(
+            <>
+              {dragAssignChip && dragAssignChip.moved && (
+                <div
+                  className={`fixed z-[150] pointer-events-none -translate-x-1/2 -translate-y-1/2 px-3 py-1.5 rounded-xl border-2 font-serif font-black text-base shadow-2xl ${
+                    dragAssignChip.hoverSlot ? 'bg-emerald-400 border-emerald-200 text-emerald-950 scale-110' : 'bg-amber-400 border-white text-amber-950'
+                  }`}
+                  style={{ left: dragAssignChip.clientX, top: dragAssignChip.clientY - (dragAssignChip.touchOffsetY || 0) }}
+                >
+                  <SqrtText text={dragAssignChip.val} />
+                </div>
+              )}
+              {dragRatioKey && dragRatioKey.moved && question && (
+                <div
+                  className={`fixed z-[150] pointer-events-none -translate-x-1/2 -translate-y-1/2 px-3 py-1 rounded-xl border-2 font-mono font-black text-sm shadow-2xl ${
+                    dragRatioKey.hoverSlot
+                      ? 'bg-emerald-400 border-emerald-200 text-emerald-950 scale-110'
+                      : dragRatioKey.key === 'x'
+                      ? 'bg-blue-600 border-blue-200 text-white'
+                      : dragRatioKey.key === 'y'
+                      ? 'bg-red-600 border-rose-200 text-white'
+                      : 'bg-amber-400 border-amber-200 text-amber-950'
+                  }`}
+                  style={{ left: dragRatioKey.clientX, top: dragRatioKey.clientY }}
+                >
+                  <span className="inline-flex items-center gap-0.5">{dragRatioKey.key} = <SqrtText text={getDisplayVal(dragRatioKey.key)} /></span>
+                </div>
+              )}
+            </>,
+            document.body
           )}
 
           {gameState === 'ended' && (
@@ -8250,40 +9088,57 @@
             containerRef={containerRef}
             active={guideMode === 'manual' || (showGuide && gameState === 'playing')}
             mode={guideMode || 'spotlight'}
-            onDismiss={() => dismissGuide(true)}
-            steps={guideMode === 'manual' ? [
-              { text: '拖曳終邊旋轉到目標角（或用下方 ±5° 按鈕精準微調）。' },
-              { text: '終邊鎖定後，依終邊坐標點選下方 x、y、r 按鈕填入分子與分母。' }
-            ] : stage === 'rotate' ? [
+            onDismiss={dismissGuide}
+            steps={guideMode === 'manual' ? (
+              question?.phase === 0 ? [
+                { text: '拖曳終邊旋轉到目標角，鬆手即自動鎖定進入下一步。' },
+                { text: '依幾何圖形與位置，從下方 7 顆數字膠囊拖曳或點選填入 x、y、r。' },
+                { text: '將圖上的 x、y、r 標籤拖進（或點擊填入）上方分子與分母格求比值。' }
+              ] : [
+                { text: '拖曳終邊旋轉到目標特殊角或象限角，鬆手即自動鎖定進入下一步。' },
+                { text: '從下方 7 顆數字膠囊填入 x、y、r（軸上點留意 0 與 ±1）。' },
+                { text: '將圖上的 x、y、r 標籤拖進（或點擊填入）上方分子與分母格求比值。' }
+              ]
+            ) : stage === 'assign' ? [
               {
                 targets: [
-                  { id: 'lv12-target', shape: 'ellipse', pad: 8 },
-                  { id: 'lv12-dial', shape: 'circle', pad: 18 }
+                  { id: 'lv11-num-pool', shape: 'pill', pad: 8 },
+                  { id: 'lv11-assign-x', shape: 'pill', pad: 10 },
+                  { id: 'lv11-assign-y', shape: 'pill', pad: 10 },
+                  { id: 'lv11-assign-r', shape: 'pill', pad: 10 }
                 ],
-                target: 'lv12-target',
-                text: '拖曳終邊到目標角，再選分子與分母',
-                shape: 'ellipse',
-                pad: 8,
-                tap: true
-              },
-              {
-                target: 'lv12-stepbtns',
-                text: '也可用 ±5° 按鈕精準微調',
+                target: 'lv11-num-pool',
+                tap: false,
+                drag: false,
+                placement: 'top',
+                text: '點擊下方數值直接填入呼吸框，或按住拖進 x、y、r 任一格（點圖上框可切換順序）！',
                 shape: 'pill',
                 pad: 8
               }
+            ] : stage === 'define' ? [
+              {
+                targets: [
+                  { id: 'lv11-demo-tag', shape: 'pill', pad: 10 },
+                  { id: 'lv11-ratio-box', shape: 'pill', pad: 10 }
+                ],
+                target: 'lv11-demo-tag',
+                drag: true,
+                text: '按住圖上的 x、y 或 r 標籤，拖進上方「分子 / 分母」框（也可點擊填入）！',
+                shape: 'pill',
+                pad: 10
+              }
             ] : [
               {
-                target: 'lv12-target',
-                text: '依終邊坐標，點選分子與分母',
-                shape: 'ellipse',
-                pad: 8
-              },
-              {
-                target: 'lv12-btns',
-                text: '依序點擊下方 x、y、r 按鈕作答',
-                shape: 'pill',
-                pad: 8
+                targets: [
+                  { id: 'lv11-dial', shape: 'circle', pad: 16 }
+                ],
+                target: 'lv11-dial',
+                arcPivot: 'lv11-board',
+                arcDeg: -42,
+                placement: 'bottom',
+                text: '對照 0°、90°、180°、270° 主軸刻度拖曳終邊到目標角，鬆手即自動進入下一步！',
+                shape: 'circle',
+                pad: 16
               }
             ]}
           />
@@ -9333,6 +10188,8 @@
       mapCtrlRef,
       celebration = null,
       onCelebrationDone = null,
+      pendingNextWalk = null,
+      onNextWalkDone = null,
       curtainPhase = 'hidden',
       onMarkStoryFlag = null,
       onStartLevel,
@@ -9345,6 +10202,8 @@
       const sceneCtrlRef = useRef(null);
       const guidePinRef = useRef(null);
       const shrinePinRef = useRef(null);
+      const pendingWalkRef = useRef(pendingNextWalk);
+      pendingWalkRef.current = pendingNextWalk;
       const [mapGuideReady, setMapGuideReady] = useState(false);
       const [showConfetti, setShowConfetti] = useState(false);
       const [focusedNodeId, setFocusedNodeId] = useState(
@@ -10496,7 +11355,8 @@
           }];
         };
 
-        const initStand = getPlatformStandPos(callbacksRef.current.currentTargetNodeId);
+        const startNodeId = pendingWalkRef.current?.fromId ?? callbacksRef.current.currentTargetNodeId;
+        const initStand = getPlatformStandPos(startNodeId);
         idaGroup.position.copy(initStand);
 
         const initTargetEntry = nodeObjects[callbacksRef.current.currentTargetNodeId] || nodeObjects[1];
@@ -10587,6 +11447,16 @@
             teleportBeam.visible = false;
             idaGroup.visible = true;
             idaGroup.scale.set(1, 1, 1);
+            if (walkStateObj.openDrawerOnArriveId !== undefined && walkStateObj.openDrawerOnArriveId !== null && walkStateObj.openDrawerOnArriveId === walkStateObj.settledNodeId) {
+              const arrivedId = walkStateObj.openDrawerOnArriveId;
+              walkStateObj.openDrawerOnArriveId = null;
+              audio.sfxSelect();
+              setFocusedNodeId(arrivedId);
+              if (typeof arrivedId === 'number') {
+                lastMainLevelRef.current = arrivedId;
+                setLastMainLevelId(arrivedId);
+              }
+            }
             return;
           }
 
@@ -10677,8 +11547,9 @@
           gatePulsed: false,
           teleportTimer: 0,
           teleportTargetPos: initStand.clone(),
-          settledNodeId: callbacksRef.current.currentTargetNodeId,
-          lastTargetId: callbacksRef.current.currentTargetNodeId
+          settledNodeId: startNodeId,
+          lastTargetId: startNodeId,
+          openDrawerOnArriveId: null
         };
 
         const handleSelectNode = (nodeId) => {
@@ -10766,6 +11637,35 @@
 
         sceneCtrlRef.current = {
           selectNode: handleSelectNode,
+          walkAndOpenNode: (fromId, toId) => {
+            const destEntry = nodeObjects[toId];
+            if (!destEntry) return;
+            setFocusedNodeId(null);
+            setActiveSea(destEntry.node.sea);
+            lastMainLevelRef.current = toId;
+            setLastMainLevelId(toId);
+            userInteracting = false;
+            const effectiveFrom = nodeObjects[fromId] ? fromId : (walkState.settledNodeId || callbacksRef.current.currentTargetNodeId);
+            if (effectiveFrom === toId && walkState.mode === 'idle') {
+              audio.sfxSelect();
+              setFocusedNodeId(toId);
+            } else {
+              walkState.openDrawerOnArriveId = toId;
+              startWalkerTransition(effectiveFrom, toId, walkState);
+            }
+            const zFactor = getPortraitZoomFactor();
+            cameraTargetPos.set(
+              destEntry.node.x + 2.8 * zFactor,
+              destEntry.node.y + 7.6 * zFactor,
+              destEntry.node.z + 10.6 * zFactor
+            );
+            controlsTargetPos.set(
+              destEntry.node.x,
+              destEntry.node.y + 0.8,
+              destEntry.node.z + 1.0
+            );
+            isTransitioning = true;
+          },
           focusSea: (seaId) => {
             setFocusedNodeId(null);
             setActiveSea(seaId);
@@ -11002,7 +11902,7 @@
           }
 
           const cb = callbacksRef.current;
-          if (cb.currentTargetNodeId !== walkState.lastTargetId) {
+          if (!pendingWalkRef.current && cb.currentTargetNodeId !== walkState.lastTargetId) {
             const fromNode = walkState.settledNodeId || walkState.lastTargetId;
             const toNode = cb.currentTargetNodeId;
             userInteracting = false;
@@ -11535,6 +12435,17 @@
         return () => clearTimeout(timer);
       }, [celebration]);
 
+      useEffect(() => {
+        if (!pendingNextWalk || curtainPhase !== 'hidden') return;
+        const tid = setTimeout(() => {
+          if (sceneCtrlRef.current && sceneCtrlRef.current.walkAndOpenNode) {
+            sceneCtrlRef.current.walkAndOpenNode(pendingNextWalk.fromId, pendingNextWalk.toId);
+          }
+          if (onNextWalkDone) onNextWalkDone();
+        }, 220);
+        return () => clearTimeout(tid);
+      }, [pendingNextWalk, curtainPhase]);
+
       const handleFocusSea = (seaId) => {
         audio.sfxClick();
         if (sceneCtrlRef.current) sceneCtrlRef.current.focusSea(seaId);
@@ -11947,6 +12858,59 @@
       };
     };
 
+    const FullscreenToggleCard = () => {
+      const [isFs, setIsFs] = useState(() => Boolean(document.fullscreenElement || document.webkitFullscreenElement));
+      const isStandalone = typeof window !== 'undefined' && Boolean(window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone);
+      const supportsFs = typeof document !== 'undefined' && Boolean(document.documentElement?.requestFullscreen || document.documentElement?.webkitRequestFullscreen);
+
+      useEffect(() => {
+        const onFsChange = () => setIsFs(Boolean(document.fullscreenElement || document.webkitFullscreenElement));
+        document.addEventListener('fullscreenchange', onFsChange);
+        document.addEventListener('webkitfullscreenchange', onFsChange);
+        return () => {
+          document.removeEventListener('fullscreenchange', onFsChange);
+          document.removeEventListener('webkitfullscreenchange', onFsChange);
+        };
+      }, []);
+
+      const toggleFs = () => {
+        audio.sfxClick();
+        if (isFs) {
+          (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+        } else {
+          const el = document.documentElement;
+          (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+        }
+      };
+
+      if (isStandalone) {
+        return (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-2.5 text-center text-[11px] font-black text-emerald-800">
+            📱 已於獨立全螢幕視窗執行中
+          </div>
+        );
+      }
+      if (supportsFs) {
+        return (
+          <button
+            onClick={toggleFs}
+            className={`w-full py-2.5 rounded-2xl border-2 font-black text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all ${
+              isFs
+                ? 'bg-emerald-100 border-emerald-400 text-emerald-900'
+                : 'bg-sky-50 hover:bg-sky-100 border-sky-300 text-sky-900'
+            }`}
+          >
+            <span>{isFs ? '🗗 退出全螢幕' : '⛶ 切換全螢幕顯示'}</span>
+          </button>
+        );
+      }
+      return (
+        <div className="bg-sky-50 border border-sky-200 rounded-2xl p-2.5 text-[11px] font-bold text-sky-900 leading-snug text-center">
+          📱 iPhone 全螢幕：點 Safari 下方「分享 ⎙ → 加入主畫面」即可全螢幕遊玩
+        </div>
+      );
+    };
+
     const normalizeProgress = (raw, fallbackName = '冒險者 1') => {
       const base = createEmptyProgress();
       if (!raw || typeof raw !== 'object') {
@@ -12025,6 +12989,7 @@
       const [showWinModal, setShowWinModal] = useState(false);
       const [earnedStars, setEarnedStars] = useState(0);
       const [pendingCelebration, setPendingCelebration] = useState(null);
+      const [pendingNextWalk, setPendingNextWalk] = useState(null);
       const [showUnifiedShrine, setShowUnifiedShrine] = useState(false);
       const [showAngleDialModal, setShowAngleDialModal] = useState(false);
       const [dialModalTab, setDialModalTab] = useState('rotate');
@@ -12102,6 +13067,15 @@
 
       const returnToMapFromLevel = useCallback(() => {
         setShowWinModal(false);
+        transitionToStage('map', null, { mode: 'fade', inMs: 160, durationMs: 260 });
+      }, [transitionToStage]);
+
+      const advanceToNextLevelFromWin = useCallback((fromId, toId) => {
+        setShowWinModal(false);
+        if (mapViewSnapshotRef.current) {
+          mapViewSnapshotRef.current = { ...mapViewSnapshotRef.current, focusedNodeId: null };
+        }
+        setPendingNextWalk({ fromId, toId, id: Date.now() });
         transitionToStage('map', null, { mode: 'fade', inMs: 160, durationMs: 260 });
       }, [transitionToStage]);
 
@@ -12195,9 +13169,9 @@
 
       useEffect(() => {
         audio.setModalDucking(
-          newCardModalSlot !== null || showSettingsModal || showUnifiedShrine || showAngleDialModal || showStatusModal || showWinModal
+          newCardModalSlot !== null || showSettingsModal || showUnifiedShrine || showAngleDialModal || showStatusModal
         );
-      }, [newCardModalSlot, showSettingsModal, showUnifiedShrine, showAngleDialModal, showStatusModal, showWinModal]);
+      }, [newCardModalSlot, showSettingsModal, showUnifiedShrine, showAngleDialModal, showStatusModal]);
 
       const enterLevelFromMap = useCallback((lvlId) => {
         if (mapCtrlRef.current) {
@@ -12423,13 +13397,28 @@
         });
       };
 
-      const handleCompleteLevel = (count, finalScore = 0) => {
+      const getNextLevelForResult = useCallback((justEarnedStars = 0) => {
+        const nextLvl = LEVELS.find(l => l.id === selectedLevel + 1);
+        if (!nextLvl || nextLvl.isPlaceholder) return null;
+        if (gameMode === 'free') return nextLvl;
+        const curStarsForLvl = userProgress.stars?.[selectedLevel] || 0;
+        const projectedTotal = adventureTotalStars + Math.max(0, justEarnedStars - curStarsForLvl);
+        const reqStars = LEVEL_STAR_REQUIREMENTS[nextLvl.id] ?? 0;
+        return projectedTotal >= reqStars ? nextLvl : null;
+      }, [selectedLevel, gameMode, userProgress.stars, adventureTotalStars]);
+
+      const handleCompleteLevel = (count, finalScore = 0, goNext = false) => {
         handleUpdateStars(selectedLevel, count, finalScore);
         setEarnedStars(count);
         if (count === 3) {
           setPendingCelebration({ levelId: selectedLevel, id: Date.now() });
         }
-        setShowWinModal(true);
+        const nextLvl = goNext ? getNextLevelForResult(count) : null;
+        if (nextLvl) {
+          advanceToNextLevelFromWin(selectedLevel, nextLvl.id);
+        } else {
+          returnToMapFromLevel();
+        }
       };
 
       const handleDialPointerDown = (e) => {
@@ -12489,8 +13478,9 @@
         isRelaxMode: gameMode === 'free',
         debugPhase: isDebugMode ? debugPhase : null,
         hasSeenHudLifeGuide,
-        markHudLifeGuideSeen
-      }), [gameMode, isDebugMode, debugPhase, hasSeenHudLifeGuide, markHudLifeGuideSeen]);
+        markHudLifeGuideSeen,
+        getNextLevelForResult
+      }), [gameMode, isDebugMode, debugPhase, hasSeenHudLifeGuide, markHudLifeGuideSeen, getNextLevelForResult]);
 
       return (
         <GameModeContext.Provider value={gameModeCtxVal}>
@@ -12857,6 +13847,8 @@
                 mapCtrlRef={mapCtrlRef}
                 celebration={pendingCelebration}
                 onCelebrationDone={() => setPendingCelebration(null)}
+                pendingNextWalk={pendingNextWalk}
+                onNextWalkDone={() => setPendingNextWalk(null)}
                 curtainPhase={curtainState.phase}
                 onMarkStoryFlag={(flagKey) => setUserProgress(prev => ({
                   ...prev,
@@ -13514,6 +14506,8 @@
                   />
                 </div>
 
+                <FullscreenToggleCard />
+
                 <div className="flex items-center gap-2">
                   {currentStage !== 'title' && (
                     <button
@@ -13529,25 +14523,6 @@
                   )}
                   <button onClick={() => { audio.sfxClick(); setShowSettingsModal(false); }} className="flex-1 py-2.5 btn-3d-blue text-white font-black text-sm rounded-xl shadow">確認</button>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {showWinModal && (
-            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 border-4 border-amber-700 rounded-3xl p-5 w-full max-w-xs text-center space-y-3 shadow-2xl relative animate-jelly">
-                <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-red-600 border-3 border-red-800 px-4 py-0.5 rounded-full shadow-lg">
-                  <span className="text-xs font-black text-white tracking-wider">STAGE CLEAR!</span>
-                </div>
-                <div className="flex justify-center gap-1.5 text-4xl pt-2">
-                  <span className={earnedStars >= 1 ? 'text-yellow-100 drop-shadow animate-bounce' : 'text-amber-800/40'}>★</span>
-                  <span className={earnedStars >= 2 ? 'text-yellow-100 drop-shadow animate-bounce delay-100' : 'text-amber-800/40'}>★</span>
-                  <span className={earnedStars >= 3 ? 'text-yellow-100 drop-shadow animate-bounce delay-200' : 'text-amber-800/40'}>★</span>
-                </div>
-                <div className="bg-white/95 rounded-2xl p-2.5 border-2 border-amber-600 text-xs font-black text-amber-950 shadow-inner">
-                  {earnedStars === 3 ? '🏆 完美三星通關！制霸此台座！' : earnedStars === 2 ? '🌟 獲得 2 顆星！試煉順利！' : '🎉 獲得 1 顆星！繼續向下一座神殿前行！'}
-                </div>
-                <button onClick={() => { audio.sfxClick(); returnToMapFromLevel(); }} className="w-full py-2.5 btn-3d-green text-white font-black text-sm rounded-2xl shadow-lg">返回聖域繼續冒險</button>
               </div>
             </div>
           )}
