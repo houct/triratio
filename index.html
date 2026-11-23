@@ -224,6 +224,14 @@
     .animate-coach-arc-press {
       animation: coachDragPress 2.8s cubic-bezier(0.37, 0, 0.63, 1) infinite;
     }
+    @keyframes quadZoneSweep {
+      0% { opacity: 0; }
+      35% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    .animate-quad-sweep {
+      animation: quadZoneSweep 0.85s ease-in-out 1 both;
+    }
     @keyframes lightSlotBreath {
       0%, 100% {
         transform: scale(1);
@@ -474,13 +482,13 @@
         if (prevLivesRef.current !== undefined && lives !== prevLivesRef.current) {
           const anim = lives < prevLivesRef.current ? 'lose' : 'heal';
           setLifeDeltaAnim(anim);
-          const t = setTimeout(() => setLifeDeltaAnim(''), 420);
+          const t = setTimeout(() => setLifeDeltaAnim(''), anim === 'heal' ? 750 : 450);
           let tipTimer = null;
           if (anim === 'lose' && !relaxActive && !hasSeenHudLifeGuide) {
             tipTimer = setTimeout(() => {
               setShowHudLifeTip(true);
               if (markHudLifeGuideSeen) markHudLifeGuideSeen();
-            }, 440);
+            }, 460);
           }
           prevLivesRef.current = lives;
           return () => {
@@ -489,7 +497,7 @@
           };
         }
         prevLivesRef.current = lives;
-      }, [lives, isLivesMode, relaxActive, hasSeenHudLifeGuide, markHudLifeGuideSeen]);
+      }, [lives, maxLives, isLivesMode, relaxActive, hasSeenHudLifeGuide, markHudLifeGuideSeen]);
 
       useEffect(() => {
         if (!showHudLifeTip) {
@@ -561,7 +569,13 @@
         const s2 = starsThreshold ? starsThreshold[1] : 7;
         const s3 = starsThreshold ? starsThreshold[2] : 12;
         const curStarsCount = progress >= s3 ? 3 : progress >= s2 ? 2 : progress >= s1 ? 1 : 0;
-        const isFullLife = lives >= maxLives;
+        const maxBonusLives = 2;
+        const maxTotalLives = maxLives + maxBonusLives;
+        const bonusLives = Math.max(0, lives - maxLives);
+        const missingBase = Math.max(0, maxLives - lives);
+        const isChargingGold = lives >= maxLives;
+        const isMaxCap = lives >= maxTotalLives;
+        const justLostBonus = lifeDeltaAnim === 'lose' && lives >= maxLives;
         const segments = [
           { start: 0, end: s1, litCls: 'bg-emerald-500 border-emerald-600 shadow-[0_0_5px_rgba(16,185,129,0.5)]' },
           { start: s1, end: s2, litCls: 'bg-sky-500 border-sky-600 shadow-[0_0_5px_rgba(14,165,233,0.5)]' },
@@ -570,7 +584,8 @@
         return (
           <div data-coach="hud-stars" className={`relative bg-white/95 backdrop-blur border-2 sm:border-3 rounded-2xl p-2 shadow-md shrink-0 flex flex-col gap-1.5 transition-colors ${
             lifeDeltaAnim === 'lose' ? 'border-rose-500 ring-2 ring-rose-300' :
-            lifeDeltaAnim === 'heal' ? 'border-emerald-500 ring-2 ring-emerald-300' :
+            lifeDeltaAnim === 'heal' && lives > maxLives ? 'border-amber-400 ring-2 ring-amber-300' :
+            lifeDeltaAnim === 'heal' ? 'border-rose-400 ring-2 ring-rose-200' :
             'border-indigo-950'
           }`}>
             <div className="flex justify-between items-center px-0.5 gap-2">
@@ -603,18 +618,50 @@
                   </div>
                 ) : (
                   <div ref={lifeGroupRef} className="flex items-center gap-2 shrink-0 relative">
+                    {/* 愛心列：所有增減統一由左端進出，原本 ❤️ ❤️ ❤️ 與右側集氣條／? 像素固定零位移 */}
                     <div className={`flex items-center gap-1 ${lifeDeltaAnim === 'lose' ? 'animate-shake' : ''}`} aria-label={`剩餘愛心 ${lives}`}>
-                      {Array.from({ length: maxLives }).map((_, idx) => {
-                        const justLost = lifeDeltaAnim === 'lose' && idx === lives;
-                        const justHealed = lifeDeltaAnim === 'heal' && idx === lives - 1;
-                        const active = idx < lives;
+                      {justLostBonus && (
+                        <div key="lost-bonus" className="relative flex items-center justify-center">
+                          <span className="text-sm sm:text-base leading-none transition-all duration-300 scale-150 rotate-12 opacity-25 drop-shadow-[0_0_6px_rgba(245,158,11,0.9)]">💔</span>
+                          <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[10px] font-black text-amber-600 bg-white/90 px-1 rounded shadow animate-float-up pointer-events-none whitespace-nowrap">-1</span>
+                        </div>
+                      )}
+                      {Array.from({ length: bonusLives }).map((_, bIdx) => {
+                        const justHealedGold = lifeDeltaAnim === 'heal' && lives > maxLives && bIdx === 0;
                         return (
-                          <div key={idx} className="relative flex items-center justify-center">
+                          <div key={`gold-${bIdx}`} className="relative flex items-center justify-center">
+                            {justHealedGold && (
+                              <span className="absolute -inset-1 rounded-full border-2 border-amber-400 animate-ping pointer-events-none" />
+                            )}
+                            <span className={`text-sm sm:text-base leading-none transition-all duration-300 ${
+                              justHealedGold
+                                ? 'scale-125 animate-bounce drop-shadow-[0_0_10px_rgba(245,158,11,0.95)]'
+                                : 'scale-100 opacity-100 drop-shadow-[0_0_4px_rgba(251,191,36,0.55)]'
+                            }`}>
+                              💛
+                            </span>
+                            {justHealedGold && (
+                              <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-black text-amber-700 bg-amber-50 border border-amber-300 px-1 rounded shadow animate-float-up pointer-events-none whitespace-nowrap">
+                                +1 💛
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {Array.from({ length: maxLives }).map((_, idx) => {
+                        const active = idx >= missingBase;
+                        const justLost = lifeDeltaAnim === 'lose' && lives < maxLives && idx === missingBase - 1;
+                        const justHealed = lifeDeltaAnim === 'heal' && lives <= maxLives && idx === missingBase;
+                        return (
+                          <div key={`base-${idx}`} className="relative flex items-center justify-center">
+                            {justHealed && (
+                              <span className="absolute -inset-1 rounded-full border-2 border-rose-400 animate-ping pointer-events-none" />
+                            )}
                             <span className={`text-sm sm:text-base leading-none transition-all duration-300 ${
                               justLost
                                 ? 'scale-150 rotate-12 opacity-20 drop-shadow-[0_0_6px_rgba(244,63,94,0.9)]'
                                 : justHealed
-                                ? 'scale-125 animate-bounce drop-shadow-[0_0_8px_rgba(16,185,129,0.95)]'
+                                ? 'scale-125 animate-bounce drop-shadow-[0_0_10px_rgba(244,63,94,0.95)]'
                                 : active
                                 ? 'scale-100 opacity-100'
                                 : 'scale-90 opacity-25 grayscale'
@@ -627,38 +674,59 @@
                               </span>
                             )}
                             {justHealed && (
-                              <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[10px] font-black text-emerald-600 bg-white/90 px-1 rounded shadow animate-float-up pointer-events-none whitespace-nowrap">
-                                +1
+                              <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-black text-rose-600 bg-rose-50 border border-rose-300 px-1 rounded shadow animate-float-up pointer-events-none whitespace-nowrap">
+                                +1 ❤️
                               </span>
                             )}
                           </div>
                         );
                       })}
                     </div>
+                    {/* 集氣條固定於愛心右側（高對比配色：補紅心玫紅點、集金心琥珀金點、空點冷灰；集滿 750ms 全亮停頓） */}
                     <div
                       className={`flex items-center gap-1 px-1.5 py-1 rounded-lg border transition-all duration-200 ${
-                        lifeDeltaAnim === 'heal'
-                          ? 'bg-emerald-200 border-emerald-500 scale-110 shadow-[0_0_10px_rgba(16,185,129,0.75)]'
-                          : isFullLife
+                        lifeDeltaAnim === 'heal' && lives > maxLives
+                          ? 'bg-amber-200 border-amber-500 scale-110 shadow-[0_0_12px_rgba(245,158,11,0.85)]'
+                          : lifeDeltaAnim === 'heal'
+                          ? 'bg-rose-200 border-rose-500 scale-110 shadow-[0_0_12px_rgba(244,63,94,0.8)]'
+                          : isChargingGold
                           ? 'bg-amber-50 border-amber-300'
-                          : 'bg-emerald-50 border-emerald-200'
+                          : 'bg-rose-50 border-rose-200'
                       }`}
-                      title={isFullLife ? '滿血護盾' : `再連對 ${Math.max(1, healTarget - healStreak)} 題回復 1 顆愛心`}
+                      title={
+                        isMaxCap
+                          ? '金心護盾已滿'
+                          : isChargingGold
+                          ? `再連對 ${Math.max(1, healTarget - healStreak)} 題獲得 1 顆 💛 金心`
+                          : `再連對 ${Math.max(1, healTarget - healStreak)} 題回復 1 顆 ❤️ 愛心`
+                      }
                     >
                       {Array.from({ length: healTarget }).map((_, i) => {
-                        const lit = isFullLife || i < healStreak;
-                        const isLatestCharge = !isFullLife && healStreak > 0 && i === healStreak - 1;
+                        const isHealBurst = lifeDeltaAnim === 'heal';
+                        const burstGold = isHealBurst && lives > maxLives;
+                        const lit = isMaxCap || isHealBurst || i < healStreak;
+                        const isLatestCharge = !isMaxCap && !isHealBurst && healStreak > 0 && i === healStreak - 1;
                         return (
                           <span
                             key={i}
                             className={`w-2 h-2 rounded-full transition-all duration-200 ${
-                              isFullLife
-                                ? 'bg-amber-400 scale-105'
-                                : isLatestCharge
-                                ? 'bg-emerald-500 scale-125 shadow-[0_0_6px_rgba(16,185,129,0.9)] animate-pulse'
-                                : lit
-                                ? 'bg-emerald-500 scale-105'
-                                : 'bg-slate-300 scale-90'
+                              isHealBurst
+                                ? (burstGold
+                                    ? 'bg-amber-500 scale-125 shadow-[0_0_8px_rgba(245,158,11,0.95)]'
+                                    : 'bg-rose-500 scale-125 shadow-[0_0_8px_rgba(244,63,94,0.95)]')
+                                : isMaxCap
+                                ? 'bg-amber-500 scale-105'
+                                : isChargingGold
+                                ? (isLatestCharge
+                                    ? 'bg-amber-500 scale-125 shadow-[0_0_6px_rgba(245,158,11,0.9)] animate-pulse'
+                                    : lit
+                                    ? 'bg-amber-500 scale-105'
+                                    : 'bg-slate-200 scale-90')
+                                : (isLatestCharge
+                                    ? 'bg-rose-500 scale-125 shadow-[0_0_6px_rgba(244,63,94,0.9)] animate-pulse'
+                                    : lit
+                                    ? 'bg-rose-500 scale-105'
+                                    : 'bg-slate-200 scale-90')
                             }`}
                           />
                         );
@@ -705,7 +773,7 @@
                         >
                           <div className="absolute -top-1.5 right-8 w-3 h-3 rotate-45 bg-slate-900 border-l border-t border-white/20" />
                           <div className="flex items-center justify-between gap-2.5">
-                            <span className="text-[12.5px] font-bold leading-snug">💔 答錯扣 1 心；連對可集氣補回愛心</span>
+                            <span className="text-[12.5px] font-bold leading-snug">💔 答錯扣 1 心；右側連對集滿可補 ❤️，滿血再集滿多 💛 金心（上限 +2）</span>
                             <button
                               onClick={(e) => { e.stopPropagation(); audio.sfxClick(); setShowHudLifeTip(false); }}
                               className="text-[11px] font-black text-sky-300 bg-sky-400/20 hover:bg-sky-400/30 px-2.5 py-1 rounded-lg shrink-0"
@@ -893,12 +961,14 @@
     const useLivesLevelSession = ({
       starThresholds = [4, 8, 12],
       maxLives = 4,
+      maxBonusLives = 2,
       healTarget = 4,
       unitLabel = '題',
       currentStars = 0,
       onUpdateStars
     }) => {
       const { isRelaxMode, debugPhase } = React.useContext(GameModeContext);
+      const maxTotalLives = maxLives + maxBonusLives;
       const [gameState, setGameState] = useState('idle');
       const [progress, setProgress] = useState(0);
       const [lives, setLives] = useState(maxLives);
@@ -919,7 +989,9 @@
         return 0;
       }, [progress, starThresholds]);
 
-      const baseScore = progress * 100;
+      const baseScore = starThresholds[2] > 0
+        ? Math.round((progress / starThresholds[2]) * 900)
+        : progress * 100;
       const lifeBonus = (!isRelaxMode && earnedStars >= 1) ? lives * 100 : 0;
       const accuracyBonus = !isRelaxMode
         ? (earnedStars >= 3
@@ -970,30 +1042,37 @@
         const nextProg = progress + 1;
         setProgress(nextProg);
         setCorrectCount(c => c + 1);
+        let didHeal = false;
         if (!wasMissed && !isRelaxMode) {
           const nextHeal = healStreak + 1;
           if (nextHeal >= healTarget) {
-            if (lives < maxLives) {
-              setLives(l => Math.min(maxLives, l + 1));
+            if (lives < maxTotalLives) {
+              didHeal = true;
+              setLives(l => Math.min(maxTotalLives, l + 1));
               audio.sfxHealLife();
             } else {
               audio.sfxHealCharge(healTarget - 1);
             }
             setHealStreak(0);
           } else {
-            if (lives < maxLives) audio.sfxHealCharge(nextHeal - 1);
+            if (lives < maxTotalLives) audio.sfxHealCharge(nextHeal - 1);
             setHealStreak(nextHeal);
           }
         }
         if (nextProg >= starThresholds[2]) {
-          audio.sfxBonus();
+          if (didHeal) {
+            setTimeout(() => audio.sfxBonus(), 220);
+          } else {
+            audio.sfxBonus();
+          }
           if (delayEndMs !== null && delayEndMs !== undefined) {
-            endTimerRef.current = setTimeout(finishNow, delayEndMs);
+            const finalDelay = didHeal ? Math.max(delayEndMs, 900) : delayEndMs;
+            endTimerRef.current = setTimeout(finishNow, finalDelay);
           }
           return { completed: true, nextProgress: nextProg };
         }
         return { completed: false, nextProgress: nextProg };
-      }, [progress, healStreak, healTarget, lives, maxLives, isRelaxMode, starThresholds, finishNow]);
+      }, [progress, healStreak, healTarget, lives, maxTotalLives, isRelaxMode, starThresholds, finishNow]);
 
       const recordWrong = useCallback(({ delayEndMs = 450, capPerQuestion = true } = {}) => {
         if (capPerQuestion && questionMissedRef.current) {
@@ -1133,6 +1212,7 @@
       isDojo = false,
       accentClass = 'text-indigo-600',
       lives,
+      maxLives = 3,
       progress,
       targetTotal,
       unitLabel = '題',
@@ -1236,7 +1316,13 @@
                 </div>
                 <div className="bg-rose-50 border border-rose-200 rounded-xl p-2.5 text-center">
                   <div className="text-[10px] font-black text-rose-700">剩餘愛心</div>
-                  <div className="text-sm font-black font-mono text-rose-950 mt-0.5">{relaxActive ? '∞ 無限' : `❤️ ×${lives}`}</div>
+                  <div className="text-sm font-black font-mono text-rose-950 mt-0.5">
+                    {relaxActive
+                      ? '∞ 無限'
+                      : lives > maxLives
+                      ? `❤️ ×${maxLives} + 💛 ×${lives - maxLives}`
+                      : `❤️ ×${lives}`}
+                  </div>
                 </div>
                 <div className="bg-sky-50 border border-sky-200 rounded-xl p-2.5 text-center">
                   <div className="text-[10px] font-black text-sky-700">本次耗時</div>
@@ -1539,10 +1625,13 @@
       }
 
       return (
-        <div className="pointer-events-none absolute inset-0 z-40 overflow-hidden rounded-3xl">
+        <div
+          onClick={() => isLast ? (onDismiss && onDismiss(false)) : setStepIdx(i => i + 1)}
+          className="pointer-events-auto cursor-pointer absolute inset-0 z-40 overflow-hidden rounded-3xl"
+        >
           {/* SVG 羽化聚光燈遮罩（第 2 道追光從主聚光位置柔和滑向目標角） */}
           {layout && (
-            <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${layout.rootW} ${layout.rootH}`} preserveAspectRatio="none">
+            <svg className="pointer-events-none absolute inset-0 w-full h-full" viewBox={`0 0 ${layout.rootW} ${layout.rootH}`} preserveAspectRatio="none">
               <defs>
                 <filter id="coachFeather" x="-45%" y="-45%" width="190%" height="190%">
                   <feGaussianBlur stdDeviation="8" />
@@ -1651,7 +1740,8 @@
           {/* 精煉極簡氣泡 */}
           {layout && (
             <div
-              className="pointer-events-auto absolute left-3 right-3 z-10 transition-all duration-300 ease-out"
+              onClick={(e) => e.stopPropagation()}
+              className="pointer-events-auto cursor-default absolute left-3 right-3 z-10 transition-all duration-300 ease-out"
               style={bubbleStyle}
             >
               {showCaret && (
@@ -1698,14 +1788,14 @@
       { id: 4, title: "黃金神殿", subtitle: "30°, 45°, 60°特殊角", island: "太陽金字塔", sea: 1, icon: "☀️", color: "from-amber-400 to-yellow-600", borderColor: "border-yellow-800" },
       { id: 5, title: "三大關係試煉", subtitle: "餘角・平方・商數等式速配", island: "晨曦沙灘", sea: 1, icon: "🌅", color: "from-sky-400 to-blue-600", borderColor: "border-blue-800" },
       { id: 6, title: "知一求一聖殿", subtitle: "畢氏三元數三角比推導", island: "凱旋高台", sea: 1, icon: "📐", color: "from-emerald-500 to-teal-700", borderColor: "border-teal-900" },
-      { id: 7, title: "廣義角舵手", subtitle: "有向角與 15° 放射雷達定向", island: "旋風群礁", sea: 2, icon: "🧭", color: "from-sky-400 to-indigo-600", borderColor: "border-indigo-800" },
+      { id: 7, title: "廣義角舵手：象限航行", subtitle: "15° 旋鈕定向 × 象限與軸上角判別", island: "旋風群礁", sea: 2, icon: "🧭", color: "from-sky-400 to-indigo-600", borderColor: "border-indigo-800" },
       { id: 8, title: "同界角星爆", subtitle: "同界角星座一筆連", island: "星雲高台", sea: 2, icon: "🫧", color: "from-fuchsia-500 to-indigo-700", borderColor: "border-indigo-900" },
-      { id: 9, title: "四象限領航員", subtitle: "廣義角象限與軸上角空間滑卡", island: "星圖分流站", sea: 2, icon: "🗺️", color: "from-teal-500 to-indigo-700", borderColor: "border-indigo-900" },
-      { id: 10, title: "坐標網格建築師", subtitle: "(x, y, r) 拖曳建構廣義角", island: "星象群礁", sea: 2, icon: "🎯", color: "from-cyan-400 to-blue-600", borderColor: "border-blue-800" },
-      { id: 11, title: "星象羅盤師", subtitle: "廣義特殊角與象限角旋轉推導", island: "星軌聖壇", sea: 2, icon: "🔭", color: "from-violet-500 to-indigo-700", borderColor: "border-indigo-900" },
-      { id: 12, title: "正負傳送帶", subtitle: "三角比正負與無意義分流", island: "四象限祭壇", sea: 2, icon: "⚡", color: "from-rose-500 to-indigo-700", borderColor: "border-indigo-900" },
+      { id: 9, title: "坐標網格建築師", subtitle: "(x, y, r) 拖曳建構廣義角", island: "星象群礁", sea: 2, icon: "🎯", color: "from-cyan-400 to-blue-600", borderColor: "border-blue-800" },
+      { id: 10, title: "星象羅盤師", subtitle: "廣義特殊角與象限角旋轉推導", island: "星軌聖壇", sea: 2, icon: "🔭", color: "from-violet-500 to-indigo-700", borderColor: "border-indigo-900" },
+      { id: 11, title: "正負傳送帶", subtitle: "三角比正負與無意義分流", island: "四象限祭壇", sea: 2, icon: "⚡", color: "from-rose-500 to-indigo-700", borderColor: "border-indigo-900" },
+      { id: 12, title: "廣轉銳密碼輪", subtitle: "廣義角化為 30°/45°/60° 銳角與求值", island: "星海彼端", sea: 2, icon: "🔑", color: "from-amber-400 to-indigo-600", borderColor: "border-indigo-900" },
       { id: 13, title: "幻夜秘境", subtitle: "廣義角知一求一（象限符號 × 參考三角形）", island: "烈日火山", sea: 3, icon: "🔮", color: "from-violet-600 to-purple-800", borderColor: "border-purple-950" },
-      { id: 14, title: "鏡像對稱陣", subtitle: "108 課綱對稱角度變換（幾何翻摺）", island: "幽暗密林", sea: 3, icon: "🪞", color: "from-emerald-500 to-teal-700", borderColor: "border-teal-900" },
+      { id: 14, title: "星鏡秘境（預留）", subtitle: "第三聖域新試煉設計中", island: "幽暗密林", sea: 3, icon: "🌌", color: "from-slate-500 to-slate-700", borderColor: "border-slate-900", isPlaceholder: true },
       { id: 15, title: "廣義特殊角密碼輪", subtitle: "符號鎖＋絕對值輪求值", island: "紫晶礦洞", sea: 3, icon: "🔐", color: "from-purple-500 to-fuchsia-700", borderColor: "border-purple-950" },
       { id: 16, title: "極坐標定位儀", subtitle: "極坐標 [r, θ] ↔ (x, y)", island: "極光觀測站", sea: 3, icon: "📡", color: "from-cyan-500 to-indigo-700", borderColor: "border-indigo-950" },
       { id: 17, title: "雙解星圖", subtitle: "由比值反求廣義角雙解", island: "四極神殿", sea: 3, icon: "✨", color: "from-amber-500 to-rose-600", borderColor: "border-rose-950" },
@@ -4969,19 +5059,26 @@
       const usedValKeys = new Set();
       const usedLabels = new Set();
 
-      if (phase === 0 && bagRef && bagRef[0].length >= 3) {
-        // Phase 0 保底每波各含 1 餘角 + 1 平方 + 1 商數，避免兩題答案為 1 同波衝突
-        const groups = [['p0_comp_s', 'p0_comp_c'], ['p0_sq_num', 'p0_sq_th'], ['p0_quo_num', 'p0_quo_th']];
-        const pickedIds = [];
+      const phaseGroups = {
+        0: [['p0_comp_s', 'p0_comp_c'], ['p0_sq_num', 'p0_sq_th'], ['p0_quo_num', 'p0_quo_th']],
+        1: [['p1_sq_c', 'p1_sq_s', 'p1_sq_zero'], ['p1_mul', 'p1_quo_sq', 'p1_div'], ['p1_sq_comp', 'p1_comp_sq1', 'p1_comp_sq2']],
+        2: [['p2_exp', 'p2_sq_sub', 'p2_sq_sum2'], ['p2_comp_tan1', 'p2_comp_tan2', 'p2_comp_mul'], ['p2_red_s', 'p2_red_c', 'p2_sq_diff', 'p2_tan_sq']]
+      };
+      const groups = phaseGroups[phase];
+
+      if (groups) {
+        // 三波全面保底分組平均出題（每波各涵蓋 3 大類型，且同波不重複右欄答案字面）
         for (const grp of groups) {
-          const idxInBag = bagRef[0].findIndex(id => grp.includes(id));
-          const chosenId = idxInBag >= 0 ? bagRef[0].splice(idxInBag, 1)[0] : grp[0];
-          const item = byId[chosenId];
-          if (item) {
-            pickedIds.push(chosenId);
-            usedValKeys.add(item.valKey);
-            usedLabels.add(item.right);
-            chosen.push(item);
+          const candidates = shuffle(grp).map(id => byId[id]).filter(Boolean);
+          const pick = candidates.find(it => !usedValKeys.has(it.valKey) && !usedLabels.has(it.right)) || candidates[0];
+          if (pick) {
+            if (bagRef && bagRef[phase]) {
+              const idxInBag = bagRef[phase].indexOf(pick.id);
+              if (idxInBag >= 0) bagRef[phase].splice(idxInBag, 1);
+            }
+            usedValKeys.add(pick.valKey);
+            usedLabels.add(pick.right);
+            chosen.push(pick);
           }
         }
       } else {
@@ -5048,14 +5145,14 @@
 
     const Level5TrigRelationsMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
-      const starsThreshold = [2, 4, 6];
+      const starsThreshold = [3, 6, 9];
       const maxLives = 3;
       const healTarget = 3;
       const {
         gameState, progress, lives, healStreak, correctCount, wrongCount, elapsedSec,
         earnedStars, baseScore, lifeBonus, accuracyBonus, speedBonus, finalScore,
         startSession, recordCorrect, recordWrong, finishNow
-      } = useLivesLevelSession({ starThresholds: starsThreshold, maxLives, healTarget, unitLabel: '波', currentStars, onUpdateStars });
+      } = useLivesLevelSession({ starThresholds: starsThreshold, maxLives, healTarget, unitLabel: '題', currentStars, onUpdateStars });
 
       const [waveNumber, setWaveNumber] = useState(1);
       const [leftCards, setLeftCards] = useState([]);
@@ -5067,6 +5164,7 @@
       const [selRight, setSelRight] = useState(null);
       const [justMatched, setJustMatched] = useState(false);
       const [wrongCardUids, setWrongCardUids] = useState([]);
+      const [wrongPairs, setWrongPairs] = useState(() => new Set());
       const [isProcessing, setIsProcessing] = useState(false);
       const [conceptTip, setConceptTip] = useState(null);
       const [feedbackAnim, setFeedbackAnim] = useState('');
@@ -5074,7 +5172,7 @@
 
       const containerRef = useRef(null);
       const bagRef = useRef({ 0: [], 1: [], 2: [] });
-      const waveErrorsRef = useRef(0);
+      const missedLeftUidsRef = useRef(new Set());
       const waveClearTimerRef = useRef(null);
       const pendingWaveNextRef = useRef(null);
       const handleWaveSkip = () => {
@@ -5091,7 +5189,7 @@
       const spawnNextWave = (curProg) => {
         const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
         const w = buildLv5RelationsWave(phase, bagRef.current);
-        waveErrorsRef.current = 0;
+        missedLeftUidsRef.current = new Set();
         setLeftCards(w.leftCards);
         setRightCards(w.rightCards);
         setMatchedUids(new Set());
@@ -5101,6 +5199,7 @@
         setSelRight(null);
         setJustMatched(false);
         setWrongCardUids([]);
+        setWrongPairs(new Set());
         setIsProcessing(false);
         setConceptTip(null);
       };
@@ -5109,9 +5208,10 @@
         clearTimeout(waveClearTimerRef.current);
         pendingWaveNextRef.current = null;
         bagRef.current = { 0: [], 1: [], 2: [] };
-        setWaveNumber(1);
+        missedLeftUidsRef.current = new Set();
         setFeedbackAnim('');
         const initProg = startSession();
+        setWaveNumber(initProg >= starsThreshold[1] ? 3 : initProg >= starsThreshold[0] ? 2 : 1);
         spawnNextWave(initProg);
         audio.init();
       };
@@ -5123,21 +5223,17 @@
       const lv5CoachSteps = useMemo(() => ([
         {
           target: 'lv5-left',
-          anchorX: 0.5,
-          anchorY: 0.5,
-          pad: 6,
-          shape: 'pill',
-          tap: true,
-          desc: '先點選左側一張三角比關係式'
+          pad: 4,
+          shape: 'rect',
+          tap: false,
+          desc: '先點選左欄任一張三角比關係式'
         },
         {
           target: 'lv5-right',
-          anchorX: 0.5,
-          anchorY: 0.5,
-          pad: 6,
-          shape: 'pill',
-          tap: true,
-          desc: '再點右側等價結果完成配對！'
+          pad: 4,
+          shape: 'rect',
+          tap: false,
+          desc: '再點選右欄對應的等價結果完成配對！'
         }
       ]), []);
 
@@ -5152,6 +5248,7 @@
           nextMatched.add(lCard.uid);
           nextMatched.add(rCard.uid);
           const isWaveDone = nextMatched.size / 2 >= leftCards.length;
+          const cardWasMissed = missedLeftUidsRef.current.has(lCard.uid);
           setAnimatingOut([lCard.uid, rCard.uid]);
           setJustMatched(true);
           setFeedbackAnim('animate-correct');
@@ -5164,23 +5261,21 @@
             setAnimatingOut([]);
             setSelLeft(null);
             setSelRight(null);
-            if (isWaveDone) {
+            const clearPause = 900;
+            const { completed, nextProgress } = recordCorrect({
+              wasMissed: cardWasMissed,
+              delayEndMs: isWaveDone ? clearPause : 520
+            });
+            if (isWaveDone && !completed) {
               audio.sfxBonus();
-              const clearPause = 900;
-              const { completed, nextProgress } = recordCorrect({ wasMissed: waveErrorsRef.current > 0, delayEndMs: clearPause });
-              if (!completed) {
-                const advanceFn = () => {
-                  pendingWaveNextRef.current = null;
-                  setJustMatched(false);
-                  setWaveNumber(w => w + 1);
-                  spawnNextWave(nextProgress);
-                };
-                pendingWaveNextRef.current = advanceFn;
-                waveClearTimerRef.current = setTimeout(advanceFn, clearPause);
-              } else {
+              const advanceFn = () => {
+                pendingWaveNextRef.current = null;
                 setJustMatched(false);
-                setIsProcessing(false);
-              }
+                setWaveNumber(w => w + 1);
+                spawnNextWave(nextProgress);
+              };
+              pendingWaveNextRef.current = advanceFn;
+              waveClearTimerRef.current = setTimeout(advanceFn, clearPause);
             } else {
               setJustMatched(false);
               setIsProcessing(false);
@@ -5188,8 +5283,17 @@
           }, holdDur);
         } else {
           audio.sfxError();
-          waveErrorsRef.current += 1;
-          const { gameOver } = recordWrong({ delayEndMs: 420 });
+          const alreadyMissedCard = missedLeftUidsRef.current.has(lCard.uid);
+          missedLeftUidsRef.current.add(lCard.uid);
+          setWrongPairs(prev => {
+            const next = new Set(prev);
+            next.add(`${lCard.uid}|${rCard.uid}`);
+            return next;
+          });
+          let gameOver = false;
+          if (!alreadyMissedCard) {
+            ({ gameOver } = recordWrong({ delayEndMs: 420, capPerQuestion: false }));
+          }
           setWrongCardUids([lCard.uid, rCard.uid]);
           setConceptTip({ text: lCard.tip, id: Date.now() });
           setFeedbackAnim('animate-shake');
@@ -5205,6 +5309,7 @@
 
       const handlePickLeft = (card) => {
         if (gameState !== 'playing' || isProcessing || matchedUids.has(card.uid)) return;
+        if (selRight && wrongPairs.has(`${card.uid}|${selRight.uid}`)) return;
         if (selLeft?.uid === card.uid) { audio.sfxClick(); setSelLeft(null); return; }
         audio.sfxSelect();
         setSelLeft(card);
@@ -5213,6 +5318,7 @@
 
       const handlePickRight = (card) => {
         if (gameState !== 'playing' || isProcessing || matchedUids.has(card.uid)) return;
+        if (selLeft && wrongPairs.has(`${selLeft.uid}|${card.uid}`)) return;
         if (selRight?.uid === card.uid) { audio.sfxClick(); setSelRight(null); return; }
         audio.sfxSelect();
         setSelRight(card);
@@ -5229,10 +5335,10 @@
                 <div className="w-20 h-20 mx-auto rounded-3xl bg-sky-100 border-4 border-sky-500 flex items-center justify-center text-4xl shadow-inner animate-bounce">🌅</div>
                 <h2 className="text-2xl font-black text-sky-950 tracking-wide">三大關係試煉</h2>
                 <p className="text-xs text-slate-500 font-bold leading-relaxed max-w-xs mx-auto">
-                  配對左右等價的銳角三角比關係式！涵蓋<span className="text-sky-600 font-black">餘角互換</span>、<span className="text-emerald-600 font-black">平方關係</span>與<span className="text-indigo-600 font-black">商數關係</span>！
+                  共 3 波 9 題配對左右等價的銳角三角比關係式！涵蓋<span className="text-sky-600 font-black">餘角互換</span>、<span className="text-emerald-600 font-black">平方關係</span>與<span className="text-indigo-600 font-black">商數關係</span>！
                 </p>
               </div>
-              <CompactStarPills starsThreshold={starsThreshold} livesMode maxLives={maxLives} unitLabel="波" />
+              <CompactStarPills starsThreshold={starsThreshold} livesMode maxLives={maxLives} unitLabel="題" />
               <div className="w-full space-y-2">
                 <button onClick={startGame} className="w-full py-4 btn-3d-blue text-white font-black text-lg rounded-2xl shadow-xl tracking-wider active:scale-95">{isRelaxMode ? '🌱 開始休閒練習！' : '🚀 開始試煉！'}</button>
                 <button onClick={onBackToMap} className="w-full py-2 text-xs font-bold text-slate-400 hover:text-slate-600">返回聖域地圖</button>
@@ -5249,7 +5355,7 @@
                 maxLives={maxLives}
                 healStreak={healStreak}
                 healTarget={healTarget}
-                unitLabel="波"
+                unitLabel="題"
                 onManualEnd={finishNow}
                 onOpenGuide={openGuide}
               />
@@ -5270,13 +5376,13 @@
                 </div>
 
                 <div className="bg-slate-100 border-b border-slate-200 flex justify-between items-center py-1 px-3 shrink-0">
-                  <span className="text-[11px] font-black text-slate-600">第 <span className="text-sky-700">{waveNumber}</span> 波 • {phaseLabel}</span>
+                  <span className="text-[11px] font-black text-slate-600">第 <span className="text-sky-700">{waveNumber}/3</span> 波 • {phaseLabel}</span>
                   <span className="text-[11px] font-mono font-black text-sky-700">{matchedUids.size / 2} / {leftCards.length}</span>
                 </div>
 
                 <div onClick={handleWaveSkip} className="relative grid grid-cols-2 gap-2.5 flex-1 min-h-0 overflow-hidden p-2.5 bg-slate-50">
                   <HintBanner tip={conceptTip} />
-                  <div className="bg-white p-1.5 rounded-2xl border-2 border-sky-100 shadow-inner flex flex-col overflow-hidden">
+                  <div data-coach="lv5-left" className="bg-white p-1.5 rounded-2xl border-2 border-sky-100 shadow-inner flex flex-col overflow-hidden">
                     <div className="text-[10px] font-black text-sky-500 text-center pb-1 shrink-0">算式</div>
                     <div className="flex flex-col justify-center gap-1.5 flex-1 min-h-0 overflow-y-auto no-scrollbar">
                       {leftCards.map((card) => {
@@ -5284,6 +5390,7 @@
                         const isOut = animatingOut.includes(card.uid);
                         const isWrong = wrongCardUids.includes(card.uid);
                         const isSelected = selLeft?.uid === card.uid;
+                        const isLockedWrong = Boolean(selRight && wrongPairs.has(`${card.uid}|${selRight.uid}`));
                         if (isMatched) {
                           return (
                             <div key={card.uid} className="h-[54px] shrink-0 rounded-xl border-2 border-emerald-200 bg-emerald-50/80 flex items-center justify-center px-1.5 text-emerald-800 font-serif font-black text-xs gap-1 overflow-hidden">
@@ -5294,29 +5401,31 @@
                             </div>
                           );
                         }
-                        const firstUnmatchedLeft = leftCards.find(c => !matchedUids.has(c.uid));
-                        const isCoachLeft = showGuide && firstUnmatchedLeft?.uid === card.uid;
                         return (
                           <button
                             key={card.uid}
-                            data-coach={isCoachLeft ? 'lv5-left' : undefined}
+                            disabled={isLockedWrong}
                             onClick={() => handlePickLeft(card)}
-                            className={`h-[54px] shrink-0 rounded-xl font-serif font-black px-2 transition-all flex items-center justify-center text-center leading-tight ${
+                            className={`relative h-[54px] shrink-0 rounded-xl font-serif font-black px-2 transition-all flex items-center justify-center text-center leading-tight ${
                               card.frac ? 'text-xs sm:text-sm' : card.label.length > 18 ? 'text-xs' : card.label.length > 12 ? 'text-sm' : 'text-base'
                             } ${
                               isOut ? 'animate-pop-out' :
+                              isLockedWrong ? 'bg-slate-100 border-2 border-dashed border-slate-300 text-slate-400 opacity-55 cursor-not-allowed' :
                               isSelected ? 'bg-gradient-to-b from-sky-400 to-sky-600 border-2 border-sky-800 text-white ring-2 ring-sky-300' :
                               'bg-gradient-to-b from-sky-50 to-white border-2 border-sky-200 border-b-[4px] border-b-sky-300 text-sky-950 shadow-sm'
                             } ${isWrong ? 'btn-wrong-flash' : ''}`}
                           >
                             {renderLv5CardLabel(card.label, card.frac)}
+                            {isLockedWrong && (
+                              <span className="absolute top-1 right-1.5 text-[10px] font-sans font-black text-rose-400">✕</span>
+                            )}
                           </button>
                         );
                       })}
                     </div>
                   </div>
 
-                  <div className="bg-white p-1.5 rounded-2xl border-2 border-amber-100 shadow-inner flex flex-col overflow-hidden">
+                  <div data-coach="lv5-right" className="bg-white p-1.5 rounded-2xl border-2 border-amber-100 shadow-inner flex flex-col overflow-hidden">
                     <div className="text-[10px] font-black text-amber-500 text-center pb-1 shrink-0">等價結果</div>
                     <div className="flex flex-col justify-center gap-1.5 flex-1 min-h-0 overflow-y-auto no-scrollbar">
                       {rightCards.map(card => {
@@ -5324,22 +5433,25 @@
                         const isOut = animatingOut.includes(card.uid);
                         const isWrong = wrongCardUids.includes(card.uid);
                         const isSelected = selRight?.uid === card.uid;
+                        const isLockedWrong = Boolean(selLeft && wrongPairs.has(`${selLeft.uid}|${card.uid}`));
                         const cardH = rightCards.length >= 6 ? 'h-[40px]' : 'h-[44px]';
                         if (isMatched) return <div key={card.uid} className={`${cardH} shrink-0 rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50/50 flex items-center justify-center text-emerald-600 font-black text-xs`}>✓ 已配對</div>;
-                        const targetLeft = selLeft || leftCards.find(c => !matchedUids.has(c.uid));
-                        const isCoachRight = showGuide && targetLeft && card.valKey === targetLeft.valKey;
                         return (
                           <button
                             key={card.uid}
-                            data-coach={isCoachRight ? 'lv5-right' : undefined}
+                            disabled={isLockedWrong}
                             onClick={() => handlePickRight(card)}
-                            className={`${cardH} shrink-0 rounded-xl font-serif font-black text-sm sm:text-base px-2 transition-all flex items-center justify-center ${
+                            className={`relative ${cardH} shrink-0 rounded-xl font-serif font-black text-sm sm:text-base px-2 transition-all flex items-center justify-center ${
                               isOut ? 'animate-pop-out' :
+                              isLockedWrong ? 'bg-slate-100 border-2 border-dashed border-slate-300 text-slate-400 opacity-55 cursor-not-allowed' :
                               isSelected ? 'bg-gradient-to-b from-amber-300 to-amber-500 border-2 border-amber-700 text-amber-950 ring-2 ring-amber-300' :
                               'bg-gradient-to-b from-amber-50 to-white border-2 border-amber-200 border-b-[4px] border-b-amber-300 text-amber-950 shadow-sm'
                             } ${isWrong ? 'btn-wrong-flash' : ''}`}
                           >
                             {card.label}
+                            {isLockedWrong && (
+                              <span className="absolute top-1 right-1.5 text-[10px] font-sans font-black text-rose-400">✕</span>
+                            )}
                           </button>
                         );
                       })}
@@ -5367,7 +5479,7 @@
               lives={lives}
               progress={progress}
               targetTotal={starsThreshold[2]}
-              unitLabel="波"
+              unitLabel="題"
               elapsedSec={elapsedSec}
               lifeBonus={lifeBonus}
               accuracyBonus={accuracyBonus}
@@ -6356,9 +6468,29 @@
         </div>
       );
     };
+    // ==================== 第 7 關組件：廣義角舵手（旋鈕定向 × 象限航行融合版） ====================
+    const LV7_QUAD_BTNS = [
+      { key: '2', label: '第 II 象限', sub: '↖ 90°~180°' },
+      { key: '1', label: '第 I 象限', sub: '↗ 0°~90°' },
+      { key: '3', label: '第 III 象限', sub: '↙ 180°~270°' },
+      { key: '4', label: '第 IV 象限', sub: '↘ 270°~360°' }
+    ];
+
+    const getLv7AngleMeta = (deg) => {
+      const std = ((deg % 360) + 360) % 360;
+      if (std === 0) return { ans: 'axis', std, label: '正向 x 軸（象限角）' };
+      if (std === 90) return { ans: 'axis', std, label: '正向 y 軸（象限角）' };
+      if (std === 180) return { ans: 'axis', std, label: '負向 x 軸（象限角）' };
+      if (std === 270) return { ans: 'axis', std, label: '負向 y 軸（象限角）' };
+      if (std < 90) return { ans: '1', std, label: '第 I 象限' };
+      if (std < 180) return { ans: '2', std, label: '第 II 象限' };
+      if (std < 270) return { ans: '3', std, label: '第 III 象限' };
+      return { ans: '4', std, label: '第 IV 象限' };
+    };
+
     const Level5AngleSteeringMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
-      const starsThreshold = [2, 5, 9];
+      const starsThreshold = [3, 6, 9];
       const maxLives = 3;
       const healTarget = 3;
       const {
@@ -6367,28 +6499,123 @@
         startSession, recordCorrect, recordWrong, finishNow
       } = useLivesLevelSession({ starThresholds: starsThreshold, maxLives, healTarget, currentStars, onUpdateStars });
 
+      const [question, setQuestion] = useState(null);
+      const [stage, setStage] = useState('rotate'); // P0: 'rotate' -> 'quadrant'; P1/P2: 'quadrant' -> 'rotate'
+      const [chosenQuadrant, setChosenQuadrant] = useState(null);
       const [currentAngle, setCurrentAngle] = useState(0);
-      const [targetAngle, setTargetAngle] = useState(90);
       const [isDragging, setIsDragging] = useState(false);
       const [feedbackAnim, setFeedbackAnim] = useState('');
-      const [floatingText, setFloatingText] = useState(null);
+      const [wrongBtnKey, setWrongBtnKey] = useState(null);
       const [isLockedSuccess, setIsLockedSuccess] = useState(false);
       const [conceptTip, setConceptTip] = useState(null);
-      const { showGuide, guideMode, openGuide, dismissGuide } = useLevelGuide(currentStars, hasSeenGuide, onMarkGuideSeen);
+      const [sweepSeq, setSweepSeq] = useState(0);
+      const [hoveredAxis, setHoveredAxis] = useState(false);
+
+      const qPhase = question ? question.phase : 0;
+      const { showGuide, guideMode, openGuide, dismissGuide } = useStagedLevelGuide({
+        currentStars,
+        hasSeenGuide,
+        onMarkGuideSeen,
+        activeStageKey: question ? `p${qPhase === 0 ? 0 : 1}_${stage}` : null,
+        phase: qPhase,
+        enabled: gameState === 'playing',
+        finalStageKey: 'p1_rotate'
+      });
 
       const containerRef = useRef(null);
-
       const dialSvgRef = useRef(null);
       const lastTickAngleRef = useRef(0);
       const lastAtanRef = useRef(0);
       const exactAngleRef = useRef(0);
-      const downPtRef = useRef(null);
       const isDraggingRef = useRef(false);
       const isLockedRef = useRef(false);
       const angleBagsRef = useRef({ 0: [], 1: [], 2: [] });
       const lastAngleRef = useRef(null);
+      const questionMissedRef = useRef(false);
 
-      const width = 540, height = 540, origin = { x: 270, y: 270 }, R = 200;
+      const width = 540, height = 540, origin = { x: 270, y: 270 }, R = 186, KNOB_R = 212;
+
+      useEffect(() => {
+        if (stage !== 'quadrant' || isLockedSuccess) setHoveredAxis(false);
+      }, [stage, isLockedSuccess, progress]);
+
+      useEffect(() => {
+        if (gameState !== 'playing' || stage !== 'quadrant' || chosenQuadrant || isLockedSuccess) return;
+        if (showGuide) {
+          const guideTimer = setTimeout(() => {
+            setSweepSeq(s => s + 1);
+          }, 450);
+          return () => clearTimeout(guideTimer);
+        }
+        setSweepSeq(0);
+        const timer = setInterval(() => {
+          setSweepSeq(s => s + 1);
+        }, 5000);
+        return () => clearInterval(timer);
+      }, [gameState, stage, chosenQuadrant, isLockedSuccess, showGuide, progress]);
+
+      const lv7CoachSteps = useMemo(() => {
+        if (qPhase === 0) {
+          if (stage === 'rotate') {
+            return [
+              {
+                target: 'lv7-dial',
+                minW: 84,
+                minH: 84,
+                shape: 'circle',
+                arcPivot: 'lv7-canvas',
+                arcDeg: -100,
+                desc: '沿外環拖曳藍色旋鈕（逆時針正角、順時針負角），轉到上方目標角度（5° 刻度）。'
+              },
+              {
+                target: 'lv7-lock-btn',
+                shape: 'pill',
+                pad: 6,
+                tap: true,
+                desc: '角度對準後點擊「鎖定終邊驗證」，接著再點選終邊所在的象限或座標軸！'
+              }
+            ];
+          }
+          return [
+            {
+              target: 'lv7-canvas',
+              shape: 'rect',
+              pad: 4,
+              tap: false,
+              desc: '點擊畫板的「第 I～IV 象限」；若終邊落在座標軸上（如 90°、180°），請點「座標大十字／中央圓心（軸上）」。'
+            }
+          ];
+        }
+        if (stage === 'quadrant') {
+          return [
+            {
+              target: 'lv7-canvas',
+              shape: 'rect',
+              pad: 4,
+              tap: false,
+              desc: '進階題會先隱藏終邊！請先點擊「第 I～IV 象限」或「大十字／圓心（軸上）」預判終邊位置（不立即扣心）。'
+            }
+          ];
+        }
+        return [
+          {
+            target: 'lv7-dial',
+            minW: 84,
+            minH: 84,
+            shape: 'circle',
+            arcPivot: 'lv7-canvas',
+            arcDeg: 95,
+            desc: '預判區已亮起！依目標角轉動外環旋鈕（多圈角可連續繞圈）來驗證終邊位置。'
+          },
+          {
+            target: 'lv7-lock-btn',
+            shape: 'pill',
+            pad: 6,
+            tap: true,
+            desc: '點擊「鎖定終邊驗證」，一次核對預判區域與終邊角度！'
+          }
+        ];
+      }, [qPhase, stage]);
 
       useEffect(() => { isDraggingRef.current = isDragging; }, [isDragging]);
       useEffect(() => {
@@ -6397,36 +6624,12 @@
         return () => document.removeEventListener('touchmove', preventTouchScroll);
       }, []);
 
-      const triggerFloat = (text, color) => {
-        const id = Date.now();
-        setFloatingText({ text, color, id });
-        setTimeout(() => setFloatingText(prev => prev?.id === id ? null : prev), 800);
-      };
-
-      const triggerSuccessMatch = () => {
-        if (isLockedRef.current) return;
-        isLockedRef.current = true;
-        if (showGuide) dismissGuide();
-        setIsLockedSuccess(true);
-        audio.sfxBonus();
-        triggerFloat('能量鎖定!', "text-amber-400");
-        setFeedbackAnim('animate-correct');
-        const { completed, nextProgress } = recordCorrect({ delayEndMs: 520 });
-        setTimeout(() => {
-          setIsLockedSuccess(false); setFeedbackAnim('');
-          if (!completed) {
-            generateNextTarget(nextProgress);
-            isLockedRef.current = false;
-          }
-        }, 520);
-      };
-
       const generateNextTarget = (curProg) => {
         const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
         const pools = {
-          0: [30, 45, 60, 120, 135, 150, 210, 240, 300, -30, -45, -60, -120, -150, -210, -240, -300],
-          1: [390, 405, 420, 450, 495, 510, 570, 600, -390, -405, -420, -480, -510, -540],
-          2: [390, 420, 495, 540, 600, 675, 750, -390, -450, -510, -600, -690]
+          0: [30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330, -30, -45, -60, -90, -120, -135, -150],
+          1: [-30, -45, -60, -120, -135, -150, -210, -240, -300, -315, 90, 180, 270, -90, -180],
+          2: [390, 405, 420, 495, 510, 600, 675, 750, -390, -405, -420, -495, -510, 450, 540, -450, -270, 720]
         };
         if (!angleBagsRef.current[phase] || angleBagsRef.current[phase].length === 0) {
           const fresh = shuffle(pools[phase]);
@@ -6435,10 +6638,15 @@
           }
           angleBagsRef.current[phase] = fresh;
         }
-        const next = angleBagsRef.current[phase].shift();
-        lastAngleRef.current = next;
-        setTargetAngle(next);
+        const deg = angleBagsRef.current[phase].shift();
+        lastAngleRef.current = deg;
+        const meta = getLv7AngleMeta(deg);
+        questionMissedRef.current = false;
+        setQuestion({ deg, phase, ...meta });
+        setStage(phase === 0 ? 'rotate' : 'quadrant');
+        setChosenQuadrant(null);
         setCurrentAngle(0);
+        setWrongBtnKey(null);
         setConceptTip(null);
         exactAngleRef.current = 0;
         lastTickAngleRef.current = 0;
@@ -6447,9 +6655,13 @@
       const startGame = () => {
         angleBagsRef.current = { 0: [], 1: [], 2: [] };
         lastAngleRef.current = null;
+        questionMissedRef.current = false;
         setFeedbackAnim('');
+        setChosenQuadrant(null);
+        setWrongBtnKey(null);
         setConceptTip(null);
-        setIsLockedSuccess(false); isLockedRef.current = false;
+        setIsLockedSuccess(false);
+        isLockedRef.current = false;
         const initProg = startSession();
         generateNextTarget(initProg);
         audio.init();
@@ -6459,42 +6671,29 @@
         startGame();
       }, []);
 
-      const lv7CoachSteps = useMemo(() => ([
-        {
-          target: 'lv7-target',
-          anchorX: 0.5,
-          anchorY: 0.5,
-          pad: 8,
-          shape: 'ellipse',
-          tap: false,
-          desc: '看上方目標角度（正逆時針、負順時針）'
-        },
-        {
-          target: 'lv7-dial',
-          anchorX: 0.5,
-          anchorY: 0.5,
-          minW: 84,
-          minH: 84,
-          shape: 'circle',
-          tap: true,
-          desc: '拖曳藍點旋轉終邊到目標位置（5° 微調）'
-        },
-        {
-          target: 'lv7-confirm-tip',
-          anchorX: 0.5,
-          anchorY: 0.5,
-          pad: 8,
-          shape: 'pill',
-          tap: true,
-          desc: '調好後，輕點畫板空白處即可鎖定判定！'
-        }
-      ]), []);
+      const finishQuestion = () => {
+        if (isLockedRef.current) return;
+        isLockedRef.current = true;
+        if (showGuide) dismissGuide();
+        setIsLockedSuccess(true);
+        audio.sfxBonus();
+        setConceptTip(null);
+        setFeedbackAnim('animate-correct');
+        const { completed, nextProgress } = recordCorrect({ wasMissed: questionMissedRef.current, delayEndMs: 850 });
+        setTimeout(() => {
+          setIsLockedSuccess(false);
+          setFeedbackAnim('');
+          if (!completed) {
+            generateNextTarget(nextProgress);
+            isLockedRef.current = false;
+          }
+        }, 850);
+      };
 
       const handlePointerDown = (e) => {
-        if (isLockedRef.current || !dialSvgRef.current || (!isRelaxMode && lives <= 0)) return;
+        if (isLockedRef.current || stage !== 'rotate' || !dialSvgRef.current || (!isRelaxMode && lives <= 0)) return;
         setIsDragging(true);
-        downPtRef.current = { x: e.clientX, y: e.clientY };
-        try { e.target.setPointerCapture(e.pointerId); } catch (_) {}
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
         const ctm = dialSvgRef.current.getScreenCTM();
         if (!ctm) return;
         const inv = ctm.inverse();
@@ -6505,7 +6704,7 @@
       };
 
       const handlePointerMove = (e) => {
-        if (!isDragging || isLockedRef.current || !dialSvgRef.current) return;
+        if (!isDragging || isLockedRef.current || stage !== 'rotate' || !dialSvgRef.current) return;
         const ctm = dialSvgRef.current.getScreenCTM();
         if (!ctm) return;
         const inv = ctm.inverse();
@@ -6517,6 +6716,7 @@
         if (diff < -180) diff += 360;
         exactAngleRef.current += diff;
         lastAtanRef.current = currentAtan;
+        // 純 5° 細膩刻度
         const snapped = Math.round(exactAngleRef.current / 5) * 5;
         if (snapped !== lastTickAngleRef.current) {
           audio.sfxTick();
@@ -6529,43 +6729,119 @@
       const handlePointerUp = (e) => {
         if (!isDragging) return;
         setIsDragging(false);
-        if (e?.target?.hasPointerCapture?.(e.pointerId)) {
-          try { e.target.releasePointerCapture(e.pointerId); } catch (_) {}
+        if (e?.currentTarget?.hasPointerCapture?.(e.pointerId)) {
+          try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
         }
-        const downPt = downPtRef.current;
-        downPtRef.current = null;
-        if (!downPt || isLockedRef.current) return;
-        const movedDist = Math.hypot(e.clientX - downPt.x, e.clientY - downPt.y);
-        if (movedDist < 8) {
-          const snapped = Math.round(exactAngleRef.current / 5) * 5;
-          if (snapped === 0) return;
-          if (snapped === targetAngle) {
+      };
+
+      const handleLockAngle = () => {
+        if (isLockedRef.current || !question || stage !== 'rotate' || (!isRelaxMode && lives <= 0)) return;
+        if (question.phase === 0) {
+          if (currentAngle === question.deg) {
+            if (showGuide) dismissGuide();
             setConceptTip(null);
-            triggerSuccessMatch();
+            audio.sfxMatch();
+            setStage('quadrant');
+            setFeedbackAnim('animate-correct');
+            setTimeout(() => setFeedbackAnim(''), 260);
           } else {
             audio.sfxError();
+            questionMissedRef.current = true;
             const { gameOver } = recordWrong({ delayEndMs: 480 });
-            const sameRay = (((snapped - targetAngle) % 360) + 360) % 360 === 0;
-            const oppSign = (snapped > 0 && targetAngle < 0) || (snapped < 0 && targetAngle > 0);
+            const sameRay = (((currentAngle - question.deg) % 360) + 360) % 360 === 0;
+            const oppSign = (currentAngle > 0 && question.deg < 0) || (currentAngle < 0 && question.deg > 0);
             const tipMsg = oppSign
-              ? (targetAngle < 0 ? '負角要順時針旋轉！' : '正角要逆時針旋轉！')
+              ? (question.deg < 0 ? '負角要順時針旋轉！' : '正角要逆時針旋轉！')
               : sameRay
-              ? `終邊相同，但圈數還差 ${Math.abs(targetAngle - snapped) / 360} 圈（目標 ${targetAngle}°）`
-              : `目前停在 ${snapped}°，目標為 ${targetAngle}°`;
+              ? `終邊相同，但圈數還差 ${Math.abs(question.deg - currentAngle) / 360} 圈（目標 ${question.deg}°）`
+              : `目前停在 ${currentAngle}°，目標為 ${question.deg}°`;
             setConceptTip({ text: tipMsg, id: Date.now() });
             setFeedbackAnim('animate-shake');
             if (!gameOver) {
               setTimeout(() => setFeedbackAnim(''), 360);
             }
           }
+          return;
+        }
+
+        // Phase 1 & 2：於鎖定終邊時同時驗證「角度」與「先前預判亮起的象限/軸上」
+        const angleOk = currentAngle === question.deg;
+        const quadOk = chosenQuadrant === question.ans;
+        if (angleOk && quadOk) {
+          finishQuestion();
+        } else {
+          audio.sfxError();
+          questionMissedRef.current = true;
+          const { gameOver } = recordWrong({ delayEndMs: 480 });
+          let tipMsg = '';
+          if (!angleOk) {
+            const sameRay = (((currentAngle - question.deg) % 360) + 360) % 360 === 0;
+            const oppSign = (currentAngle > 0 && question.deg < 0) || (currentAngle < 0 && question.deg > 0);
+            tipMsg = oppSign
+              ? (question.deg < 0 ? '負角要順時針旋轉！' : '正角要逆時針旋轉！')
+              : sameRay
+              ? `終邊相同，但圈數還差 ${Math.abs(question.deg - currentAngle) / 360} 圈（目標 ${question.deg}°）`
+              : `目前停在 ${currentAngle}°，目標為 ${question.deg}°`;
+          } else {
+            tipMsg = question.ans === 'axis'
+              ? `終邊已在 ${question.deg}°，但預判錯囉！此角落在${question.label}，請重選後再鎖定！`
+              : `終邊已在 ${question.deg}°，但預判錯囉！實際落在${question.label}，請重選後再鎖定！`;
+            if (!gameOver) {
+              setStage('quadrant');
+            }
+          }
+          setConceptTip({ text: tipMsg, id: Date.now() });
+          setFeedbackAnim('animate-shake');
+          if (!gameOver) {
+            setTimeout(() => setFeedbackAnim(''), 360);
+          }
         }
       };
+
+      const handleSelectQuadrant = (choiceKey) => {
+        if (isLockedRef.current || !question || stage !== 'quadrant' || (!isRelaxMode && lives <= 0)) return;
+        if (question.phase === 0) {
+          if (choiceKey === question.ans) {
+            setConceptTip(null);
+            setWrongBtnKey(null);
+            setChosenQuadrant(choiceKey);
+            finishQuestion();
+          } else {
+            audio.sfxError();
+            questionMissedRef.current = true;
+            setWrongBtnKey(choiceKey);
+            const { gameOver } = recordWrong({ delayEndMs: 480 });
+            const tipMsg = `${question.deg}° 同界角為 ${question.std}°，落在${question.label}！`;
+            setConceptTip({ text: tipMsg, id: Date.now() });
+            setFeedbackAnim('animate-shake');
+            if (!gameOver) {
+              setTimeout(() => { setFeedbackAnim(''); setWrongBtnKey(null); }, 350);
+            }
+          }
+        } else {
+          // Phase 1 & 2：預判不直接扣心，先亮起該象限/軸線並解鎖旋鈕讓玩家轉過去驗證！
+          if (showGuide) dismissGuide();
+          audio.sfxSelect();
+          setConceptTip(null);
+          setWrongBtnKey(null);
+          setChosenQuadrant(choiceKey);
+          setStage('rotate');
+        }
+      };
+
+      const rayAngles = Array.from({ length: 24 }, (_, i) => i * 15);
+      const bezelTicks = Array.from({ length: 72 }, (_, i) => i * 5);
+      const currentRad = (currentAngle * Math.PI) / 180;
+      const ptTerminal = { x: origin.x + R * Math.cos(currentRad), y: origin.y - R * Math.sin(currentRad) };
+      const ptKnob = { x: origin.x + KNOB_R * Math.cos(currentRad), y: origin.y - KNOB_R * Math.sin(currentRad) };
+      const dialInteractive = stage === 'rotate' && !isLockedSuccess;
+      const showTerminal = Boolean(question) && (qPhase === 0 || stage === 'rotate' || isLockedSuccess);
 
       const generateSpiral = () => {
         if (currentAngle === 0) return "";
         const points = [];
         const steps = Math.max(20, Math.floor(Math.abs(currentAngle) / 3));
-        const baseR = 25, maxGrowth = 120;
+        const baseR = 24, maxGrowth = 112;
         const totalRotations = Math.abs(currentAngle) / 360;
         const growthPerRotation = Math.min(15, maxGrowth / Math.max(1, totalRotations));
         for (let i = 0; i <= steps; i++) {
@@ -6577,11 +6853,9 @@
         return `M ${origin.x + baseR},${origin.y} L ${points.join(' ')}`;
       };
 
-      const rayAngles = Array.from({ length: 24 }, (_, i) => i * 15);
-      const currentRad = (currentAngle * Math.PI) / 180;
-      const ptTerminal = { x: origin.x + R * Math.cos(currentRad), y: origin.y - R * Math.sin(currentRad) };
-      let principal = ((currentAngle % 360) + 360) % 360;
-      let quadrantText = principal === 0 ? "正向 X 軸" : principal < 90 ? "第 I 象限" : principal === 90 ? "正向 Y 軸" : principal < 180 ? "第 II 象限" : principal === 180 ? "負向 X 軸" : principal < 270 ? "第 III 象限" : principal === 270 ? "負向 Y 軸" : "第 IV 象限";
+      const stepBadgeText = qPhase === 0
+        ? (stage === 'rotate' ? '步驟 1/2：轉動終邊' : '步驟 2/2：選象限／軸上')
+        : (stage === 'quadrant' ? '步驟 1/2：預判象限／軸上' : '步驟 2/2：轉旋鈕驗證');
 
       return (
         <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
@@ -6590,10 +6864,9 @@
             <div className="flex-1 my-3 bg-white/95 rounded-3xl border-4 border-indigo-950 p-5 shadow-2xl flex flex-col justify-between text-center items-center">
               <div className="w-full space-y-3 pt-2">
                 <div className="w-20 h-20 mx-auto rounded-3xl bg-sky-100 border-4 border-sky-500 flex items-center justify-center text-4xl shadow-inner animate-bounce">🧭</div>
-                <h2 className="text-2xl font-black text-indigo-950 tracking-wide">廣義角舵手</h2>
+                <h2 className="text-2xl font-black text-indigo-950 tracking-wide">廣義角舵手：象限航行</h2>
                 <p className="text-xs text-slate-500 font-bold leading-relaxed max-w-xs mx-auto">
-                  撥動終邊到達指定角度（5° 刻度），<br/>
-                  放開手指後<span className="text-sky-600 font-black">輕點空白處鎖定判定</span>！
+                  先透過 <span className="text-sky-600 font-black">15° 磁吸旋鈕</span>轉動終邊並確認象限；進入高階後改為<span className="text-indigo-600 font-black">先盲判象限／軸上</span>，再轉盤精準定位！
                 </p>
               </div>
               <CompactStarPills starsThreshold={starsThreshold} livesMode maxLives={maxLives} />
@@ -6604,7 +6877,7 @@
             </div>
           )}
 
-          {gameState === 'playing' && (
+          {gameState === 'playing' && question && (
             <div className={`flex-1 min-h-0 flex flex-col justify-between gap-2 overflow-hidden pb-0.5 ${feedbackAnim}`}>
               <GameHUD
                 progress={progress}
@@ -6617,71 +6890,210 @@
                 onOpenGuide={openGuide}
               />
 
-              {(() => {
-                const lv7Phase = progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0;
-                return (
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${isLockedSuccess ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                <StagePhaseStrip phase={lv7Phase} labels={['單圈任意正負 • 完整 15° 刻度', '多圈旋轉入門 • 僅留軸線刻度', '多圈盲轉驗收 • 隱藏刻度與讀數']} />
-                <div data-coach="lv7-target" className="bg-gradient-to-r from-sky-500 to-indigo-600 py-2 px-3.5 flex justify-between items-center text-white border-b-2 border-indigo-800 shrink-0">
+                <StagePhaseStrip phase={qPhase} labels={['先轉 5° 旋鈕 • 再選象限／軸上', '先預判象限／軸上 • 再轉盤驗證', '多圈角度 • 先預判位置再驗證']} />
+                <div data-coach="lv7-target" className="bg-gradient-to-r from-sky-600 to-indigo-700 py-2 px-3.5 flex justify-between items-center text-white border-b-2 border-indigo-800 shrink-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-sky-100 font-bold uppercase">目標角度</span>
-                    <span className="text-2xl sm:text-3xl font-mono font-black text-white tracking-wider drop-shadow">{targetAngle}°</span>
+                    <span className="text-[11px] bg-white/15 px-2 py-0.5 rounded-lg font-black">目標角</span>
+                    <span className="text-2xl sm:text-3xl font-mono font-black text-white tracking-wider drop-shadow">{question.deg}°</span>
                   </div>
-                  <div className="text-right flex items-center gap-2">
-                    <div>
-                      <span className="text-[10px] text-sky-200 block font-bold leading-none">當前位置</span>
-                      <span className={`text-xl font-mono font-black leading-none ${
-                        lv7Phase === 2 && !isLockedSuccess ? 'text-sky-200/80' : currentAngle === targetAngle ? 'text-amber-300' : 'text-white'
-                      }`}>
-                        {lv7Phase === 2 && !isLockedSuccess ? '?°' : `${currentAngle}°`}
+                  <div className="flex items-center gap-2">
+                    {stage === 'rotate' ? (
+                      <div className="text-right">
+                        <span className="text-[10px] text-sky-200 block font-bold leading-none">{stepBadgeText}</span>
+                        <span className={`text-xl font-mono font-black leading-none ${
+                          currentAngle === question.deg ? 'text-amber-300' : 'text-white'
+                        }`}>
+                          {currentAngle}°
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs font-black bg-amber-400 text-amber-950 px-2.5 py-1 rounded-xl shadow-sm">
+                        {stepBadgeText}
                       </span>
-                    </div>
-                    <span className="text-xs font-bold text-indigo-950 bg-white/90 px-2 py-1 rounded-lg border border-indigo-200 shadow-sm">{quadrantText}</span>
+                    )}
+                    <SuccessBadge show={isLockedSuccess} />
                   </div>
                 </div>
 
-                <div className="relative w-full flex-1 min-h-0 bg-white flex items-center justify-center overflow-hidden">
+                {/* 座標與外環旋鈕畫板（五大區域無虛線設計） */}
+                <div
+                  data-coach="lv7-canvas"
+                  className="relative w-full flex-1 min-h-0 bg-white flex items-center justify-center overflow-hidden"
+                >
                   <HintBanner tip={conceptTip} />
-                  <div className="pointer-events-none absolute top-2 inset-x-0 flex justify-center z-10">
-                    <span data-coach="lv7-confirm-tip" className="text-[11px] font-black text-sky-800 bg-sky-50/90 border border-sky-200 px-3 py-0.5 rounded-full shadow-sm">
-                      拖曳藍點旋轉，調好後輕點空白處鎖定
-                    </span>
-                  </div>
-                  {isLockedSuccess && <div className="absolute inset-0 bg-amber-400/25 z-30 pointer-events-none animate-ping"></div>}
-                  <svg ref={dialSvgRef} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" className="w-full h-full object-contain cursor-grab active:cursor-grabbing select-none" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp}>
+                  <svg
+                    ref={dialSvgRef}
+                    viewBox={`0 0 ${width} ${height}`}
+                    preserveAspectRatio="xMidYMid meet"
+                    className={`w-full h-full object-contain select-none ${dialInteractive ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerCancel={handlePointerUp}
+                  >
                     <defs>
-                      <pattern id="gridLv5" width="100" height="100" patternUnits="userSpaceOnUse" x="270" y="270">
+                      <pattern id="gridLv7" width="100" height="100" patternUnits="userSpaceOnUse" x="270" y="270">
                         <rect width="100" height="100" fill="#ffffff" />
                         <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#e2e8f0" strokeWidth="2.5" />
                       </pattern>
-                      <marker id="arrowHeadLv5" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                      <marker id="arrowHeadLv7" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                         <path d="M 0 0 L 10 5 L 0 10 z" fill="#f59e0b" />
                       </marker>
+                      <linearGradient id="bezelMetalLv7" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#cbd5e1" />
+                        <stop offset="50%" stopColor="#f8fafc" />
+                        <stop offset="100%" stopColor="#94a3b8" />
+                      </linearGradient>
                     </defs>
-                    <rect width="100%" height="100%" fill="url(#gridLv5)" />
-                    <line x1={30} y1={270} x2={510} y2={270} stroke="#94a3b8" strokeWidth="2.5" />
-                    <line x1={270} y1={30} x2={270} y2={510} stroke="#94a3b8" strokeWidth="2.5" />
-                    <text x="500" y="255" fill="#94a3b8" fontSize="24" fontWeight="bold">x</text>
-                    <text x="285" y="50" fill="#94a3b8" fontSize="24" fontWeight="bold">y</text>
-                    <text x="440" y="100" fill="#e2e8f0" fontSize="64" fontWeight="bold" opacity="0.6">I</text>
-                    <text x="80" y="100" fill="#e2e8f0" fontSize="64" fontWeight="bold" opacity="0.6">II</text>
-                    <text x="80" y="460" fill="#e2e8f0" fontSize="64" fontWeight="bold" opacity="0.6">III</text>
-                    <text x="440" y="460" fill="#e2e8f0" fontSize="64" fontWeight="bold" opacity="0.6">IV</text>
+                    <rect width="100%" height="100%" fill="url(#gridLv7)" />
+
+                    {/* 第 5 區（底層）：統一「座標大十字 ＋ 中央圓」象限角點擊區（退入底層不遮擋座標軸／終邊／螺旋角，採群組透明度避免交點疊色＋React 狀態確保懸停 100% 亮起） */}
+                    {(stage === 'quadrant' || (isLockedSuccess && chosenQuadrant === 'axis')) && (() => {
+                      const isLit = chosenQuadrant === 'axis';
+                      const isPickable = stage === 'quadrant' && !isLockedSuccess;
+                      const isSweeping = stage === 'quadrant' && !chosenQuadrant && !isLockedSuccess;
+                      const isWrongFlash = wrongBtnKey === 'axis';
+                      const isSuccessLit = isLockedSuccess && isLit;
+                      const baseColor = isWrongFlash ? '#f43f5e' : isSuccessLit ? '#10b981' : '#38bdf8';
+                      const baseOpacity = isWrongFlash ? 0.28 : isSuccessLit ? 0.34 : isLit ? 0.34 : (hoveredAxis && isPickable) ? 0.26 : 0.11;
+                      return (
+                        <g
+                          key={`axis-sweep-${progress}-${stage}-${sweepSeq}`}
+                          className={isPickable ? 'cursor-pointer' : 'pointer-events-none'}
+                          onPointerEnter={isPickable ? () => setHoveredAxis(true) : undefined}
+                          onPointerLeave={() => setHoveredAxis(false)}
+                          onClick={isPickable ? (e) => { e.stopPropagation(); setHoveredAxis(false); handleSelectQuadrant('axis'); } : undefined}
+                        >
+                          {/* 統一群組透明度：大十字感應條 ＋ 中央圓完全無接縫、無邊線、不遮擋上層座標軸 */}
+                          <g opacity={baseOpacity} style={{ transition: 'opacity 150ms ease' }}>
+                            <rect x="24" y="256" width="492" height="28" rx="14" fill={baseColor} stroke="none" />
+                            <rect x="256" y="24" width="28" height="492" rx="14" fill={baseColor} stroke="none" />
+                            <circle cx="270" cy="270" r="46" fill={baseColor} stroke="none" />
+                          </g>
+                          {/* 輪動高亮層（0s 第 1 拍先高亮一圈） */}
+                          {isSweeping && !isWrongFlash && (
+                            <g style={{ animationDelay: '0s' }} className="animate-quad-sweep pointer-events-none">
+                              <g opacity="0.42">
+                                <rect x="24" y="256" width="492" height="28" rx="14" fill="#38bdf8" stroke="none" />
+                                <rect x="256" y="24" width="28" height="492" rx="14" fill="#38bdf8" stroke="none" />
+                                <circle cx="270" cy="270" r="46" fill="#38bdf8" stroke="none" />
+                              </g>
+                            </g>
+                          )}
+                          {/* 底層柔和浮水印字樣 */}
+                          <text x="270" y="254" fill={isWrongFlash ? '#be123c' : isSuccessLit ? '#047857' : '#0369a1'} fontSize="13" fontWeight="900" textAnchor="middle" dominantBaseline="middle" opacity="0.72" className="pointer-events-none">軸上</text>
+                          <text x="270" y="288" fill={isWrongFlash ? '#9f1239' : isSuccessLit ? '#059669' : '#0284c7'} fontSize="11" fontWeight="900" textAnchor="middle" dominantBaseline="middle" opacity="0.68" className="pointer-events-none">象限角</text>
+                        </g>
+                      );
+                    })()}
+
+                    {/* 第 1～4 區（底層）：大圓扇環無邊線象限（內半徑 66 留白圓心、外半徑 246 與第 5 區大十字齊平構成大圓） */}
+                    <g key={`sweep-${progress}-${stage}-${sweepSeq}`}>
+                    {[
+                      { key: '1', sx: 1,  sy: -1, delay: '0.22s' },
+                      { key: '2', sx: -1, sy: -1, delay: '0.40s' },
+                      { key: '3', sx: -1, sy: 1,  delay: '0.58s' },
+                      { key: '4', sx: 1,  sy: 1,  delay: '0.76s' }
+                    ].map(sec => {
+                      const rIn = 66, rOut = 246, gap = 28;
+                      const dxIn = Math.sqrt(rIn * rIn - gap * gap);
+                      const dxOut = Math.sqrt(rOut * rOut - gap * gap);
+                      const p1x = 270 + sec.sx * dxIn,  p1y = 270 + sec.sy * gap;
+                      const p2x = 270 + sec.sx * dxOut, p2y = 270 + sec.sy * gap;
+                      const p3x = 270 + sec.sx * gap,   p3y = 270 + sec.sy * dxOut;
+                      const p4x = 270 + sec.sx * gap,   p4y = 270 + sec.sy * dxIn;
+                      const outerSweep = (sec.sx * sec.sy > 0) ? 1 : 0;
+                      const innerSweep = 1 - outerSweep;
+                      const dPath = `M ${p1x} ${p1y} L ${p2x} ${p2y} A ${rOut} ${rOut} 0 0 ${outerSweep} ${p3x} ${p3y} L ${p4x} ${p4y} A ${rIn} ${rIn} 0 0 ${innerSweep} ${p1x} ${p1y} Z`;
+                      const isLit = chosenQuadrant === sec.key;
+                      const isSuccessLit = isLockedSuccess && isLit;
+                      const isPickable = stage === 'quadrant' && !isLockedSuccess;
+                      const isSweeping = stage === 'quadrant' && !chosenQuadrant && !isLockedSuccess;
+                      const isWrongFlash = wrongBtnKey === sec.key;
+                      return (
+                        <g key={`sec-${sec.key}`}>
+                          <path
+                            d={dPath}
+                            fill={
+                              isWrongFlash ? 'rgba(244, 63, 94, 0.28)' :
+                              isSuccessLit ? 'rgba(16, 185, 129, 0.34)' :
+                              isLit ? 'rgba(56, 189, 248, 0.34)' :
+                              stage === 'quadrant' && !isLockedSuccess ? 'rgba(56, 189, 248, 0.11)' :
+                              'transparent'
+                            }
+                            stroke="none"
+                            className={isPickable ? 'cursor-pointer hover:fill-sky-400/25 transition-colors' : 'pointer-events-none'}
+                            onClick={isPickable ? () => handleSelectQuadrant(sec.key) : undefined}
+                          />
+                          {isSweeping && !isWrongFlash && (
+                            <path
+                              d={dPath}
+                              fill="rgba(56, 189, 248, 0.42)"
+                              stroke="none"
+                              style={{ animationDelay: sec.delay }}
+                              className="animate-quad-sweep pointer-events-none"
+                            />
+                          )}
+                        </g>
+                      );
+                    })}
+                    </g>
+
+                    {/* 外環金屬齒紋旋鈕軌道（r = 200~224，pointer-events-none 避免擋住大扇環外側點擊） */}
+                    <circle cx={270} cy={270} r={212} fill="none" stroke="url(#bezelMetalLv7)" strokeWidth="24" opacity={dialInteractive ? 0.92 : 0.35} className="pointer-events-none" />
+                    <circle cx={270} cy={270} r={224} fill="none" stroke="#64748b" strokeWidth="2" opacity="0.5" className="pointer-events-none" />
+                    <circle cx={270} cy={270} r={200} fill="none" stroke="#94a3b8" strokeWidth="2" opacity="0.6" className="pointer-events-none" />
+                    {bezelTicks.map(deg => {
+                      const rRad = (deg * Math.PI) / 180;
+                      const isMajor = deg % 15 === 0;
+                      const rIn = isMajor ? 202 : 207;
+                      const rOut = isMajor ? 222 : 217;
+                      return (
+                        <line
+                          key={`bz-${deg}`}
+                          x1={270 + rIn * Math.cos(rRad)} y1={270 - rIn * Math.sin(rRad)}
+                          x2={270 + rOut * Math.cos(rRad)} y2={270 - rOut * Math.sin(rRad)}
+                          stroke={deg % 90 === 0 ? '#1e293b' : isMajor ? '#475569' : '#94a3b8'}
+                          strokeWidth={deg % 90 === 0 ? '3' : isMajor ? '1.8' : '1'}
+                          opacity={dialInteractive ? 0.85 : 0.3}
+                          className="pointer-events-none"
+                        />
+                      );
+                    })}
+
+                    {/* 固定座標軸與象限字樣（pointer-events-none 確保不攔截底層五大區懸停與點擊） */}
+                    <line x1={65} y1={270} x2={475} y2={270} stroke={isLockedSuccess && chosenQuadrant === 'axis' ? '#10b981' : chosenQuadrant === 'axis' ? '#0284c7' : '#64748b'} strokeWidth={chosenQuadrant === 'axis' ? '5' : '2.5'} className="pointer-events-none" />
+                    <line x1={270} y1={65} x2={270} y2={475} stroke={isLockedSuccess && chosenQuadrant === 'axis' ? '#10b981' : chosenQuadrant === 'axis' ? '#0284c7' : '#64748b'} strokeWidth={chosenQuadrant === 'axis' ? '5' : '2.5'} className="pointer-events-none" />
+                    <text x="462" y="256" fill={isLockedSuccess && chosenQuadrant === 'axis' ? '#059669' : chosenQuadrant === 'axis' ? '#0369a1' : '#475569'} fontSize="20" fontWeight="900" className="pointer-events-none">x</text>
+                    <text x="282" y="82" fill={isLockedSuccess && chosenQuadrant === 'axis' ? '#059669' : chosenQuadrant === 'axis' ? '#0369a1' : '#475569'} fontSize="20" fontWeight="900" className="pointer-events-none">y</text>
+                    <text x="359" y="181" fill={isLockedSuccess && chosenQuadrant === '1' ? '#047857' : chosenQuadrant === '1' || stage === 'quadrant' ? '#0369a1' : '#cbd5e1'} fontSize="44" fontWeight="900" textAnchor="middle" dominantBaseline="middle" opacity={chosenQuadrant === '1' ? 0.98 : stage === 'quadrant' ? 0.85 : 0.75} className="pointer-events-none">I</text>
+                    <text x="181" y="181" fill={isLockedSuccess && chosenQuadrant === '2' ? '#047857' : chosenQuadrant === '2' || stage === 'quadrant' ? '#0369a1' : '#cbd5e1'} fontSize="44" fontWeight="900" textAnchor="middle" dominantBaseline="middle" opacity={chosenQuadrant === '2' ? 0.98 : stage === 'quadrant' ? 0.85 : 0.75} className="pointer-events-none">II</text>
+                    <text x="181" y="359" fill={isLockedSuccess && chosenQuadrant === '3' ? '#047857' : chosenQuadrant === '3' || stage === 'quadrant' ? '#0369a1' : '#cbd5e1'} fontSize="44" fontWeight="900" textAnchor="middle" dominantBaseline="middle" opacity={chosenQuadrant === '3' ? 0.98 : stage === 'quadrant' ? 0.85 : 0.75} className="pointer-events-none">III</text>
+                    <text x="359" y="359" fill={isLockedSuccess && chosenQuadrant === '4' ? '#047857' : chosenQuadrant === '4' || stage === 'quadrant' ? '#0369a1' : '#cbd5e1'} fontSize="44" fontWeight="900" textAnchor="middle" dominantBaseline="middle" opacity={chosenQuadrant === '4' ? 0.98 : stage === 'quadrant' ? 0.85 : 0.75} className="pointer-events-none">IV</text>
+
+                    {/* 15° 放射刻度（固定不動） */}
                     {rayAngles.map(deg => {
                       const rRad = (deg * Math.PI) / 180;
                       const isAxis = deg % 90 === 0;
-                      const isThirty = deg % 30 === 0;
-                      const showLabel = lv7Phase === 0 ? true : lv7Phase === 1 ? isAxis : false;
-                      const labelR = isAxis ? 232 : isThirty ? 224 : 246;
+                      const showLabel = qPhase === 0 ? (deg % 30 === 0) : qPhase === 1 ? isAxis : false;
+                      const labelR = isAxis ? 244 : 242;
                       return (
-                        <g key={deg}>
-                          <line x1={270} y1={270} x2={270 + 200 * Math.cos(rRad)} y2={270 - 200 * Math.sin(rRad)} stroke="#94a3b8" strokeWidth={isAxis ? 3 : 2} strokeDasharray={isAxis ? "none" : "5 5"} />
+                        <g key={deg} className="pointer-events-none">
+                          <line
+                            x1={270} y1={270}
+                            x2={270 + R * Math.cos(rRad)} y2={270 - R * Math.sin(rRad)}
+                            stroke="#94a3b8"
+                            strokeWidth={isAxis ? 2.5 : 1.5}
+                            strokeDasharray={isAxis ? "none" : "4 5"}
+                            opacity="0.65"
+                          />
                           {showLabel && (
                             <text
                               x={270 + labelR * Math.cos(rRad)}
                               y={270 - labelR * Math.sin(rRad)}
-                              fill={isAxis ? '#334155' : '#475569'}
-                              fontSize={isAxis ? '20' : isThirty ? '16' : '15'}
+                              fill={isAxis ? '#0f172a' : '#475569'}
+                              fontSize={isAxis ? '19' : '14'}
                               fontWeight="900"
                               textAnchor="middle"
                               dominantBaseline="middle"
@@ -6693,35 +7105,82 @@
                         </g>
                       );
                     })}
-                    <path d={generateSpiral()} fill="none" stroke={isLockedSuccess ? "#fbbf24" : "#f59e0b"} strokeWidth={isLockedSuccess ? "6" : "4.5"} strokeLinecap="round" strokeLinejoin="round" markerEnd="url(#arrowHeadLv5)" />
-                    <line x1={270} y1={270} x2={490} y2={270} stroke="#ef4444" strokeWidth="8" strokeLinecap="round" />
-                    <rect x="435" y="282" width="56" height="26" fill="white" stroke="#ef4444" strokeWidth="1.5" rx="6" />
-                    <text x="463" y="300" fill="#b91c1c" fontSize="16" fontWeight="900" textAnchor="middle">始邊</text>
-                    <line x1={270} y1={270} x2={ptTerminal.x} y2={ptTerminal.y} stroke={isLockedSuccess ? "#f59e0b" : "#3b82f6"} strokeWidth={isLockedSuccess ? "11" : "8"} strokeLinecap="round" />
-                    <g transform={`translate(${270 + 135 * Math.cos(currentRad)}, ${270 - 135 * Math.sin(currentRad)})`} className="pointer-events-none">
-                      <rect x="-26" y="-12" width="52" height="24" fill="white" stroke={isLockedSuccess ? "#d97706" : "#3b82f6"} strokeWidth="1.8" rx="6" />
-                      <text x="0" y="1" fill={isLockedSuccess ? "#b45309" : "#1d4ed8"} fontSize="15" fontWeight="900" textAnchor="middle" dominantBaseline="middle">終邊</text>
+
+                    {/* 紅色始邊 */}
+                    <g className="pointer-events-none">
+                      <line x1={270} y1={270} x2={456} y2={270} stroke="#ef4444" strokeWidth="7" strokeLinecap="round" />
+                      <rect x="394" y="280" width="48" height="22" fill="white" stroke="#ef4444" strokeWidth="1.5" rx="6" />
+                      <text x="418" y="295" fill="#b91c1c" fontSize="14" fontWeight="900" textAnchor="middle">始邊</text>
                     </g>
-                    <g data-coach="lv7-dial" transform={`translate(${ptTerminal.x}, ${ptTerminal.y})`}>
-                      {(isDragging || isLockedSuccess) && <circle cx="0" cy="0" r={isLockedSuccess ? 50 : 44} fill={isLockedSuccess ? "#fde047" : "#60a5fa"} opacity="0.4" className="animate-pulse" />}
-                      <circle cx="0" cy="0" r={isDragging ? 22 : 18} fill={isLockedSuccess ? "#f59e0b" : "#2563eb"} stroke="#ffffff" strokeWidth="4" />
-                      <circle cx="0" cy="0" r="6" fill="#ffffff" />
-                    </g>
-                    <circle cx={270} cy={270} r={height} fill="transparent" style={{ touchAction: 'none' }} className="cursor-grab active:cursor-grabbing" />
+
+                    {/* 終邊與螺旋角（Phase 1/2 預判階段隱藏） */}
+                    {showTerminal ? (
+                      <g className="pointer-events-none">
+                        <path d={generateSpiral()} fill="none" stroke={isLockedSuccess ? "#fbbf24" : "#f59e0b"} strokeWidth={isLockedSuccess ? "6" : "4.5"} strokeLinecap="round" strokeLinejoin="round" markerEnd="url(#arrowHeadLv7)" />
+                        <line x1={270} y1={270} x2={ptTerminal.x} y2={ptTerminal.y} stroke={isLockedSuccess ? "#f59e0b" : "#2563eb"} strokeWidth={isLockedSuccess ? "10" : "7.5"} strokeLinecap="round" />
+                        <circle cx={270} cy={270} r="6.5" fill="#1e293b" stroke="#ffffff" strokeWidth="2.5" />
+                        <g transform={`translate(${270 + 122 * Math.cos(currentRad)}, ${270 - 122 * Math.sin(currentRad)})`} className="pointer-events-none">
+                          <rect x="-24" y="-11" width="48" height="22" fill="white" stroke={isLockedSuccess ? "#d97706" : "#2563eb"} strokeWidth="1.8" rx="6" />
+                          <text x="0" y="1" fill={isLockedSuccess ? "#b45309" : "#1d4ed8"} fontSize="14" fontWeight="900" textAnchor="middle" dominantBaseline="middle">終邊</text>
+                        </g>
+                        {/* 外環 3D 金屬旋鈕握把 */}
+                        <g data-coach="lv7-dial" transform={`translate(${ptKnob.x}, ${ptKnob.y}) rotate(${-currentAngle})`}>
+                          {(isDragging || isLockedSuccess) && (
+                            <circle cx="0" cy="0" r={isLockedSuccess ? 42 : 36} fill={isLockedSuccess ? "#fde047" : "#60a5fa"} opacity="0.4" className="animate-pulse" />
+                          )}
+                          <circle cx="0" cy="0" r={isDragging ? 22 : 19} fill={isLockedSuccess ? "#f59e0b" : "#1d4ed8"} stroke="#ffffff" strokeWidth="3.5" className="drop-shadow-md" />
+                          <line x1="-8" y1="-4" x2="8" y2="-4" stroke="#93c5fd" strokeWidth="2" strokeLinecap="round" />
+                          <line x1="-8" y1="0" x2="8" y2="0" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
+                          <line x1="-8" y1="4" x2="8" y2="4" stroke="#93c5fd" strokeWidth="2" strokeLinecap="round" />
+                        </g>
+                      </g>
+                    ) : (
+                      <g className="pointer-events-none">
+                        <circle cx={270} cy={270} r="6.5" fill="#475569" stroke="#ffffff" strokeWidth="2" />
+                      </g>
+                    )}
+
+                    {/* 全盤透明觸控層（僅在旋鈕解鎖時啟用） */}
+                    {dialInteractive && (
+                      <circle cx={270} cy={270} r={height} fill="transparent" style={{ touchAction: 'none' }} />
+                    )}
                   </svg>
                 </div>
+
+                {/* 底部固定操作區 */}
+                <div className="bg-slate-50 border-t-2 border-slate-200 p-2 shrink-0">
+                  {stage === 'rotate' ? (
+                    <button
+                      type="button"
+                      data-coach="lv7-lock-btn"
+                      onClick={handleLockAngle}
+                      disabled={isLockedSuccess}
+                      className={`w-full py-3.5 rounded-2xl font-black text-base tracking-wider shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 ${
+                        isLockedSuccess
+                          ? 'bg-emerald-500 border-b-4 border-emerald-700 text-white'
+                          : 'btn-3d-blue text-white'
+                      }`}
+                    >
+                      <span>{isLockedSuccess ? '✨ 終邊驗證通過！' : `🔒 鎖定終邊驗證（${currentAngle}°）`}</span>
+                    </button>
+                  ) : (
+                    <div className="w-full py-3.5 px-3 rounded-2xl bg-sky-50 border border-sky-300 text-sky-900 font-black text-sm text-center flex items-center justify-center gap-1.5">
+                      <span>👆</span>
+                      <span>點擊畫板第 I～IV 象限，或「大十字／圓心」選象限角</span>
+                    </div>
+                  )}
+                </div>
               </div>
-                );
-              })()}
-              <CoachOverlay
-                containerRef={containerRef}
-                active={guideMode === 'manual' || (gameState === 'playing' && showGuide && !isLockedSuccess)}
-            mode={guideMode || 'spotlight'}
-                steps={lv7CoachSteps}
-                onDismiss={dismissGuide}
-              />
             </div>
           )}
+
+          <CoachOverlay
+            containerRef={containerRef}
+            active={guideMode === 'manual' || (gameState === 'playing' && showGuide && !isLockedSuccess)}
+            mode={guideMode || 'spotlight'}
+            steps={lv7CoachSteps}
+            onDismiss={dismissGuide}
+          />
 
           {gameState === 'ended' && (
             <LevelResultScreen
@@ -6971,14 +7430,11 @@
           desc: '看上方基準角，找出相差 360° 整數倍的 3 顆同界星'
         },
         {
-          target: 'lv8-correct',
-          anchorX: 0.5,
-          anchorY: 0.5,
-          minW: 84,
-          minH: 84,
-          shape: 'circle',
-          tap: true,
-          desc: '滑動一筆連（或依序點擊）串起 3 顆同界角星！'
+          target: 'lv8-board',
+          pad: 4,
+          shape: 'rect',
+          tap: false,
+          desc: '在星空中滑動一筆連（或依序點擊）串起 3 顆同界角星！'
         }
       ]), []);
 
@@ -7198,6 +7654,7 @@
 
                 <div
                   ref={boardRef}
+                  data-coach="lv8-board"
                   onPointerDown={handleBoardPointerDown}
                   onPointerMove={handleBoardPointerMove}
                   onPointerUp={handleBoardPointerUp}
@@ -7333,12 +7790,9 @@
                     const isLinked = b.status === 'linked';
                     const isWrong = b.status === 'wrong';
                     const isFade = b.status === 'fade';
-                    const firstCorrectBubble = bubbles.find(item => item.isCorrect && item.status === 'active');
-                    const isCoachBubble = showGuide && firstCorrectBubble?.uid === b.uid;
                     return (
                       <div
                         key={b.uid}
-                        data-coach={isCoachBubble ? 'lv8-correct' : undefined}
                         style={{ left: `${b.x}%`, top: `${b.y}%` }}
                         className={`pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 w-[68px] h-[68px] sm:w-[74px] sm:h-[74px] rounded-full flex items-center justify-center font-mono font-black text-sm sm:text-base border-2 transition-all duration-200 z-20 ${
                           isLinked
@@ -10172,6 +10626,592 @@
               }
             ]}
           />
+        </div>
+      );
+    };
+
+
+    // ==================== 第 12 關組件：廣轉銳密碼輪（廣義角化為 30°/45°/60° 銳角與求值） ====================
+    const LV12_SIGNS = ['+', '−'];
+    const LV12_REFS = [30, 45, 60];
+    const LV12_ABS_VALS = ['1/2', '√2/2', '√3/2', '√3/3', '1', '√3'];
+    const LV12_ACUTE_VAL = {
+      sin: { 30: '1/2', 45: '√2/2', 60: '√3/2' },
+      cos: { 30: '√3/2', 45: '√2/2', 60: '1/2' },
+      tan: { 30: '√3/3', 45: '1', 60: '√3' }
+    };
+
+    const generateLevel12Question = (phase, bagState = null) => {
+      const pools = {
+        0: [120, 135, 150, 210, 225, 240, 300, 315, 330],
+        1: [-30, -45, -60, -120, -135, -150, -210, -225, -240, -300, -315, -330],
+        2: [390, 405, 420, 480, 495, 510, 570, 585, 600, 660, 675, 690, -390, -405, -420, -480, -495, -510]
+      };
+      const anglePool = pools[phase] || pools[0];
+      const funcs = ['sin', 'cos', 'tan'];
+      const used = bagState?.usedKeys || [];
+
+      let deg = anglePool[Math.floor(Math.random() * anglePool.length)];
+      let func = funcs[Math.floor(Math.random() * funcs.length)];
+      for (let attempt = 0; attempt < 24; attempt++) {
+        const d = anglePool[Math.floor(Math.random() * anglePool.length)];
+        const f = funcs[Math.floor(Math.random() * funcs.length)];
+        const key = `${f}_${d}`;
+        if (!used.includes(key) && d !== bagState?.lastDeg) {
+          deg = d;
+          func = f;
+          break;
+        }
+      }
+      if (bagState) {
+        bagState.usedKeys = [...used.slice(-16), `${func}_${deg}`];
+        bagState.lastDeg = deg;
+      }
+
+      const std = ((deg % 360) + 360) % 360;
+      const quad = std < 90 ? 1 : std < 180 ? 2 : std < 270 ? 3 : 4;
+      const quadRoman = ['', 'I', 'II', 'III', 'IV'][quad];
+      const refDeg = quad === 1 ? std : quad === 2 ? 180 - std : quad === 3 ? std - 180 : 360 - std;
+      const isPos = func === 'sin' ? (quad === 1 || quad === 2) : func === 'cos' ? (quad === 1 || quad === 4) : (quad === 1 || quad === 3);
+      const ansSign = isPos ? '+' : '−';
+      const ansAbs = LV12_ACUTE_VAL[func][refDeg];
+
+      const otherRefs = LV12_REFS.filter(r => r !== refDeg);
+      const initRef = otherRefs[Math.floor(Math.random() * otherRefs.length)];
+      const initSign = LV12_SIGNS[Math.floor(Math.random() * LV12_SIGNS.length)];
+      const otherVals = LV12_ABS_VALS.filter(v => v !== ansAbs);
+      const initAbs = otherVals[Math.floor(Math.random() * otherVals.length)];
+
+      const axisAnchor = quad === 1 ? '0°' : (quad === 2 || quad === 3) ? '180°' : '360°';
+      const degLabel = deg < 0 ? `(${deg}°)` : `${deg}°`;
+      const stdNote = (deg < 0 || deg >= 360) ? `同界角 ${std}°，` : '';
+
+      return {
+        key: `lv12_${func}_${deg}_${Date.now()}`,
+        phase,
+        func,
+        deg,
+        degLabel,
+        std,
+        quad,
+        quadRoman,
+        refDeg,
+        ansSign,
+        ansAbs,
+        initSign,
+        initRef,
+        initAbs,
+        signTip: `${deg}° ${stdNote}在第 ${quadRoman} 象限，${func} 為${isPos ? '正（+）' : '負（−）'}！`,
+        refTip: `${deg}° ${stdNote}距 ${axisAnchor} 差 ${refDeg}°，參考銳角應為 ${refDeg}°！`,
+        valTip: `正負與銳角正確！但 ${func} ${refDeg}° = ${ansAbs}`
+      };
+    };
+
+    const Level12GenToAcuteWheel = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
+      const { isRelaxMode } = React.useContext(GameModeContext);
+      const starsThreshold = [3, 6, 9];
+      const maxLives = 3;
+      const healTarget = 3;
+      const {
+        gameState, progress, lives, healStreak, correctCount, wrongCount, elapsedSec,
+        earnedStars, baseScore, lifeBonus, accuracyBonus, speedBonus, finalScore,
+        startSession, recordCorrect, recordWrong, finishNow
+      } = useLivesLevelSession({ starThresholds: starsThreshold, maxLives, healTarget, unitLabel: '題', currentStars, onUpdateStars });
+
+      const [question, setQuestion] = useState(null);
+      const [selSign, setSelSign] = useState('+');
+      const [selRef, setSelRef] = useState(30);
+      const [selAbs, setSelAbs] = useState('1/2');
+      const [isSolved, setIsSolved] = useState(false);
+      const [wrongLock, setWrongLock] = useState(false);
+      const [conceptTip, setConceptTip] = useState(null);
+      const [feedbackAnim, setFeedbackAnim] = useState('');
+
+      const qPhase = question ? question.phase : 0;
+      const isValLocked = qPhase === 0;
+      const { showGuide, guideMode, openGuide, dismissGuide } = useStagedLevelGuide({
+        currentStars,
+        hasSeenGuide,
+        onMarkGuideSeen,
+        activeStageKey: question ? (qPhase === 0 ? 'p0' : 'p1') : null,
+        phase: qPhase,
+        enabled: gameState === 'playing',
+        finalStageKey: 'p1'
+      });
+
+      const containerRef = useRef(null);
+      const bagRef = useRef({ usedKeys: [], lastDeg: null });
+      const stepMissedRef = useRef(false);
+      const confirmTimerRef = useRef(null);
+      const pendingNextRef = useRef(null);
+      const justSolvedAtRef = useRef(0);
+
+      const handleConfirmSkip = () => {
+        if (!pendingNextRef.current) return;
+        if (Date.now() - justSolvedAtRef.current < 260) return;
+        clearTimeout(confirmTimerRef.current);
+        const fn = pendingNextRef.current;
+        pendingNextRef.current = null;
+        audio.sfxClick();
+        fn();
+      };
+      useEffect(() => () => clearTimeout(confirmTimerRef.current), []);
+
+      const nextQuestion = (curProg) => {
+        const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
+        const q = generateLevel12Question(phase, bagRef.current);
+        stepMissedRef.current = false;
+        setQuestion(q);
+        setSelSign(q.initSign);
+        setSelRef(q.initRef);
+        setSelAbs(q.initAbs);
+        setIsSolved(false);
+        setWrongLock(false);
+        setConceptTip(null);
+      };
+
+      const startGame = () => {
+        clearTimeout(confirmTimerRef.current);
+        pendingNextRef.current = null;
+        bagRef.current = { usedKeys: [], lastDeg: null };
+        stepMissedRef.current = false;
+        setFeedbackAnim('');
+        const initProg = startSession();
+        nextQuestion(initProg);
+        audio.init();
+      };
+
+      useEffect(() => { startGame(); }, []);
+
+      const lv12CoachSteps = useMemo(() => {
+        if (qPhase === 0) {
+          return [
+            {
+              target: 'lv12-eq',
+              pad: 6,
+              shape: 'rect',
+              tap: false,
+              desc: '將上方廣義角化為「正負號 × 銳角特殊角（30°/45°/60°）」！'
+            },
+            {
+              target: 'lv12-wheel',
+              pad: 4,
+              shape: 'rect',
+              drag: true,
+              desc: '階段一先上下撥動「符號輪」與「銳角輪」，右側數值輪會自動連動顯示！'
+            },
+            {
+              target: 'lv12-unlock',
+              pad: 6,
+              shape: 'pill',
+              tap: true,
+              desc: '對準後點擊右側黑曜石「🔓 開鎖」鎖栓即可解鎖！'
+            }
+          ];
+        }
+        return [
+          {
+            target: 'lv12-wheel',
+            pad: 4,
+            shape: 'rect',
+            drag: true,
+            desc: '進階解鎖！現在第三顆「數值輪」也開啟了，請自己轉出正負、銳角與最終數值！'
+          }
+        ];
+      }, [qPhase]);
+
+      const stepWheel = (which, dir) => {
+        if (isSolved || wrongLock || !question) return;
+        if (which === 'abs' && isValLocked) return;
+        audio.sfxTick();
+        if (which === 'sign') {
+          const idx = LV12_SIGNS.indexOf(selSign);
+          setSelSign(LV12_SIGNS[(idx + dir + LV12_SIGNS.length) % LV12_SIGNS.length]);
+        } else if (which === 'ref') {
+          const idx = LV12_REFS.indexOf(selRef);
+          setSelRef(LV12_REFS[(idx + dir + LV12_REFS.length) % LV12_REFS.length]);
+        } else {
+          const idx = LV12_ABS_VALS.indexOf(selAbs);
+          setSelAbs(LV12_ABS_VALS[(idx + dir + LV12_ABS_VALS.length) % LV12_ABS_VALS.length]);
+        }
+      };
+
+      const displayAbs = question
+        ? (isValLocked ? LV12_ACUTE_VAL[question.func][selRef] : selAbs)
+        : '1/2';
+
+      const handleUnlock = () => {
+        if (!question || isSolved || wrongLock || (!isRelaxMode && lives <= 0)) return;
+        const okSign = selSign === question.ansSign;
+        const okRef = selRef === question.refDeg;
+        const okVal = isValLocked ? true : selAbs === question.ansAbs;
+
+        if (okSign && okRef && okVal) {
+          audio.sfxMatch();
+          if (showGuide) dismissGuide();
+          setIsSolved(true);
+          setConceptTip(null);
+          setFeedbackAnim('animate-correct');
+          justSolvedAtRef.current = Date.now();
+          const confirmMs = 850;
+          const { completed, nextProgress } = recordCorrect({ wasMissed: stepMissedRef.current, delayEndMs: confirmMs });
+          if (!completed) {
+            const advanceFn = () => {
+              pendingNextRef.current = null;
+              setFeedbackAnim('');
+              nextQuestion(nextProgress);
+            };
+            pendingNextRef.current = advanceFn;
+            confirmTimerRef.current = setTimeout(advanceFn, confirmMs);
+          } else {
+            setTimeout(() => setFeedbackAnim(''), confirmMs);
+          }
+        } else {
+          audio.sfxError();
+          stepMissedRef.current = true;
+          const { gameOver } = recordWrong({ delayEndMs: 460 });
+          const tipText = !okSign ? question.signTip : !okRef ? question.refTip : question.valTip;
+          setConceptTip({ text: tipText, id: Date.now() });
+          setWrongLock(true);
+          setFeedbackAnim('animate-shake');
+          setTimeout(() => {
+            setFeedbackAnim('');
+            if (!gameOver) setWrongLock(false);
+          }, 420);
+        }
+      };
+
+      const phaseBadge = qPhase === 0 ? '單圈正角' : qPhase === 1 ? '負角轉換' : '多圈同界角';
+
+      return (
+        <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
+          {gameState === 'idle' && (
+            <div className="flex-1 my-3 bg-white/95 rounded-3xl border-4 border-indigo-950 p-5 shadow-2xl flex flex-col justify-between text-center items-center">
+              <div className="w-full space-y-2.5 pt-2">
+                <div className="w-20 h-20 mx-auto rounded-3xl bg-amber-100 border-4 border-amber-500 flex items-center justify-center text-4xl shadow-inner animate-bounce">🔑</div>
+                <h2 className="text-2xl font-black text-indigo-950 tracking-wide">廣轉銳密碼輪</h2>
+                <p className="text-xs text-slate-500 font-bold leading-relaxed max-w-xs mx-auto">
+                  將廣義角化為 <span className="text-amber-600 font-black">30° / 45° / 60° 銳角</span>並求值！階段一先撥<span className="text-indigo-600 font-black">符號與銳角輪</span>，進階再解鎖數值輪！
+                </p>
+              </div>
+              <CompactStarPills starsThreshold={starsThreshold} livesMode maxLives={maxLives} />
+              <div className="w-full space-y-2">
+                <button onClick={startGame} className="w-full py-4 btn-3d-blue text-white font-black text-lg rounded-2xl shadow-xl tracking-wider active:scale-95">{isRelaxMode ? '🌱 開始休閒練習！' : '🚀 開始試煉！'}</button>
+                <button onClick={onBackToMap} className="w-full py-2 text-xs font-bold text-slate-400 hover:text-slate-600">返回聖域地圖</button>
+              </div>
+            </div>
+          )}
+
+          {gameState === 'playing' && question && (
+            <div onClick={handleConfirmSkip} className={`flex-1 min-h-0 flex flex-col justify-between gap-2 overflow-hidden pb-0.5 ${feedbackAnim}`}>
+              <GameHUD
+                progress={progress}
+                starsThreshold={starsThreshold}
+                lives={lives}
+                maxLives={maxLives}
+                healStreak={healStreak}
+                healTarget={healTarget}
+                onManualEnd={finishNow}
+                onOpenGuide={openGuide}
+              />
+
+              <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-amber-900 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${isSolved ? 'ring-4 ring-emerald-400/75' : ''}`}>
+                <StagePhaseStrip phase={qPhase} labels={['單圈正角 • 符號＋銳角（數值自動）', '負角轉換 • 三輪全開求值', '多圈廣義角 • 三輪全開求值']} />
+
+                {/* 固定 48px 神殿題目等式橫條（完全比照 Lv.4 格式） */}
+                <div data-coach="lv12-eq" className="bg-gradient-to-r from-amber-500 to-yellow-600 h-[48px] px-3 flex items-center justify-center gap-1.5 text-amber-950 border-b-2 border-amber-700 shrink-0">
+                  <div className="flex items-center gap-1.5 font-serif font-black text-base sm:text-lg">
+                    <span className={isSolved ? 'text-emerald-950' : 'text-amber-950'}>
+                      {question.func}({question.deg}°) {isSolved ? '=' : '≟'}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-lg border-2 transition-all inline-flex items-center gap-0.5 ${
+                      isSolved
+                        ? 'bg-emerald-400 border-emerald-200 text-emerald-950 scale-105'
+                        : 'bg-white/85 border-amber-700/35 text-amber-950'
+                    }`}>
+                      <span>{selSign}{question.func} {selRef}°</span>
+                    </span>
+                    <span className="font-black text-amber-950/70">=</span>
+                    <span className={`px-2 py-0.5 rounded-lg border-2 transition-all inline-flex items-center gap-0.5 ${
+                      isSolved
+                        ? 'bg-emerald-400 border-emerald-200 text-emerald-950 scale-105'
+                        : 'bg-white/85 border-amber-700/35 text-amber-950'
+                    }`}>
+                      {selSign === '−' && <span>−</span>}
+                      <FracText value={displayAbs} size="xs" />
+                    </span>
+                    <span className="w-6 h-6 inline-flex items-center justify-center shrink-0">
+                      <SuccessBadge show={isSolved} />
+                    </span>
+                  </div>
+                </div>
+
+                {/* 中央思維輔助畫板（與銳角輪即時連動的極簡單位圓鏡像盤，三階段漸進退場） */}
+                <div onClick={handleConfirmSkip} className="relative w-full flex-1 min-h-0 bg-gradient-to-b from-amber-50/40 to-white flex items-center justify-center overflow-hidden px-2 py-1">
+                  <HintBanner tip={conceptTip} />
+                  {(() => {
+                    const cx = 160, cy = 115, r = 82;
+                    const stdRad = (question.std * Math.PI) / 180;
+                    const tx = cx + r * Math.cos(stdRad);
+                    const ty = cy - r * Math.sin(stdRad);
+                    const refRad = (selRef * Math.PI) / 180;
+                    const rx = cx + r * Math.cos(refRad);
+                    const ry = cy - r * Math.sin(refRad);
+
+                    const showTargetRay = qPhase === 0 || isSolved;
+                    const showMirrorRay = qPhase === 0 || isSolved;
+
+                    // 參考角夾角扇形（介於目標終邊與最近水平 x 軸 0°/180° 之間，不印數字）
+                    const wedgeR = 30;
+                    const axisDeg = (question.quad === 2 || question.quad === 3) ? 180 : 0;
+                    const axisRad = (axisDeg * Math.PI) / 180;
+                    const wx1 = cx + wedgeR * Math.cos(axisRad);
+                    const wy1 = cy - wedgeR * Math.sin(axisRad);
+                    const wx2 = cx + wedgeR * Math.cos(stdRad);
+                    const wy2 = cy - wedgeR * Math.sin(stdRad);
+                    const wedgeSweep = (question.quad === 1 || question.quad === 3) ? 0 : 1;
+                    const wedgePath = `M ${cx} ${cy} L ${wx1} ${wy1} A ${wedgeR} ${wedgeR} 0 0 ${wedgeSweep} ${wx2} ${wy2} Z`;
+
+                    // 階段二負角順時針小方向箭頭（-6° -> -38°）
+                    const cwR = 54;
+                    const cw1x = cx + cwR * Math.cos((-6 * Math.PI) / 180);
+                    const cw1y = cy - cwR * Math.sin((-6 * Math.PI) / 180);
+                    const cw2x = cx + cwR * Math.cos((-38 * Math.PI) / 180);
+                    const cw2y = cy - cwR * Math.sin((-38 * Math.PI) / 180);
+
+                    // 階段三開鎖後的多圈螺旋軌跡
+                    const spiralPath = (() => {
+                      if (!isSolved || qPhase !== 2) return '';
+                      const steps = Math.max(24, Math.floor(Math.abs(question.deg) / 6));
+                      const baseR = 14;
+                      const maxR = 46;
+                      const pts = [];
+                      for (let i = 0; i <= steps; i++) {
+                        const a = (i / steps) * question.deg;
+                        const aRad = (a * Math.PI) / 180;
+                        const cr = baseR + (i / steps) * (maxR - baseR);
+                        pts.push(`${(cx + cr * Math.cos(aRad)).toFixed(1)},${(cy - cr * Math.sin(aRad)).toFixed(1)}`);
+                      }
+                      return `M ${pts[0]} L ${pts.join(' ')}`;
+                    })();
+
+                    // 參考角標籤位置（僅開鎖後顯示）
+                    const midWedgeDeg = question.quad === 1 ? question.refDeg / 2
+                      : question.quad === 2 ? 180 - question.refDeg / 2
+                      : question.quad === 3 ? 180 + question.refDeg / 2
+                      : 360 - question.refDeg / 2;
+                    const midWedgeRad = (midWedgeDeg * Math.PI) / 180;
+                    const refLblX = cx + 44 * Math.cos(midWedgeRad);
+                    const refLblY = cy - 44 * Math.sin(midWedgeRad);
+
+                    return (
+                      <svg viewBox="0 0 320 230" className="w-full h-full max-w-[340px] object-contain select-none">
+                        <defs>
+                          <marker id="lv12CwArrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#f59e0b" />
+                          </marker>
+                        </defs>
+
+                        {/* 單位圓與座標軸（特別強化水平 x 軸：參考角基準線） */}
+                        <circle cx={cx} cy={cy} r={r} fill="rgba(255,251,235,0.65)" stroke="#cbd5e1" strokeWidth="1.6" strokeDasharray="4 4" />
+                        <line x1={cx} y1={20} x2={cx} y2={210} stroke="#cbd5e1" strokeWidth="1.5" />
+                        <line x1={56} y1={cy} x2={264} y2={cy} stroke="#64748b" strokeWidth="2.4" strokeLinecap="round" />
+
+                        {/* 水平基準軸標記（0° / 180°） */}
+                        <text x="274" y={cy + 4} fill="#475569" fontSize="11" fontWeight="900" textAnchor="start" className="font-mono">0°</text>
+                        <text x="46" y={cy + 4} fill="#475569" fontSize="11" fontWeight="900" textAnchor="end" className="font-mono">180°</text>
+
+                        {/* 四象限淡字標示 */}
+                        <text x={cx + 50} y={cy - 44} fill={isSolved && question.quad === 1 ? '#059669' : '#cbd5e1'} fontSize="14" fontWeight="900" textAnchor="middle">I</text>
+                        <text x={cx - 50} y={cy - 44} fill={isSolved && question.quad === 2 ? '#059669' : '#cbd5e1'} fontSize="14" fontWeight="900" textAnchor="middle">II</text>
+                        <text x={cx - 50} y={cy + 54} fill={isSolved && question.quad === 3 ? '#059669' : '#cbd5e1'} fontSize="14" fontWeight="900" textAnchor="middle">III</text>
+                        <text x={cx + 50} y={cy + 54} fill={isSolved && question.quad === 4 ? '#059669' : '#cbd5e1'} fontSize="14" fontWeight="900" textAnchor="middle">IV</text>
+
+                        {/* 第 I 象限即時鏡像對照虛線（隨銳角輪 30°/45°/60° 轉動，方便比對斜度） */}
+                        {showMirrorRay && (
+                          <g className="transition-all duration-150">
+                            <line x1={rx} y1={ry} x2={rx} y2={cy} stroke={isSolved ? '#10b981' : '#f59e0b'} strokeWidth="1.4" strokeDasharray="3 3" opacity="0.55" />
+                            <line x1={cx} y1={cy} x2={rx} y2={ry} stroke={isSolved ? '#10b981' : '#f59e0b'} strokeWidth="2.5" strokeDasharray="5 4" strokeLinecap="round" opacity={isSolved ? 0.9 : 0.8} />
+                            <circle cx={rx} cy={ry} r="4" fill={isSolved ? '#10b981' : '#f59e0b'} opacity="0.85" />
+                            <text
+                              x={cx + (r + 14) * Math.cos(refRad)}
+                              y={cy - (r + 12) * Math.sin(refRad)}
+                              fill={isSolved ? '#047857' : '#b45309'}
+                              fontSize="11"
+                              fontWeight="900"
+                              textAnchor="middle"
+                              dominantBaseline="middle"
+                              className="font-mono"
+                            >
+                              {selRef}°
+                            </text>
+                          </g>
+                        )}
+
+                        {/* 階段二（未開鎖）：順時針負角方向小箭頭提示 */}
+                        {qPhase === 1 && !isSolved && (
+                          <g>
+                            <path d={`M ${cw1x} ${cw1y} A ${cwR} ${cwR} 0 0 1 ${cw2x} ${cw2y}`} fill="none" stroke="#f59e0b" strokeWidth="2.4" strokeLinecap="round" markerEnd="url(#lv12CwArrow)" />
+                            <text x={cx + 68} y={cy + 34} fill="#b45309" fontSize="10" fontWeight="900">負角順時針</text>
+                          </g>
+                        )}
+
+                        {/* 階段三（未開鎖）：靜謐盲算徽章 */}
+                        {qPhase === 2 && !isSolved && (
+                          <g>
+                            <circle cx={cx} cy={cy} r="30" fill="rgba(255,255,255,0.9)" stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="3 3" />
+                            <text x={cx} y={cy - 4} fill="#92400e" fontSize="11" fontWeight="900" textAnchor="middle">多圈心算</text>
+                            <text x={cx} y={cy + 11} fill="#64748b" fontSize="9.5" fontWeight="800" textAnchor="middle">先減 360°</text>
+                          </g>
+                        )}
+
+                        {/* 階段三開鎖後的多圈螺旋軌跡 */}
+                        {spiralPath && (
+                          <path d={spiralPath} fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" opacity="0.75" />
+                        )}
+
+                        {/* 目標終邊 ＋ 與水平 x 軸的參考角扇形（P0 顯示、P1/P2 開鎖後展開） */}
+                        {showTargetRay && (
+                          <g>
+                            <path d={wedgePath} fill={isSolved ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.22)'} stroke={isSolved ? '#10b981' : '#f59e0b'} strokeWidth="1.2" />
+                            <line x1={tx} y1={ty} x2={tx} y2={cy} stroke={isSolved ? '#10b981' : '#6366f1'} strokeWidth="1.6" strokeDasharray="3 3" opacity="0.7" />
+                            <line x1={cx} y1={cy} x2={tx} y2={ty} stroke={isSolved ? '#059669' : '#312e81'} strokeWidth="4" strokeLinecap="round" />
+                            <circle cx={tx} cy={ty} r="5.5" fill={isSolved ? '#10b981' : '#f59e0b'} stroke="#ffffff" strokeWidth="2" />
+                            {isSolved && (
+                              <text x={refLblX} y={refLblY} fill="#047857" fontSize="11" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">
+                                {question.refDeg}°
+                              </text>
+                            )}
+                          </g>
+                        )}
+
+                        {/* 原點 */}
+                        <circle cx={cx} cy={cy} r="4" fill="#1e293b" stroke="#ffffff" strokeWidth="1.5" />
+
+                        {/* 底部精簡提示膠囊 */}
+                        <g transform="translate(160, 217)">
+                          <rect x="-112" y="-11" width="224" height="22" rx="11" fill={isSolved ? '#d1fae5' : '#fef3c7'} stroke={isSolved ? '#34d399' : '#fcd34d'} strokeWidth="1.2" />
+                          <text x="0" y="3.5" fill={isSolved ? '#065f46' : '#92400e'} fontSize="10.5" fontWeight="900" textAnchor="middle">
+                            {isSolved
+                              ? `✓ 第 ${question.quadRoman} 象限 • ${question.func} 為${question.ansSign === '+' ? '正' : '負'} • 參考角 ${question.refDeg}°`
+                              : qPhase === 0
+                              ? '撥動銳角輪，比對第 I 象限虛線斜度！'
+                              : qPhase === 1
+                              ? '順時針心算負角象限與參考銳角'
+                              : '先扣 360° 整數倍，再定正負與數值'}
+                          </text>
+                        </g>
+                      </svg>
+                    );
+                  })()}
+                </div>
+
+                {/* 懸空黃金密碼筒（1:1 仿 Lv.4 Cryptex 實體輪廓＋右端可彈開黑曜石鎖栓＋底部落地投影） */}
+                <div className="bg-gradient-to-b from-white to-amber-50/80 pt-1.5 pb-3 px-2 shrink-0 flex flex-col items-center">
+                  <div className="relative w-full max-w-[356px] flex items-center justify-center">
+                    {/* 貫穿金屬圓柱軸心 */}
+                    <div
+                      className="pointer-events-none absolute inset-x-3 h-[74px] rounded-full border border-amber-900/60 shadow-[0_10px_18px_rgba(69,26,3,0.28),inset_0_1px_0_rgba(255,255,255,0.45)]"
+                      style={{ background: 'linear-gradient(180deg, #78350f 0%, #b45309 22%, #fde68a 42%, #b45309 68%, #451a03 100%)' }}
+                    />
+
+                    {/* 左端圓弧銅蓋（帶上下鉚釘） */}
+                    <div
+                      className="relative z-10 w-4 h-[78px] rounded-l-full border-y border-l border-amber-800/80 flex flex-col items-center justify-between py-3 shadow-[inset_2px_0_4px_rgba(255,255,255,0.4)] shrink-0"
+                      style={{ background: 'linear-gradient(180deg, #78350f 0%, #d97706 32%, #fef3c7 46%, #b45309 72%, #451a03 100%)' }}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-950/70 shadow-[0_1px_0_rgba(255,255,255,0.5)]" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-950/70 shadow-[0_1px_0_rgba(255,255,255,0.5)]" />
+                    </div>
+
+                    {/* 中央三滾筒（窄符號輪 ＋ 銳角輪 ＋ 數值輪） */}
+                    <div data-coach="lv12-wheel" className="relative z-20 flex-1 grid grid-cols-[0.78fr_1fr_1.12fr] gap-1 px-1 touch-none">
+                      <TempleDrumWheel
+                        label="符號"
+                        options={LV12_SIGNS}
+                        value={selSign}
+                        disabled={isSolved || wrongLock}
+                        onStep={(dir) => stepWheel('sign', dir)}
+                      />
+                      <TempleDrumWheel
+                        label="銳角"
+                        options={LV12_REFS}
+                        value={selRef}
+                        formatOption={(d) => `${d}°`}
+                        disabled={isSolved || wrongLock}
+                        onStep={(dir) => stepWheel('ref', dir)}
+                      />
+                      <TempleDrumWheel
+                        label={isValLocked ? '自動' : '數值'}
+                        options={LV12_ABS_VALS}
+                        value={displayAbs}
+                        locked={isValLocked}
+                        disabled={isSolved || wrongLock || isValLocked}
+                        formatOption={(v) => <FracText value={v} size="xs" />}
+                        onStep={(dir) => stepWheel('abs', dir)}
+                      />
+                    </div>
+
+                    {/* 右端可彈開黑曜石鎖栓（開鎖向右彈開） */}
+                    <button
+                      type="button"
+                      data-coach="lv12-unlock"
+                      onClick={handleUnlock}
+                      disabled={isSolved || wrongLock}
+                      className={`relative z-10 w-[72px] h-[82px] rounded-r-[24px] rounded-l-lg border-2 px-1.5 py-1.5 flex flex-col items-center justify-between transition-all duration-300 select-none cursor-pointer shrink-0 ${
+                        isSolved
+                          ? 'translate-x-2.5 bg-gradient-to-b from-emerald-600 via-emerald-800 to-emerald-950 border-emerald-300 shadow-[0_0_18px_rgba(52,211,153,0.75)]'
+                          : wrongLock
+                          ? 'bg-gradient-to-b from-rose-700 to-rose-950 border-rose-400 btn-wrong-flash'
+                          : 'bg-gradient-to-b from-slate-700 via-slate-900 to-stone-950 border-amber-400 shadow-[0_6px_12px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(253,230,138,0.45)] hover:brightness-110 active:translate-x-1'
+                      }`}
+                    >
+                      <span className="text-[9px] font-black text-amber-300/85 tracking-wider">
+                        {isSolved ? '✨ 已彈開' : '🔓 開鎖'}
+                      </span>
+                      <div className="font-serif font-black text-lg text-amber-200 drop-shadow flex items-center justify-center">
+                        {selSign === '−' && <span>−</span>}
+                        <FracText value={displayAbs} size="xs" barClass="bg-amber-200" />
+                      </div>
+                      <span className="w-5 h-1 rounded-full bg-amber-400/60" />
+                    </button>
+                  </div>
+
+                  {/* 懸空落地投影 */}
+                  <div className="w-[78%] max-w-[268px] h-3 rounded-full bg-amber-950/25 blur-sm mt-2 pointer-events-none" />
+                </div>
+              </div>
+
+              <CoachOverlay
+                containerRef={containerRef}
+                active={guideMode === 'manual' || (gameState === 'playing' && showGuide && !isSolved)}
+                mode={guideMode || 'spotlight'}
+                steps={lv12CoachSteps}
+                onDismiss={dismissGuide}
+              />
+            </div>
+          )}
+
+          {gameState === 'ended' && (
+            <LevelResultScreen
+              score={finalScore}
+              baseScore={baseScore}
+              earnedStars={earnedStars}
+              correctCount={correctCount}
+              wrongCount={wrongCount}
+              lives={lives}
+              progress={progress}
+              targetTotal={starsThreshold[2]}
+              elapsedSec={elapsedSec}
+              lifeBonus={lifeBonus}
+              accuracyBonus={accuracyBonus}
+              speedBonus={speedBonus}
+              accentClass="text-amber-600"
+              onCompleteLevel={onCompleteLevel}
+              onRestart={startGame}
+              onBackToMap={onBackToMap}
+            />
+          )}
         </div>
       );
     };
@@ -13871,10 +14911,10 @@
       },
       { id: 7,  kind: 'level', x: -6.8, y: 4.8, z: 2.6,   pillarH: 3.1, radScale: 1.00, sides: 6, rot: Math.PI / 6, baseColor: 0x1d4ed8, trimColor: 0xe0f2fe, color: 0x60a5fa, sea: 2 },
       { id: 8,  kind: 'level', x: -3.8, y: 5.6, z: 0.0,   pillarH: 4.6, radScale: 1.08, sides: 6, rot: Math.PI / 6, baseColor: 0x701a75, trimColor: 0xf5d0fe, color: 0xe879f9, sea: 2 },
-      { id: 9,  kind: 'level', x: -0.8, y: 6.4, z: -2.6,  pillarH: 3.3, radScale: 1.02, sides: 6, rot: Math.PI / 6, baseColor: 0x0f766e, trimColor: 0x5eead4, color: 0x14b8a6, sea: 2 },
-      { id: 10, kind: 'level', x: 2.2,  y: 7.2, z: -5.2,  pillarH: 4.5, radScale: 1.04, sides: 6, rot: Math.PI / 6, baseColor: 0x0e7490, trimColor: 0xcffafe, color: 0x22d3ee, sea: 2 },
-      { id: 11, kind: 'level', x: 5.2,  y: 8.0, z: -7.8,  pillarH: 3.6, radScale: 1.02, sides: 6, rot: Math.PI / 6, baseColor: 0x881337, trimColor: 0xffe4e6, color: 0xfb7185, sea: 2 },
-      { id: 12, kind: 'level', x: 8.2,  y: 8.8, z: -10.4, pillarH: 5.0, radScale: 1.10, sides: 6, rot: Math.PI / 6, baseColor: 0x4c1d95, trimColor: 0xede9fe, color: 0xa78bfa, sea: 2 },
+      { id: 9,  kind: 'level', x: -0.8, y: 6.4, z: -2.6,  pillarH: 3.3, radScale: 1.02, sides: 6, rot: Math.PI / 6, baseColor: 0x0e7490, trimColor: 0xcffafe, color: 0x22d3ee, sea: 2 },
+      { id: 10, kind: 'level', x: 2.2,  y: 7.2, z: -5.2,  pillarH: 4.5, radScale: 1.04, sides: 6, rot: Math.PI / 6, baseColor: 0x881337, trimColor: 0xffe4e6, color: 0xfb7185, sea: 2 },
+      { id: 11, kind: 'level', x: 5.2,  y: 8.0, z: -7.8,  pillarH: 3.6, radScale: 1.02, sides: 6, rot: Math.PI / 6, baseColor: 0x4c1d95, trimColor: 0xede9fe, color: 0xa78bfa, sea: 2 },
+      { id: 12, kind: 'level', x: 8.2,  y: 8.8, z: -10.4, pillarH: 5.0, radScale: 1.10, sides: 6, rot: Math.PI / 6, baseColor: 0x334155, trimColor: 0xcbd5e1, color: 0x64748b, sea: 2, isPlaceholder: true },
 
       // === 第三聖域｜幻夜王座尖塔（正八邊形 sides: 8，Lv.13~18） ===
       {
@@ -14064,7 +15104,17 @@
         scene.fog = new THREE.FogExp2(0x091926, 0.0115);
 
         const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 220);
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+        let renderer = null;
+        try {
+          renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+        } catch (err1) {
+          try {
+            renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+          } catch (err2) {
+            console.warn('WebGLRenderer unavailable, skipping 3D map canvas:', err2);
+            return;
+          }
+        }
         renderer.setSize(width, height);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
         renderer.shadowMap.enabled = true;
@@ -18456,17 +19506,26 @@
                   ) : selectedLevel === 8 ? (
                     <LevelCoterminalPopMaster currentStars={activeStarsMap[8] || 0} hasSeenGuide={hasSeenGuide(8)} onMarkGuideSeen={() => markGuideSeen(8)} onUpdateStars={(c, s) => handleUpdateStars(8, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 9 ? (
-                    <Level9QuadrantNavigator currentStars={activeStarsMap[9] || 0} hasSeenGuide={hasSeenGuide(9)} onMarkGuideSeen={() => markGuideSeen(9)} onUpdateStars={(c, s) => handleUpdateStars(9, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
+                    <Level6VectorCompassMaster currentStars={activeStarsMap[9] || 0} hasSeenGuide={hasSeenGuide(9)} onMarkGuideSeen={() => markGuideSeen(9)} onUpdateStars={(c, s) => handleUpdateStars(9, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 10 ? (
-                    <Level6VectorCompassMaster currentStars={activeStarsMap[10] || 0} hasSeenGuide={hasSeenGuide(10)} onMarkGuideSeen={() => markGuideSeen(10)} onUpdateStars={(c, s) => handleUpdateStars(10, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
+                    <Level7AstroCompassMaster currentStars={activeStarsMap[10] || 0} hasSeenGuide={hasSeenGuide(10)} onMarkGuideSeen={() => markGuideSeen(10)} onUpdateStars={(c, s) => handleUpdateStars(10, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 11 ? (
-                    <Level7AstroCompassMaster currentStars={activeStarsMap[11] || 0} hasSeenGuide={hasSeenGuide(11)} onMarkGuideSeen={() => markGuideSeen(11)} onUpdateStars={(c, s) => handleUpdateStars(11, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
+                    <Level8QuadrantSignMaster currentStars={activeStarsMap[11] || 0} hasSeenGuide={hasSeenGuide(11)} onMarkGuideSeen={() => markGuideSeen(11)} onUpdateStars={(c, s) => handleUpdateStars(11, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 12 ? (
-                    <Level8QuadrantSignMaster currentStars={activeStarsMap[12] || 0} hasSeenGuide={hasSeenGuide(12)} onMarkGuideSeen={() => markGuideSeen(12)} onUpdateStars={(c, s) => handleUpdateStars(12, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
+                    <Level12GenToAcuteWheel currentStars={activeStarsMap[12] || 0} hasSeenGuide={hasSeenGuide(12)} onMarkGuideSeen={() => markGuideSeen(12)} onUpdateStars={(c, s) => handleUpdateStars(12, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 13 ? (
                     <Level13NightMysteryMaster currentStars={activeStarsMap[13] || 0} hasSeenGuide={hasSeenGuide(13)} onMarkGuideSeen={() => markGuideSeen(13)} onUpdateStars={(c, s) => handleUpdateStars(13, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 14 ? (
-                    <Level14MirrorSymmetryMaster currentStars={activeStarsMap[14] || 0} hasSeenGuide={hasSeenGuide(14)} onMarkGuideSeen={() => markGuideSeen(14)} onUpdateStars={(c, s) => handleUpdateStars(14, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
+                    <div className="flex-1 my-3 bg-white/95 rounded-3xl border-4 border-indigo-950 p-6 shadow-2xl flex flex-col justify-between text-center items-center">
+                      <div className="w-full space-y-3 pt-4">
+                        <div className="w-20 h-20 mx-auto rounded-3xl bg-slate-100 border-4 border-slate-400 flex items-center justify-center text-4xl shadow-inner">🌌</div>
+                        <h2 className="text-2xl font-black text-indigo-950 tracking-wide">星鏡秘境（預留中）</h2>
+                        <p className="text-xs text-slate-500 font-bold leading-relaxed max-w-xs mx-auto">
+                          原 Lv.14 已改造為新版 Lv.12「廣轉銳密碼輪」；此台座預留給第三聖域全新試煉！
+                        </p>
+                      </div>
+                      <button onClick={returnToMapFromLevel} className="w-full py-3.5 btn-3d-blue text-white font-black text-base rounded-2xl shadow-lg active:scale-95">返回聖域地圖</button>
+                    </div>
                   ) : selectedLevel === 15 ? (
                     <Level15GeneralizedWheelMaster currentStars={activeStarsMap[15] || 0} hasSeenGuide={hasSeenGuide(15)} onMarkGuideSeen={() => markGuideSeen(15)} onUpdateStars={(c, s) => handleUpdateStars(15, c, s)} onCompleteLevel={handleCompleteLevel} onBackToMap={returnToMapFromLevel} />
                   ) : selectedLevel === 16 ? (
@@ -19588,7 +20647,29 @@
                   ) : (
                     <>
                   <div className="space-y-1">
-                    <div className="text-[10px] font-bold text-slate-400">引導與劇情旗標</div>
+                    <div className="text-[10px] font-bold text-slate-400">模式與引導旗標（當前存檔）</div>
+                    <div className="grid grid-cols-2 gap-1">
+                      <button
+                        onClick={() => setUserProgress(prev => ({ ...prev, mode: 'adventure' }))}
+                        className={`py-1.5 px-2 rounded-lg font-black text-center border ${
+                          gameMode === 'adventure'
+                            ? 'bg-indigo-500 border-indigo-200 text-white ring-1 ring-white'
+                            : 'bg-slate-800 hover:bg-slate-700 border-white/10 text-slate-300'
+                        }`}
+                      >
+                        🗺️ 闖關模式
+                      </button>
+                      <button
+                        onClick={() => setUserProgress(prev => ({ ...prev, mode: 'free' }))}
+                        className={`py-1.5 px-2 rounded-lg font-black text-center border ${
+                          gameMode === 'free'
+                            ? 'bg-emerald-500 border-emerald-200 text-slate-950 ring-1 ring-white'
+                            : 'bg-slate-800 hover:bg-slate-700 border-white/10 text-slate-300'
+                        }`}
+                      >
+                        🌱 休閒模式
+                      </button>
+                    </div>
                     <button
                       onClick={() => {
                         setUserProgress(prev => ({ ...prev, seenStoryFlags: { intro: true }, seenGuides: {} }));
