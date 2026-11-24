@@ -18122,6 +18122,162 @@
         idaBaseRing.renderOrder = 3;
         idaGroup.add(idaBaseRing);
 
+        // 7b. 小人偶「6 種三角比 × 情緒」互動專屬 3D 光影配件（平常隱藏，點擊隨機觸發時浮現）
+        const makeEmoteTextSprite = (text, fillColor = '#fef08a', strokeColor = '#1e1b4b') => {
+          const cvs = document.createElement('canvas');
+          cvs.width = 160;
+          cvs.height = 80;
+          const ctx = cvs.getContext('2d');
+          ctx.clearRect(0, 0, 160, 80);
+          ctx.font = '900 44px Georgia, serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.lineWidth = 8;
+          ctx.strokeStyle = strokeColor;
+          ctx.strokeText(text, 80, 42);
+          ctx.fillStyle = fillColor;
+          ctx.fillText(text, 80, 42);
+          const tex = new THREE.CanvasTexture(cvs);
+          const spMat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+          const sp = new THREE.Sprite(spMat);
+          sp.scale.set(0.56, 0.28, 1);
+          sp.renderOrder = 7;
+          return sp;
+        };
+
+        // 1) 暈眩・多圈同界角螺旋＋雙金星
+        const dizzyGroup = new THREE.Group();
+        dizzyGroup.position.set(0, 1.72, 0);
+        const dizzyPts = [];
+        for (let i = 0; i <= 44; i++) {
+          const a = (i / 44) * Math.PI * 4;
+          const rad = 0.05 + (i / 44) * 0.26;
+          dizzyPts.push(new THREE.Vector3(Math.cos(a) * rad, (i / 44) * 0.06, Math.sin(a) * rad));
+        }
+        const dizzySpiral = new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints(dizzyPts),
+          new THREE.LineBasicMaterial({ color: 0xfde047, transparent: true, opacity: 0.95 })
+        );
+        dizzyGroup.add(dizzySpiral);
+        const dizzyStarGeo = new THREE.OctahedronGeometry(0.055, 0);
+        const dizzyStarMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+        const dizzyStar1 = new THREE.Mesh(dizzyStarGeo, dizzyStarMat);
+        dizzyStar1.position.set(0.30, 0.06, 0);
+        const dizzyStar2 = new THREE.Mesh(dizzyStarGeo, dizzyStarMat);
+        dizzyStar2.position.set(-0.24, 0.04, 0.14);
+        dizzyGroup.add(dizzyStar1, dizzyStar2);
+        dizzyGroup.visible = false;
+        idaGroup.add(dizzyGroup);
+
+        // 2) 靈光一閃・立體金色直角三角形（含直角記號）
+        const eurekaGroup = new THREE.Group();
+        eurekaGroup.position.set(0, 1.76, 0);
+        const triShape = new THREE.Shape();
+        triShape.moveTo(-0.18, -0.13);
+        triShape.lineTo(0.18, -0.13);
+        triShape.lineTo(-0.18, 0.15);
+        triShape.closePath();
+        const eurekaFill = new THREE.Mesh(
+          new THREE.ShapeGeometry(triShape),
+          new THREE.MeshBasicMaterial({ color: 0xfde047, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false })
+        );
+        const eurekaEdge = new THREE.LineLoop(
+          new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(-0.18, -0.13, 0.005),
+            new THREE.Vector3(0.18, -0.13, 0.005),
+            new THREE.Vector3(-0.18, 0.15, 0.005)
+          ]),
+          new THREE.LineBasicMaterial({ color: 0xfef9c3 })
+        );
+        const eurekaSq = new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(-0.11, -0.13, 0.008),
+            new THREE.Vector3(-0.11, -0.06, 0.008),
+            new THREE.Vector3(-0.18, -0.06, 0.008)
+          ]),
+          new THREE.LineBasicMaterial({ color: 0xffffff })
+        );
+        eurekaGroup.add(eurekaFill, eurekaEdge, eurekaSq);
+        eurekaGroup.visible = false;
+        idaGroup.add(eurekaGroup);
+
+        // 3) 好奇歪頭・量角器弧線 ＋ θ? 符號
+        const curiousGroup = new THREE.Group();
+        curiousGroup.position.set(0.32, 1.48, 0.10);
+        const protArc = new THREE.Mesh(
+          new THREE.RingGeometry(0.13, 0.21, 16, 1, 0, Math.PI),
+          new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.78, side: THREE.DoubleSide, depthWrite: false })
+        );
+        const protBase = new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-0.21, 0, 0), new THREE.Vector3(0.21, 0, 0)]),
+          new THREE.LineBasicMaterial({ color: 0xfef08a })
+        );
+        const curiousSprite = makeEmoteTextSprite('θ?', '#fde047', '#312e81');
+        curiousSprite.position.set(0.02, 0.18, 0.05);
+        curiousGroup.add(protArc, protBase, curiousSprite);
+        curiousGroup.visible = false;
+        idaGroup.add(curiousGroup);
+
+        // 4) 開心踏舞・身前發光青藍正弦光波（9 顆光球）
+        const sineGroup = new THREE.Group();
+        const sineOrbs = [];
+        const sineOrbGeo = new THREE.SphereGeometry(0.036, 8, 8);
+        const sineOrbMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.92 });
+        for (let i = 0; i < 9; i++) {
+          const sOrb = new THREE.Mesh(sineOrbGeo, sineOrbMat);
+          sOrb.position.set(-0.36 + i * 0.09, 0.68, 0.38);
+          sineGroup.add(sOrb);
+          sineOrbs.push(sOrb);
+        }
+        sineGroup.visible = false;
+        idaGroup.add(sineGroup);
+
+        // 5) 受驚 90° 飛帽・90°! 驚嘆光標
+        const shockGroup = new THREE.Group();
+        const shockSprite = makeEmoteTextSprite('90°!', '#fb7185', '#1e1b4b');
+        shockSprite.position.set(0.34, 1.62, 0.10);
+        shockGroup.add(shockSprite);
+        shockGroup.visible = false;
+        idaGroup.add(shockGroup);
+
+        // 6) 舉燈打氣・腳底四象限座標十字星芒
+        const quadrantGroup = new THREE.Group();
+        quadrantGroup.position.set(0, 0.04, 0);
+        const qAxisMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.85, depthWrite: false });
+        const qAxisX = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.015, 0.032), qAxisMat);
+        const qAxisZ = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.015, 1.16), qAxisMat);
+        quadrantGroup.add(qAxisX, qAxisZ);
+        const qDotGeo = new THREE.OctahedronGeometry(0.05, 0);
+        const qDotMat = new THREE.MeshBasicMaterial({ color: 0xfde047 });
+        [[0.34, 0.34], [-0.34, 0.34], [-0.34, -0.34], [0.34, -0.34]].forEach(([qx, qz]) => {
+          const qDot = new THREE.Mesh(qDotGeo, qDotMat);
+          qDot.position.set(qx, 0.06, qz);
+          quadrantGroup.add(qDot);
+        });
+        quadrantGroup.visible = false;
+        idaGroup.add(quadrantGroup);
+
+        const IDA_EMOTE_DUR = {
+          coterminalDizzy: 1.65,
+          eurekaTriangle: 1.45,
+          curiousAngle: 1.55,
+          sineWaveDance: 1.65,
+          hatPop: 1.30,
+          quadrantCheer: 1.50
+        };
+        const IDA_EMOTE_KEYS = Object.keys(IDA_EMOTE_DUR);
+        let lastIdaEmote = null;
+        let idaEmote = { type: null, elapsed: 0, duration: 0 };
+
+        const hideAllEmoteProps = () => {
+          dizzyGroup.visible = false;
+          eurekaGroup.visible = false;
+          curiousGroup.visible = false;
+          sineGroup.visible = false;
+          shockGroup.visible = false;
+          quadrantGroup.visible = false;
+        };
+
         scene.add(idaGroup);
 
         const photonGroup = new THREE.Group();
@@ -18582,6 +18738,12 @@
           idaGroup.position.copy(currentVisualPos);
           idaGroup.visible = true;
           idaGroup.scale.set(1, 1, 1);
+          idaEmote = { type: null, elapsed: 0, duration: 0 };
+          hideAllEmoteProps();
+          hatPivot.position.y = 0.95;
+          hatPivot.rotation.set(0, 0, 0);
+          lanternPivot.position.set(0.25, 0.56, 0.14);
+          lanternPivot.rotation.set(0, 0, 0);
           hidePhotonVisuals();
           teleportBeam.visible = false;
 
@@ -18683,7 +18845,15 @@
           const idaHits = raycaster.intersectObjects(idaInteractMeshes);
           if (idaHits.length > 0) {
             audio.sfxIdaChirp();
-            celebrateSpinTimer = 0.75;
+            if (walkState.mode === 'idle') {
+              const pool = IDA_EMOTE_KEYS.filter(k => k !== lastIdaEmote);
+              const picked = pool[Math.floor(Math.random() * pool.length)] || IDA_EMOTE_KEYS[0];
+              lastIdaEmote = picked;
+              hideAllEmoteProps();
+              idaEmote = { type: picked, elapsed: 0, duration: IDA_EMOTE_DUR[picked] };
+            } else {
+              lanternGlowMat.emissiveIntensity = 2.8;
+            }
             return;
           }
           const hits = raycaster.intersectObjects(islandMeshes);
@@ -19247,14 +19417,132 @@
             idaGroup.position.lerp(standPos, 0.14);
             idaGroup.rotation.x *= 0.84;
             idaGroup.rotation.z *= 0.84;
+            hatPivot.position.y += (0.95 - hatPivot.position.y) * 0.22;
+            hatPivot.rotation.x *= 0.82;
+            hatPivot.rotation.y *= 0.82;
             hatPivot.rotation.z *= 0.86;
+            lanternPivot.position.lerp(new THREE.Vector3(0.25, 0.56, 0.14), 0.18);
+            lanternPivot.rotation.x *= 0.82;
+            lanternPivot.rotation.z *= 0.82;
+            lanternGlowMat.emissiveIntensity += (1.35 - lanternGlowMat.emissiveIntensity) * 0.12;
+            idaBaseRing.scale.lerp(new THREE.Vector3(1, 1, 1), 0.16);
             leftLeg.rotation.x *= 0.84;
             rightLeg.rotation.x *= 0.84;
 
             if (celebrateSpinTimer > 0) {
               celebrateSpinTimer -= dt;
+              idaEmote.type = null;
+              hideAllEmoteProps();
               idaGroup.rotation.y += dt * 8.5;
               idaGroup.position.y += Math.abs(Math.sin(celebrateSpinTimer * 8)) * 0.16;
+            } else if (idaEmote.type) {
+              idaEmote.elapsed += dt;
+              const e = idaEmote.elapsed;
+              const p = Math.min(1, e / Math.max(0.01, idaEmote.duration));
+              const fade = p > 0.82 ? Math.max(0, (1 - p) / 0.18) : 1;
+
+              if (idaEmote.type === 'coterminalDizzy') {
+                // 1) 多圈同界角轉到頭暈：720° 高速旋轉 → 晃腦冒出金色螺旋星環
+                if (p < 0.42) {
+                  const u = p / 0.42;
+                  idaGroup.rotation.y = u * Math.PI * 4;
+                  idaGroup.position.y = standPos.y + Math.sin(u * Math.PI) * 0.14;
+                  dizzyGroup.visible = false;
+                } else {
+                  const u = (p - 0.42) / 0.58;
+                  idaGroup.rotation.y *= 0.85;
+                  idaGroup.rotation.z = Math.sin(u * Math.PI * 5) * 0.22 * fade;
+                  hatPivot.rotation.z = Math.sin(u * Math.PI * 5 - 0.5) * 0.20 * fade;
+                  dizzyGroup.visible = true;
+                  dizzyGroup.rotation.y = e * 4.8;
+                  dizzyGroup.scale.setScalar(Math.min(1, u * 4) * fade);
+                }
+              } else if (idaEmote.type === 'eurekaTriangle') {
+                // 2) 靈光一閃：開心跳起＋頭頂彈出旋轉金色直角三角形
+                if (p < 0.12) {
+                  idaGroup.scale.set(1.12, 0.86, 1.12);
+                } else if (p < 0.48) {
+                  const u = (p - 0.12) / 0.36;
+                  idaGroup.position.y = standPos.y + Math.sin(u * Math.PI) * 0.34;
+                  idaGroup.scale.set(0.94, 1.10, 0.94);
+                  leftLeg.rotation.x = Math.sin(u * Math.PI * 2) * 0.42;
+                  rightLeg.rotation.x = -Math.sin(u * Math.PI * 2) * 0.42;
+                  lanternGlowMat.emissiveIntensity = 2.8;
+                }
+                eurekaGroup.visible = p >= 0.14;
+                if (eurekaGroup.visible) {
+                  const pop = Math.min(1, (p - 0.14) / 0.14);
+                  eurekaGroup.scale.setScalar((0.3 + 0.85 * pop) * fade);
+                  eurekaGroup.position.y = 1.72 + Math.sin(e * 5) * 0.05;
+                  eurekaGroup.rotation.y = e * 3.4;
+                }
+              } else if (idaEmote.type === 'curiousAngle') {
+                // 3) 歪頭測量：左歪 → 右歪 → 雙點頭 ＋ 側邊金色量角器 θ?
+                if (p < 0.36) {
+                  idaGroup.rotation.z = 0.24;
+                  hatPivot.rotation.z = 0.16;
+                } else if (p < 0.70) {
+                  idaGroup.rotation.z = -0.22;
+                  hatPivot.rotation.z = -0.15;
+                } else {
+                  const u = (p - 0.70) / 0.30;
+                  idaGroup.rotation.z = 0;
+                  idaGroup.rotation.x = Math.abs(Math.sin(u * Math.PI * 2)) * 0.24;
+                }
+                curiousGroup.visible = true;
+                curiousGroup.scale.setScalar(Math.min(1, p * 5) * fade);
+                curiousGroup.position.y = 1.48 + Math.sin(e * 4.5) * 0.04;
+                curiousGroup.rotation.z = Math.sin(e * 3) * 0.12;
+              } else if (idaEmote.type === 'sineWaveDance') {
+                // 4) 正弦光波踏舞：節奏左右搖擺＋雙腿小碎步＋身前 9 顆青藍正弦光波
+                idaGroup.rotation.z = Math.sin(e * 8.5) * 0.14 * fade;
+                hatPivot.rotation.z = Math.sin(e * 8.5 - 0.6) * 0.16 * fade;
+                idaGroup.position.y = standPos.y + Math.abs(Math.sin(e * 8.5)) * 0.07 * fade;
+                leftLeg.rotation.x = Math.sin(e * 12) * 0.42 * fade;
+                rightLeg.rotation.x = -Math.sin(e * 12) * 0.42 * fade;
+                lanternPivot.position.set(0.26 + Math.sin(e * 8.5) * 0.06, 0.64 + Math.cos(e * 8.5) * 0.08, 0.22);
+                sineGroup.visible = true;
+                sineGroup.scale.setScalar(Math.min(1, p * 4.5) * fade);
+                sineOrbs.forEach((orb, idx) => {
+                  orb.position.y = 0.68 + Math.sin(e * 7.2 + idx * 0.72) * 0.13;
+                });
+              } else if (idaEmote.type === 'hatPop') {
+                // 5) 受驚 90° 垂直飛帽：縮身一驚 → 象牙尖帽垂直飛起旋轉一圈接住 ＋ 90°! 光標
+                if (p < 0.14) {
+                  idaGroup.scale.set(1.14, 0.82, 1.14);
+                } else if (p < 0.78) {
+                  const u = (p - 0.14) / 0.64;
+                  hatPivot.position.y = 0.95 + Math.sin(u * Math.PI) * 0.72;
+                  hatPivot.rotation.z = u * Math.PI * 2;
+                  idaGroup.rotation.x = -Math.sin(u * Math.PI) * 0.18;
+                } else {
+                  const u = (p - 0.78) / 0.22;
+                  hatPivot.rotation.z = Math.sin(u * Math.PI * 3) * 0.18 * (1 - u);
+                }
+                shockGroup.visible = p >= 0.10 && p < 0.85;
+                if (shockGroup.visible) {
+                  shockGroup.scale.setScalar(Math.min(1, (p - 0.10) * 8) * fade);
+                  shockGroup.position.y = Math.sin(e * 10) * 0.03;
+                }
+              } else if (idaEmote.type === 'quadrantCheer') {
+                // 6) 舉燈打氣：高舉提燈左右搖晃＋燈光爆亮＋腳底展開四象限十字星芒
+                idaGroup.scale.set(0.95, 1.06, 0.95);
+                idaGroup.position.y = standPos.y + Math.sin(p * Math.PI) * 0.08;
+                lanternPivot.position.set(0.14 + Math.sin(e * 9) * 0.06, 1.48, 0.14);
+                lanternPivot.rotation.z = Math.sin(e * 9) * 0.25;
+                lanternGlowMat.emissiveIntensity = 2.9;
+                quadrantGroup.visible = true;
+                const sc = Math.min(1, p * 4.5) * fade;
+                quadrantGroup.scale.set(sc, 1, sc);
+                quadrantGroup.rotation.y = e * 0.8;
+                const ringSc = 1 + Math.sin(p * Math.PI) * 0.55;
+                idaBaseRing.scale.set(ringSc, ringSc, 1);
+              }
+
+              if (idaEmote.elapsed >= idaEmote.duration) {
+                idaEmote = { type: null, elapsed: 0, duration: 0 };
+                hideAllEmoteProps();
+              }
             } else {
               let diff = 0 - idaGroup.rotation.y;
               while (diff > Math.PI) diff -= Math.PI * 2;
