@@ -12267,9 +12267,9 @@
       const lockedDone = isOpened || isUnlocking;
 
       return (
-        <div ref={containerRef} className={`w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0 ${feedbackAnim}`}>
+        <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
           {gameState === 'playing' && question && (
-            <div onClick={handleConfirmSkip} className="flex-1 min-h-0 flex flex-col justify-between gap-2 overflow-hidden pb-0.5">
+            <div onClick={handleConfirmSkip} className="flex-1 min-h-0 flex flex-col justify-between gap-1.5 overflow-hidden pb-0.5">
               <GameHUD
                 lives={lives}
                 maxLives={maxLives}
@@ -12282,33 +12282,34 @@
                 onOpenGuide={openGuide}
               />
 
-              {/* 真實滑蓋機身容器：收合時整台精巧置中、滑開時自然上下展開，螢幕尺寸 100% 鎖定不變形 */}
-              <div className="flex-1 min-h-0 flex flex-col justify-center overflow-hidden">
-                <div className={`w-full max-h-full bg-gradient-to-b from-slate-100 via-slate-100 to-slate-200/90 rounded-3xl border-3 border-violet-900 shadow-xl flex flex-col overflow-hidden transition-all duration-300 ${bombStage === 'defused' ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                  <StagePhaseStrip
-                    phase={question.phase}
-                    labels={['P0 半圓角度交集解碼', 'P1 單函數正負交集解碼', 'P2 乘積不等式 × 根號壓軸']}
-                  />
-
-                  {/* 置頂主題題目列（完整保留原始題目：條件一、條件二、求目標，無膠囊純文字色字排印） */}
-                  <div className="bg-gradient-to-r from-violet-800 to-indigo-800 text-white min-h-[50px] px-3 py-1.5 flex items-center justify-between gap-2 shrink-0 border-b-2 border-violet-950">
-                    <div className="flex-1 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 font-serif font-black text-xs sm:text-sm leading-snug min-w-0">
-                      <span className="inline-flex items-center gap-1 text-sky-200">
-                        <span>{question.givenFunc} θ =</span>
-                        <FracText value={question.givenValStr} />
-                      </span>
-                      <span className="text-violet-300/65">，</span>
-                      <span className="text-fuchsia-200">{question.cond2Prompt}</span>
-                      <span className="text-violet-300/65">，</span>
-                      <span className="text-amber-300 text-sm sm:text-base tracking-wide">求 {question.targetFunc} θ</span>
-                    </div>
-                    <span className="w-6 h-6 inline-flex items-center justify-center shrink-0">
-                      <SuccessBadge show={bombStage === 'defused'} />
+              {/* 置頂固定題目卡（獨立於滑蓋機外，滑蓋收合／展開時題目紋絲不動！） */}
+              <div className={`shrink-0 rounded-2xl border-2 border-violet-900 shadow-md overflow-hidden transition-all duration-300 ${bombStage === 'defused' ? 'ring-2 ring-emerald-400/80' : ''}`}>
+                <StagePhaseStrip
+                  phase={question.phase}
+                  labels={['半圓角度交集解碼', '單函數正負交集解碼', '乘積不等式 × 根號壓軸']}
+                />
+                <div className="bg-gradient-to-r from-violet-800 to-indigo-800 text-white min-h-[40px] px-3 py-1 flex items-center justify-between gap-2">
+                  <div className="flex-1 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 font-serif font-black text-xs sm:text-sm leading-snug min-w-0">
+                    <span className="inline-flex items-center gap-1 text-sky-200">
+                      <span>{question.givenFunc} θ =</span>
+                      <FracText value={question.givenValStr} />
                     </span>
+                    <span className="text-violet-300/65">，</span>
+                    <span className="text-fuchsia-200">{question.cond2Prompt}</span>
+                    <span className="text-violet-300/65">，</span>
+                    <span className="text-amber-300 text-sm sm:text-base tracking-wide">求 {question.targetFunc} θ</span>
                   </div>
+                  <span className="w-6 h-6 inline-flex items-center justify-center shrink-0">
+                    <SuccessBadge show={bombStage === 'defused'} />
+                  </span>
+                </div>
+              </div>
 
-                  {/* 中段定高上蓋螢幕（鎖定高度 h-[196px] sm:h-[212px]，鍵盤收放時螢幕大小紋絲不動！） */}
-                  <div className="relative z-20 shrink-0 h-[196px] sm:h-[212px] bg-gradient-to-b from-slate-100 to-slate-100/95 shadow-[0_6px_14px_rgba(15,23,42,0.16)] px-2.5 pt-1.5 pb-2 flex flex-col gap-1 select-none overflow-hidden">
+              {/* 真實獨立滑蓋機身容器：收合時整台精巧置中、滑開時自然上下展開，絕不牽動上方題目 */}
+              <div className="flex-1 min-h-0 flex flex-col justify-center overflow-hidden">
+                <div className={`w-full max-h-full bg-gradient-to-b from-slate-100 via-slate-100 to-slate-200/95 rounded-[26px] border-[3px] border-slate-500/90 shadow-[0_12px_28px_rgba(15,23,42,0.28),inset_0_1px_0_rgba(255,255,255,0.85)] flex flex-col overflow-hidden transition-all duration-300 ${feedbackAnim} ${bombStage === 'defused' ? 'ring-4 ring-emerald-400/75 border-emerald-600' : ''}`}>
+                  {/* 中段定高上蓋螢幕（鎖定高度 h-[208px] sm:h-[222px]，略高於下方滑蓋鍵盤以符合物理收納比例！） */}
+                  <div className="relative z-20 shrink-0 h-[208px] sm:h-[222px] bg-gradient-to-b from-slate-100 to-slate-100/95 shadow-[0_6px_14px_rgba(15,23,42,0.16)] px-2.5 pt-1.5 pb-1.5 flex flex-col gap-1 select-none overflow-hidden">
                   <HintBanner tip={conceptTip} />
 
                   {/* 極簡極客機型絲印列（左上型號 ＋ 右上三區訊號小燈＋小小太陽能紋飾） */}
@@ -12707,20 +12708,20 @@
                     <span className="pointer-events-none absolute right-1 top-0 bottom-2 w-[2px] rounded-full bg-gradient-to-b from-slate-400/60 via-slate-300/40 to-transparent" />
                     <div
                       data-coach="lv13-panel"
-                      className={`px-2.5 pt-1 pb-2 flex flex-col gap-1.5 select-none transition-[transform,opacity] duration-[560ms] [transition-timing-function:cubic-bezier(0.22,1.08,0.36,1)] ${
+                      className={`px-2.5 pt-1 pb-1.5 flex flex-col gap-1 select-none transition-[transform,opacity] duration-[560ms] [transition-timing-function:cubic-bezier(0.22,1.08,0.36,1)] ${
                         keypadReady ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'
                       }`}
                     >
                   {/* 第一區：淡琥珀微凹托盤（1×4 絕對值單選） */}
-                  <div className={`rounded-xl border p-1.5 flex flex-col gap-1 transition-colors ${
+                  <div className={`rounded-xl border p-1 flex flex-col gap-0.5 transition-colors ${
                     lockedDone ? 'bg-emerald-50/60 border-emerald-400/80' : 'bg-amber-50/75 border-amber-300/80'
                   }`}>
                     <div className="flex items-center justify-between px-0.5">
-                      <span className="text-sm sm:text-base font-black text-amber-900 font-serif flex items-center gap-1.5 leading-tight">
-                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-400 text-amber-950 text-[10px] font-sans font-black shrink-0">1</span>
+                      <span className="text-xs sm:text-sm font-black text-amber-900 font-serif flex items-center gap-1 leading-tight">
+                        <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-amber-400 text-amber-950 text-[9px] font-sans font-black shrink-0">1</span>
                         <span>|{question.targetFunc} θ| 絕對值</span>
                       </span>
-                      <span className={`text-[11px] font-bold ${lockedDone ? 'text-emerald-700' : 'text-amber-700/80'}`}>
+                      <span className={`text-[10px] font-bold ${lockedDone ? 'text-emerald-700' : 'text-amber-700/80'}`}>
                         {lockedDone ? '✓ 已鎖定' : '單選'}
                       </span>
                     </div>
@@ -12733,7 +12734,7 @@
                             type="button"
                             disabled={lockedDone}
                             onClick={(e) => { e.stopPropagation(); handlePickAbs(opt); }}
-                            className={`h-[46px] sm:h-[50px] rounded-xl border-2 border-b-[4px] font-serif font-black text-base flex items-center justify-center transition-all ${
+                            className={`h-[36px] sm:h-[38px] rounded-xl border-2 border-b-[3px] font-serif font-black text-sm sm:text-base flex items-center justify-center transition-all ${
                               active
                                 ? 'bg-gradient-to-b from-amber-300 to-amber-500 border-amber-600 border-b-amber-700 text-amber-950 shadow-sm translate-y-[1.5px] border-b-[2px]'
                                 : lockedDone
@@ -12780,20 +12781,20 @@
                       return (
                         <div
                           key={panel.idx}
-                          className={`rounded-xl border p-1.5 flex flex-col gap-1.5 transition-colors ${
+                          className={`rounded-xl border p-1 flex flex-col gap-1 transition-colors ${
                             lockedDone ? 'bg-emerald-50/60 border-emerald-400/80' : panel.trayCls
                           }`}
                         >
-                          <div className="flex items-center gap-1 px-0.5 min-w-0">
-                            <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-sans font-black shrink-0 ${panel.badgeCls}`}>{panel.idx}</span>
-                            <span className={`${isLongTitle ? 'text-[12.5px] sm:text-sm tracking-tight' : 'text-[13.5px] sm:text-[15px]'} font-black font-serif leading-tight whitespace-nowrap ${panel.titleCls}`}>{panel.title}</span>
+                          <div className="flex items-center justify-center gap-1 px-0.5 min-w-0">
+                            <span className={`inline-flex items-center justify-center w-3.5 h-3.5 rounded-full text-[9px] font-sans font-black shrink-0 ${panel.badgeCls}`}>{panel.idx}</span>
+                            <span className={`${isLongTitle ? 'text-[11.5px] sm:text-xs tracking-tight' : 'text-xs sm:text-[13.5px]'} font-black font-serif leading-tight whitespace-nowrap ${panel.titleCls}`}>{panel.title}</span>
                           </div>
 
-                          <div className="relative grid grid-cols-2 grid-rows-2 gap-1.5">
+                          <div className="relative mx-auto w-[92px] sm:w-[100px] grid grid-cols-2 grid-rows-2 gap-1">
                             <div className={`pointer-events-none absolute left-1/2 top-0 bottom-0 w-[1.5px] -translate-x-1/2 ${panel.axisCls}`} />
                             <div className={`pointer-events-none absolute top-1/2 left-0 right-0 h-[1.5px] -translate-y-1/2 ${panel.axisCls}`} />
-                            <span className="pointer-events-none absolute left-1/2 -top-1 translate-x-1 text-[9px] font-serif italic font-bold text-slate-400 leading-none">y</span>
-                            <span className="pointer-events-none absolute -right-0.5 top-1/2 -translate-y-3 text-[9px] font-serif italic font-bold text-slate-400 leading-none">x</span>
+                            <span className="pointer-events-none absolute left-1/2 -top-1 translate-x-1 text-[8px] font-serif italic font-bold text-slate-400 leading-none">y</span>
+                            <span className="pointer-events-none absolute -right-1 top-1/2 -translate-y-2.5 text-[8px] font-serif italic font-bold text-slate-400 leading-none">x</span>
 
                             {LV13_QUAD_LAYOUT.map(qNum => {
                               const isOn = panel.selected.includes(qNum);
@@ -12803,7 +12804,7 @@
                                   type="button"
                                   disabled={lockedDone}
                                   onClick={(e) => { e.stopPropagation(); panel.onToggle(qNum); }}
-                                  className={`relative h-[46px] sm:h-[50px] rounded-xl border-2 border-b-[4px] font-serif font-black text-base flex items-center justify-center transition-all ${
+                                  className={`relative aspect-square w-full rounded-xl border-2 border-b-[3px] font-serif font-black text-sm sm:text-base flex items-center justify-center transition-all ${
                                     isOn
                                       ? panel.onBtnCls
                                       : lockedDone
