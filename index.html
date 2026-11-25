@@ -416,6 +416,39 @@
     .animate-float-slow {
       animation: floatSlow 3.4s ease-in-out infinite;
     }
+
+    /* Lv.13 電影級氣閘洩壓、晶片壓入卡榫與通電波紋特效 */
+    @keyframes lv13SteamUp {
+      0% { transform: translate(-50%, 4px) scale(0.35, 0.45); opacity: 0.95; }
+      35% { opacity: 0.78; }
+      100% { transform: translate(-50%, -62px) scale(2.2, 1.8); opacity: 0; }
+    }
+    @keyframes lv13SteamDown {
+      0% { transform: translate(-50%, -4px) scale(0.35, 0.45); opacity: 0.95; }
+      35% { opacity: 0.78; }
+      100% { transform: translate(-50%, 62px) scale(2.2, 1.8); opacity: 0; }
+    }
+    @keyframes lv13ChipSeat {
+      0% { transform: translate(96px, -6px) scale(1.16); opacity: 0.45; }
+      44% { transform: translate(0px, -10px) scale(1.12); opacity: 1; }
+      72% { transform: translate(0px, 2px) scale(0.92); opacity: 1; }
+      88% { transform: translate(0px, -0.5px) scale(1.03); opacity: 1; }
+      100% { transform: translate(0px, 0px) scale(1); opacity: 1; }
+    }
+    @keyframes lv13PowerRing {
+      0% { transform: scale(0.65); opacity: 0.95; }
+      100% { transform: scale(1.55); opacity: 0; }
+    }
+    @keyframes lv13SeamFlash {
+      0% { opacity: 0; }
+      30% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    .lv13-steam-up { animation: lv13SteamUp 0.92s ease-out forwards; }
+    .lv13-steam-down { animation: lv13SteamDown 0.92s ease-out forwards; }
+    .lv13-chip-seat { animation: lv13ChipSeat 0.58s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    .lv13-power-ring { animation: lv13PowerRing 0.72s 0.36s ease-out both; }
+    .lv13-seam-flash { animation: lv13SeamFlash 0.5s ease-out forwards; }
   </style>
 </head>
 <body class="bg-gradient-to-b from-sky-400 via-indigo-700 to-slate-950 h-[100dvh] w-full overflow-hidden text-slate-800 flex justify-center selection:bg-amber-300" style="background-color:#070d1f;">
@@ -511,12 +544,12 @@
               : 'bg-amber-50/95 border-amber-400 text-amber-950'
           }`}
         >
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="shrink-0">{isSuccess ? '✓' : '💡'}</span>
-            <span className="truncate flex items-center gap-1">{tip.node || tip.text}</span>
+          <div className="flex items-start gap-1.5 min-w-0">
+            <span className="shrink-0 mt-[1px]">{isSuccess ? '✓' : '💡'}</span>
+            <span className="leading-snug break-words">{tip.node || tip.text}</span>
           </div>
           {isSuccess && tip.canSkip && (
-            <span className="text-[10px] font-bold text-emerald-700/80 shrink-0 whitespace-nowrap">{tip.skipLabel || '輕點繼續 ▸'}</span>
+            <span className="text-[10px] font-bold text-emerald-700/80 shrink-0 whitespace-nowrap self-center">{tip.skipLabel || '輕點繼續 ▸'}</span>
           )}
         </div>
       );
@@ -1970,7 +2003,7 @@
       { id: 10, title: "星象羅盤師", subtitle: "廣義特殊角與象限角旋轉推導", island: "星軌聖壇", sea: 2, icon: "🔭", color: "from-violet-500 to-indigo-700", borderColor: "border-indigo-900" },
       { id: 11, title: "正負傳送帶", subtitle: "三角比正負與無意義分流", island: "四象限祭壇", sea: 2, icon: "⚡", color: "from-rose-500 to-indigo-700", borderColor: "border-indigo-900" },
       { id: 12, title: "廣轉銳密碼輪", subtitle: "廣義角化為銳角變換（四大公式）", island: "星海彼端", sea: 2, icon: "🔑", color: "from-amber-400 to-indigo-600", borderColor: "border-indigo-900" },
-      { id: 13, title: "幻夜拆彈專家", subtitle: "三區田字解鎖 × 紅藍剪線拆彈（廣義角知一求一）", island: "烈日火山", sea: 3, icon: "💣", color: "from-violet-600 to-purple-800", borderColor: "border-purple-950" },
+      { id: 13, title: "知一解碼終端", subtitle: "三區密鑰驗證 × IC 晶片解碼（廣義角知一求一）", island: "烈日火山", sea: 3, icon: "💻", color: "from-violet-600 to-purple-800", borderColor: "border-purple-950" },
       { id: 14, title: "極坐標定位儀", subtitle: "極坐標 [r, θ] ↔ (x, y)", island: "極光觀測站", sea: 3, icon: "📡", color: "from-cyan-500 to-indigo-700", borderColor: "border-indigo-950" },
       { id: 15, title: "面積公式殿堂", subtitle: "鎖定兩鄰邊與夾角 • Δ = ½ab sin C", island: "翠光神殿", sea: 3, icon: "📐", color: "from-emerald-500 to-teal-700", borderColor: "border-teal-950" },
       { id: 16, title: "正弦定理殿堂", subtitle: "配對對邊與對角 • a/sinA = b/sinB = 2R", island: "星橋高台", sea: 3, icon: "🌉", color: "from-sky-500 to-indigo-700", borderColor: "border-indigo-950" },
@@ -11552,29 +11585,11 @@
       return arrA.every(v => setB.has(v));
     };
 
-    const generateLevel13Question = (phase, bagState = null) => {
-      const triplePool = phase === 0
-        ? [
-            { a: 3, b: 4, c: 5 },
-            { a: 4, b: 3, c: 5 }
-          ]
-        : phase === 1
-        ? [
-            { a: 3, b: 4, c: 5 },
-            { a: 4, b: 3, c: 5 },
-            { a: 5, b: 12, c: 13 },
-            { a: 12, b: 5, c: 13 }
-          ]
-        : [
-            { a: 3, b: 4, c: 5 },
-            { a: 4, b: 3, c: 5 },
-            { a: 5, b: 12, c: 13 },
-            { a: 12, b: 5, c: 13 },
-            { a: 8, b: 15, c: 17 },
-            { a: 7, b: 24, c: 25 }
-          ];
+    const lv13RatioStr = (num, den) => (String(den) === '1' ? String(num) : `${num}/${den}`);
 
-      const allQuads = phase === 2 ? [1, 2, 3, 4] : [2, 3, 4];
+    const generateLevel13Question = (phase, bagState = null) => {
+      // 全場固定第 II、III、IV 象限（排除全正的第 I 象限），以洗牌袋確保三象限均衡不連出
+      const allQuads = [2, 3, 4];
       const usedQuads = new Set(bagState?.usedQuads || []);
       let availQuads = allQuads.filter(q => !usedQuads.has(q));
       if (availQuads.length === 0) {
@@ -11587,19 +11602,65 @@
         bagState.usedQuads = [...(bagState.usedQuads || []), quad];
       }
 
-      const t = triplePool[Math.floor(Math.random() * triplePool.length)];
+      // 三階段邊長池（家族防連題重複；P2 固定 1 題整數三元數 ＋ 1 題不有理化簡易根號）
+      const intP0 = [
+        { family: '345', a: '3', b: '4', c: '5' },
+        { family: '345', a: '4', b: '3', c: '5' }
+      ];
+      const intP1 = [
+        { family: '345', a: '3', b: '4', c: '5' },
+        { family: '345', a: '4', b: '3', c: '5' },
+        { family: '51213', a: '5', b: '12', c: '13' },
+        { family: '51213', a: '12', b: '5', c: '13' }
+      ];
+      const intP2 = [
+        { family: '51213', a: '5', b: '12', c: '13' },
+        { family: '51213', a: '12', b: '5', c: '13' },
+        { family: '81517', a: '8', b: '15', c: '17' },
+        { family: '81517', a: '15', b: '8', c: '17' }
+      ];
+      const rootP2 = [
+        { family: 'r5_tan', a: '1', b: '2', c: '√5', allowedGiven: ['tan'] },
+        { family: 'r10_tan', a: '1', b: '3', c: '√10', allowedGiven: ['tan'] },
+        { family: 'r5_3', a: '2', b: '√5', c: '3', allowedGiven: ['cos'] },
+        { family: 'r5_3', a: '√5', b: '2', c: '3', allowedGiven: ['sin'] },
+        { family: 'r7_4', a: '3', b: '√7', c: '4', allowedGiven: ['cos'] },
+        { family: 'r7_4', a: '√7', b: '3', c: '4', allowedGiven: ['sin'] }
+      ];
+
+      let rawPool = phase === 0 ? intP0 : phase === 1 ? intP1 : intP2;
+      if (phase === 2) {
+        if (bagState && !Array.isArray(bagState.p2RootOrder)) {
+          bagState.p2RootOrder = Math.random() < 0.5 ? [false, true] : [true, false];
+          bagState.p2Idx = 0;
+        }
+        const wantRoot = bagState
+          ? bagState.p2RootOrder[bagState.p2Idx % bagState.p2RootOrder.length]
+          : Math.random() < 0.5;
+        if (bagState) bagState.p2Idx = (bagState.p2Idx || 0) + 1;
+        rawPool = wantRoot ? rootP2 : intP2;
+      }
+
+      let filteredPool = rawPool.filter(item => item.family !== bagState?.lastFamily);
+      if (filteredPool.length === 0) filteredPool = rawPool;
+      const t = filteredPool[Math.floor(Math.random() * filteredPool.length)];
+      if (bagState) bagState.lastFamily = t.family;
+
       const sx = (quad === 1 || quad === 4) ? 1 : -1;
       const sy = (quad === 1 || quad === 2) ? 1 : -1;
 
-      const givenPool = phase === 0 ? ['sin', 'cos'] : ['sin', 'cos', 'tan'];
+      // P0 不給 tan；且第 IV 象限在 P0 固定給 cos > 0（以配合 180°<θ<360° 唯一交集出 IV）
+      let givenPool = phase === 0
+        ? (quad === 4 ? ['cos'] : ['sin', 'cos'])
+        : (t.allowedGiven || ['sin', 'cos', 'tan']);
       const givenFunc = givenPool[Math.floor(Math.random() * givenPool.length)];
       const targetCands = ['sin', 'cos', 'tan'].filter(f => f !== givenFunc);
       const targetFunc = targetCands[Math.floor(Math.random() * targetCands.length)];
 
       const getFuncMeta = (fn) => {
-        if (fn === 'sin') return { absStr: `${t.b}/${t.c}`, sign: sy };
-        if (fn === 'cos') return { absStr: `${t.a}/${t.c}`, sign: sx };
-        return { absStr: `${t.b}/${t.a}`, sign: sx * sy };
+        if (fn === 'sin') return { absStr: lv13RatioStr(t.b, t.c), sign: sy };
+        if (fn === 'cos') return { absStr: lv13RatioStr(t.a, t.c), sign: sx };
+        return { absStr: lv13RatioStr(t.b, t.a), sign: sx * sy };
       };
       const givenMeta = getFuncMeta(givenFunc);
       const targetMeta = getFuncMeta(targetFunc);
@@ -11624,48 +11685,45 @@
         return inter.length === 1 && inter[0] === quad;
       };
 
-      let cond2 = { promptText: `θ 為第 ${quadRoman} 象限角`, label: `第 ${quadRoman} 象限角`, quads: [quad] };
-      if (phase === 1) {
-        const p1Cands = [
-          { promptText: 'sin θ > 0', label: 'sin θ > 0', quads: [1, 2] },
-          { promptText: 'sin θ < 0', label: 'sin θ < 0', quads: [3, 4] },
-          { promptText: 'cos θ > 0', label: 'cos θ > 0', quads: [1, 4] },
-          { promptText: 'cos θ < 0', label: 'cos θ < 0', quads: [2, 3] },
-          { promptText: 'tan θ > 0', label: 'tan θ > 0', quads: [1, 3] },
-          { promptText: 'tan θ < 0', label: 'tan θ < 0', quads: [2, 4] },
-          { promptText: '0° < θ < 180°', label: '0° < θ < 180°', quads: [1, 2] },
-          { promptText: '180° < θ < 360°', label: '180° < θ < 360°', quads: [3, 4] }
-        ].filter(c => !lv13SameSet(c.quads, cond1Quads) && intersectOk(c.quads));
-        if (p1Cands.length > 0) cond2 = p1Cands[Math.floor(Math.random() * p1Cands.length)];
-      } else if (phase === 2) {
-        const rangeByQuad = {
-          1: { promptText: '0° < θ < 90°', label: '0° < θ < 90°', quads: [1] },
-          2: { promptText: '90° < θ < 180°', label: '90° < θ < 180°', quads: [2] },
-          3: { promptText: '180° < θ < 270°', label: '180° < θ < 270°', quads: [3] },
-          4: { promptText: '270° < θ < 360°', label: '270° < θ < 360°', quads: [4] }
-        };
-        const p2Cands = [
-          rangeByQuad[quad],
-          { promptText: 'sin θ · cos θ > 0', label: 'sinθ·cosθ > 0', quads: [1, 3] },
-          { promptText: 'sin θ · cos θ < 0', label: 'sinθ·cosθ < 0', quads: [2, 4] },
-          { promptText: 'sin θ · tan θ > 0', label: 'sinθ·tanθ > 0', quads: [1, 4] },
-          { promptText: 'sin θ · tan θ < 0', label: 'sinθ·tanθ < 0', quads: [2, 3] },
-          { promptText: 'cos θ · tan θ > 0', label: 'cosθ·tanθ > 0', quads: [1, 2] },
-          { promptText: 'cos θ · tan θ < 0', label: 'cosθ·tanθ < 0', quads: [3, 4] }
-        ].filter(c => !lv13SameSet(c.quads, cond1Quads) && intersectOk(c.quads));
-        if (p2Cands.length > 0) cond2 = p2Cands[Math.floor(Math.random() * p2Cands.length)];
-      }
+      // 三階段純真交集條件二：P0 半圓角度區間 → P1 單函數正負 → P2 雙函數乘積不等式
+      const p0Cands = [
+        { promptText: '0° < θ < 180°', label: '0° < θ < 180°', quads: [1, 2] },
+        { promptText: '90° < θ < 270°', label: '90° < θ < 270°', quads: [2, 3] },
+        { promptText: '180° < θ < 360°', label: '180° < θ < 360°', quads: [3, 4] }
+      ];
+      const p1Cands = [
+        { promptText: 'sin θ > 0', label: 'sin θ > 0', quads: [1, 2] },
+        { promptText: 'sin θ < 0', label: 'sin θ < 0', quads: [3, 4] },
+        { promptText: 'cos θ > 0', label: 'cos θ > 0', quads: [1, 4] },
+        { promptText: 'cos θ < 0', label: 'cos θ < 0', quads: [2, 3] },
+        { promptText: 'tan θ > 0', label: 'tan θ > 0', quads: [1, 3] },
+        { promptText: 'tan θ < 0', label: 'tan θ < 0', quads: [2, 4] }
+      ];
+      const p2Cands = [
+        { promptText: 'sin θ · cos θ > 0', label: 'sinθ·cosθ > 0', quads: [1, 3] },
+        { promptText: 'sin θ · cos θ < 0', label: 'sinθ·cosθ < 0', quads: [2, 4] },
+        { promptText: 'sin θ · tan θ > 0', label: 'sinθ·tanθ > 0', quads: [1, 4] },
+        { promptText: 'sin θ · tan θ < 0', label: 'sinθ·tanθ < 0', quads: [2, 3] },
+        { promptText: 'cos θ · tan θ > 0', label: 'cosθ·tanθ > 0', quads: [1, 2] },
+        { promptText: 'cos θ · tan θ < 0', label: 'cosθ·tanθ < 0', quads: [3, 4] }
+      ];
 
-      // 第一區（絕對值）田字 4 選項：必含正確值＋高品質干擾比值
+      const stagePool = phase === 0 ? p0Cands : phase === 1 ? p1Cands : p2Cands;
+      const validCond2 = stagePool.filter(c => !lv13SameSet(c.quads, cond1Quads) && intersectOk(c.quads));
+      const fallbackCond2 = p1Cands.filter(c => !lv13SameSet(c.quads, cond1Quads) && intersectOk(c.quads));
+      const finalPool = validCond2.length > 0 ? validCond2 : fallbackCond2;
+      const cond2 = finalPool[Math.floor(Math.random() * finalPool.length)];
+
+      // 第一區（絕對值）4 選項：必含正確值＋高品質干擾比值（支援簡易根號不有理化）
       const absCandPool = [
         absTargetStr,
         givenMeta.absStr,
-        `${t.a}/${t.c}`,
-        `${t.b}/${t.c}`,
-        `${t.b}/${t.a}`,
-        `${t.a}/${t.b}`,
-        `${t.c}/${t.a}`,
-        `${t.c}/${t.b}`
+        lv13RatioStr(t.a, t.c),
+        lv13RatioStr(t.b, t.c),
+        lv13RatioStr(t.b, t.a),
+        lv13RatioStr(t.a, t.b),
+        lv13RatioStr(t.c, t.a),
+        lv13RatioStr(t.c, t.b)
       ];
       const absSet = new Set([absTargetStr]);
       for (const s of absCandPool) {
@@ -11735,8 +11793,14 @@
       const [selCond1, setSelCond1] = useState([]);
       const [selCond2, setSelCond2] = useState([]);
       const [bombStage, setBombStage] = useState('locked'); // 'locked' | 'unlocking' | 'wires' | 'defused'
+      const [isArming, setIsArming] = useState(false); // 開局滑門自動關門上鎖動畫（防洩漏數值、不卡操作）
+      const [doorSliding, setDoorSliding] = useState(false); // 兩段式氣閘開門：先轉閥退栓 → 再慣性滑開
+      const [steamBurst, setSteamBurst] = useState(0); // 氣閘洩壓白霧特效觸發戳記
+      const [lockFlash, setLockFlash] = useState(0); // 關門落鎖電磁閃光戳記
+      const [keypadReady, setKeypadReady] = useState(true); // 滑蓋式背蓋鍵盤滑出／收回
       const [cutWireId, setCutWireId] = useState(null);
       const [sparkWireId, setSparkWireId] = useState(null);
+      const [dragWire, setDragWire] = useState(null); // { wire, x, y, startX, startY, isDragging, isTouch, overTarget }
       const [conceptTip, setConceptTip] = useState(null);
       const [feedbackAnim, setFeedbackAnim] = useState('');
 
@@ -11752,15 +11816,88 @@
       });
 
       const containerRef = useRef(null);
+      const targetSlotRef = useRef(null);
       const bagRef = useRef({ usedQuads: [], lastQuad: null });
       const questionMissedRef = useRef(false);
       const unlockTimerRef = useRef(null);
+      const doorSlideTimerRef = useRef(null);
+      const armingTimerRef = useRef(null);
+      const keypadTimerRef = useRef(null);
       const pendingNextRef = useRef(null);
       const justSolvedAtRef = useRef(0);
 
       useEffect(() => () => {
         if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
+        if (doorSlideTimerRef.current) clearTimeout(doorSlideTimerRef.current);
+        if (armingTimerRef.current) clearTimeout(armingTimerRef.current);
+        if (keypadTimerRef.current) clearTimeout(keypadTimerRef.current);
       }, []);
+
+      const playFirewallLock = () => {
+        if (audio?.ctx && audio.ctx.state === 'running') {
+          try {
+            const ctx = audio.ctx;
+            const now = ctx.currentTime;
+            // 低頻滑門合攏氣壓聲
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(140, now);
+            osc.frequency.exponentialRampToValueAtTime(58, now + 0.16);
+            g.gain.setValueAtTime(0.085, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
+            osc.connect(g); g.connect(ctx.destination);
+            osc.start(now); osc.stop(now + 0.18);
+            // 末尾重金屬落鎖「咔嗒」
+            const clickOsc = ctx.createOscillator();
+            const clickG = ctx.createGain();
+            clickOsc.type = 'square';
+            clickOsc.frequency.setValueAtTime(520, now + 0.15);
+            clickOsc.frequency.exponentialRampToValueAtTime(190, now + 0.2);
+            clickG.gain.setValueAtTime(0.06, now + 0.15);
+            clickG.gain.exponentialRampToValueAtTime(0.001, now + 0.21);
+            clickOsc.connect(clickG); clickG.connect(ctx.destination);
+            clickOsc.start(now + 0.15); clickOsc.stop(now + 0.22);
+          } catch (_) {}
+        }
+      };
+
+      const playKeypadSlide = (retract = false) => {
+        if (audio?.ctx && audio.ctx.state === 'running') {
+          try {
+            const ctx = audio.ctx;
+            const now = ctx.currentTime;
+            // 滑蓋滑軌高通白噪音「唰」
+            const bufLen = Math.floor(ctx.sampleRate * 0.12);
+            const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+            const data = buf.getChannelData(0);
+            for (let i = 0; i < bufLen; i++) {
+              const env = Math.sin((i / bufLen) * Math.PI);
+              data[i] = (Math.random() * 2 - 1) * env * 0.65;
+            }
+            const src = ctx.createBufferSource();
+            src.buffer = buf;
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(retract ? 2400 : 1500, now);
+            filter.frequency.exponentialRampToValueAtTime(retract ? 1200 : 2800, now + 0.12);
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(0.095, now);
+            src.connect(filter); filter.connect(g); g.connect(ctx.destination);
+            src.start(now);
+            // 滑蓋到位彈簧「喀」
+            const snap = ctx.createOscillator();
+            const snapG = ctx.createGain();
+            snap.type = 'sine';
+            snap.frequency.setValueAtTime(retract ? 620 : 900, now + 0.12);
+            snap.frequency.exponentialRampToValueAtTime(retract ? 360 : 540, now + 0.165);
+            snapG.gain.setValueAtTime(0.075, now + 0.12);
+            snapG.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
+            snap.connect(snapG); snapG.connect(ctx.destination);
+            snap.start(now + 0.12); snap.stop(now + 0.175);
+          } catch (_) {}
+        }
+      };
 
       const playToggleTone = (isTurningOn) => {
         if (typeof audio.playTone === 'function') {
@@ -11776,8 +11913,8 @@
             const ctx = audio.ctx;
             if (ctx.state === 'suspended') ctx.resume();
             const now = ctx.currentTime;
-            // 雙短高音解鎖「嗶嗶」
-            [0, 0.09].forEach((offset, i) => {
+            // 1. 雙短高音解鎖「嗶嗶」
+            [0, 0.085].forEach((offset, i) => {
               const osc = ctx.createOscillator();
               const g = ctx.createGain();
               osc.type = 'sine';
@@ -11787,16 +11924,36 @@
               osc.connect(g); g.connect(ctx.destination);
               osc.start(now + offset); osc.stop(now + offset + 0.085);
             });
-            // 低頻氣壓滑門滑開感
+            // 2. 電影級高壓氣閘洩壓「嘶——」氣流白噪音（0.36s 對齊氣閘門滑開瞬間）
+            const hissLen = Math.floor(ctx.sampleRate * 0.48);
+            const hissBuf = ctx.createBuffer(1, hissLen, ctx.sampleRate);
+            const hissData = hissBuf.getChannelData(0);
+            for (let i = 0; i < hissLen; i++) {
+              const t = i / hissLen;
+              hissData[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 1.5);
+            }
+            const hissSrc = ctx.createBufferSource();
+            hissSrc.buffer = hissBuf;
+            const hissFilter = ctx.createBiquadFilter();
+            hissFilter.type = 'bandpass';
+            hissFilter.frequency.setValueAtTime(3200, now + 0.36);
+            hissFilter.frequency.exponentialRampToValueAtTime(1100, now + 0.84);
+            hissFilter.Q.value = 1.2;
+            const hissGain = ctx.createGain();
+            hissGain.gain.setValueAtTime(0.18, now + 0.36);
+            hissGain.gain.exponentialRampToValueAtTime(0.001, now + 0.84);
+            hissSrc.connect(hissFilter); hissFilter.connect(hissGain); hissGain.connect(ctx.destination);
+            hissSrc.start(now + 0.36);
+            // 3. 低頻重金屬滑軌慣性滑開聲（0.38s 對齊重門滑動）
             const slideOsc = ctx.createOscillator();
             const slideGain = ctx.createGain();
             slideOsc.type = 'sawtooth';
-            slideOsc.frequency.setValueAtTime(160, now + 0.16);
-            slideOsc.frequency.exponentialRampToValueAtTime(75, now + 0.48);
-            slideGain.gain.setValueAtTime(0.055, now + 0.16);
-            slideGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+            slideOsc.frequency.setValueAtTime(135, now + 0.38);
+            slideOsc.frequency.exponentialRampToValueAtTime(56, now + 0.96);
+            slideGain.gain.setValueAtTime(0.06, now + 0.38);
+            slideGain.gain.exponentialRampToValueAtTime(0.001, now + 0.98);
             slideOsc.connect(slideGain); slideGain.connect(ctx.destination);
-            slideOsc.start(now + 0.16); slideOsc.stop(now + 0.52);
+            slideOsc.start(now + 0.38); slideOsc.stop(now + 1.0);
             return;
           } catch (_) {}
         }
@@ -11842,6 +11999,18 @@
           clearTimeout(unlockTimerRef.current);
           unlockTimerRef.current = null;
         }
+        if (doorSlideTimerRef.current) {
+          clearTimeout(doorSlideTimerRef.current);
+          doorSlideTimerRef.current = null;
+        }
+        if (armingTimerRef.current) {
+          clearTimeout(armingTimerRef.current);
+          armingTimerRef.current = null;
+        }
+        if (keypadTimerRef.current) {
+          clearTimeout(keypadTimerRef.current);
+          keypadTimerRef.current = null;
+        }
         const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
         const q = generateLevel13Question(phase, bagRef.current);
         questionMissedRef.current = false;
@@ -11850,10 +12019,28 @@
         setSelCond1([]);
         setSelCond2([]);
         setBombStage('locked');
+        setIsArming(true);
+        setDoorSliding(false);
+        setSteamBurst(0);
+        setLockFlash(0);
+        setKeypadReady(false);
         setCutWireId(null);
         setSparkWireId(null);
+        setDragWire(null);
         setConceptTip(null);
         setFeedbackAnim('');
+        // 電影分拍裝填節奏：先露出雙晶片 ? → 500ms 實心氣閘重門合攏落鎖 → 920ms 背蓋鍵盤展開滑出就位
+        armingTimerRef.current = setTimeout(() => {
+          setIsArming(false);
+          setLockFlash(Date.now());
+          playFirewallLock();
+          armingTimerRef.current = null;
+        }, 500);
+        keypadTimerRef.current = setTimeout(() => {
+          setKeypadReady(true);
+          playKeypadSlide(false);
+          keypadTimerRef.current = null;
+        }, 920);
       };
 
       const startGame = () => {
@@ -11867,19 +12054,34 @@
 
       useEffect(() => { startGame(); }, []);
 
-      // 三區皆對瞬間自動觸發開蓋（零扣心、按錯不提示）
+      // 三區皆對瞬間自動觸發「兩段式電影氣閘開門」（零扣心、按錯不提示）
       const checkAutoUnlock = (nextAbs, nextC1, nextC2) => {
         if (!question || bombStage !== 'locked') return;
         const absOk = nextAbs === question.absTargetStr;
         const c1Ok = lv13SameSet(nextC1, question.cond1Quads);
         const c2Ok = lv13SameSet(nextC2, question.cond2Quads);
         if (absOk && c1Ok && c2Ok) {
-          setBombStage('unlocking');
+          if (armingTimerRef.current) {
+            clearTimeout(armingTimerRef.current);
+            armingTimerRef.current = null;
+          }
+          if (keypadTimerRef.current) {
+            clearTimeout(keypadTimerRef.current);
+            keypadTimerRef.current = null;
+          }
+          setIsArming(false);
+          setKeypadReady(true);
+          setBombStage('unlocking'); // Step 1 (0–380ms): 圓形鎖閥旋轉 180° 轉翠綠 ＋ 門縫透出高能縫光
           playHatchOpen();
+          doorSlideTimerRef.current = setTimeout(() => {
+            setDoorSliding(true); // Step 2 (380ms): 噴出大片冷白洩壓蒸汽霧 ＋ 實心重門慣性滑開
+            setSteamBurst(Date.now());
+            doorSlideTimerRef.current = null;
+          }, 380);
           unlockTimerRef.current = setTimeout(() => {
             setBombStage('wires');
             unlockTimerRef.current = null;
-          }, 260);
+          }, 620);
         }
       };
 
@@ -11911,22 +12113,49 @@
         checkAutoUnlock(selAbs, selCond1, nextC2);
       };
 
+      const playChipLatch = () => {
+        if (audio?.ctx && audio.ctx.state === 'running') {
+          try {
+            const ctx = audio.ctx;
+            const now = ctx.currentTime;
+            // 晶片橫飛至插槽並於 0.36s 垂直重壓「咔噠！」鎖扣聲
+            const snapOsc = ctx.createOscillator();
+            const snapG = ctx.createGain();
+            snapOsc.type = 'square';
+            snapOsc.frequency.setValueAtTime(680, now + 0.36);
+            snapOsc.frequency.exponentialRampToValueAtTime(180, now + 0.42);
+            snapG.gain.setValueAtTime(0.09, now + 0.36);
+            snapG.gain.exponentialRampToValueAtTime(0.001, now + 0.43);
+            snapOsc.connect(snapG); snapG.connect(ctx.destination);
+            snapOsc.start(now + 0.36); snapOsc.stop(now + 0.44);
+          } catch (_) {}
+        }
+      };
+
       const handleCutWire = (wire) => {
         if (gameState !== 'playing' || !question || bombStage !== 'wires' || (!isRelaxMode && lives <= 0)) return;
         if (showGuide) dismissGuide();
         playWireSnip();
         if (wire.sign === question.targetSign) {
-          setTimeout(() => audio.sfxBonus(), 90);
+          playChipLatch();
+          setTimeout(() => audio.sfxBonus(), 380);
           setCutWireId(wire.id);
           setBombStage('defused');
           setSparkWireId(null);
+          // 等 680ms 完整演出晶片橫飛壓入＋夾扣鎖死通電後，滑蓋機身優雅收回鍵盤
+          if (keypadTimerRef.current) clearTimeout(keypadTimerRef.current);
+          keypadTimerRef.current = setTimeout(() => {
+            setKeypadReady(false);
+            playKeypadSlide(true);
+            keypadTimerRef.current = null;
+          }, 680);
           const { nextProgress, completed } = recordCorrect({ wasMissed: questionMissedRef.current, delayEndMs: null });
           justSolvedAtRef.current = Date.now();
           setConceptTip({
             tone: 'success',
             canSkip: true,
             skipLabel: completed ? '輕點查看結算 ▸' : '輕點繼續 ▸',
-            text: `DEFUSED！${LV13_QUAD_SIGN_HINT[question.quad]} → ${question.targetFunc} θ = ${question.signedAnsStr}`,
+            text: `UNLOCKED！${LV13_QUAD_SIGN_HINT[question.quad]} → ${question.targetFunc} θ = ${question.signedAnsStr}`,
             id: Date.now()
           });
           const goNext = () => {
@@ -11935,12 +12164,6 @@
             else nextQuestion(nextProgress);
           };
           pendingNextRef.current = goNext;
-          setTimeout(() => {
-            if (pendingNextRef.current === goNext) {
-              pendingNextRef.current = null;
-              goNext();
-            }
-          }, 1350);
         } else {
           audio.sfxError();
           const alreadyMissed = questionMissedRef.current;
@@ -11948,7 +12171,7 @@
           const { gameOver } = alreadyMissed ? { gameOver: false } : recordWrong({ delayEndMs: 520 });
           setSparkWireId(wire.id);
           setFeedbackAnim('animate-shake');
-          setConceptTip({ text: question.tip, id: Date.now() });
+          setConceptTip({ text: question.tip.replace('應剪', '應選'), id: Date.now() });
           if (!gameOver) {
             setTimeout(() => {
               setFeedbackAnim('');
@@ -11958,13 +12181,62 @@
         }
       };
 
+      // 雙軌互動：輕點 (<8px) 直接注入金鑰，拖曳 (>=8px) 可透過 Portal 拖進左側終端填空槽
+      const handleWirePointerDown = (e, wire) => {
+        if (gameState !== 'playing' || !question || bombStage !== 'wires' || (!isRelaxMode && lives <= 0)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (showGuide) dismissGuide();
+        const isTouch = e.pointerType === 'touch';
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const initState = { wire, x: startX, y: startY, startX, startY, isDragging: false, isTouch, overTarget: false };
+        setDragWire(initState);
+
+        const isPointInSlot = (cx, cy) => {
+          const el = targetSlotRef.current;
+          if (!el) return false;
+          const r = el.getBoundingClientRect();
+          const pad = 16;
+          return cx >= r.left - pad && cx <= r.right + pad && cy >= r.top - pad && cy <= r.bottom + pad;
+        };
+
+        const onMove = (ev) => {
+          const dx = ev.clientX - startX;
+          const dy = ev.clientY - startY;
+          const moved = Math.hypot(dx, dy) >= 8;
+          const visualY = isTouch ? ev.clientY - 46 : ev.clientY;
+          const over = moved && (isPointInSlot(ev.clientX, ev.clientY) || isPointInSlot(ev.clientX, visualY));
+          setDragWire(prev => prev ? { ...prev, x: ev.clientX, y: ev.clientY, isDragging: prev.isDragging || moved, overTarget: over } : null);
+        };
+
+        const onUp = (ev) => {
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('pointerup', onUp);
+          window.removeEventListener('pointercancel', onUp);
+          const dx = ev.clientX - startX;
+          const dy = ev.clientY - startY;
+          const moved = Math.hypot(dx, dy) >= 8;
+          const visualY = isTouch ? ev.clientY - 46 : ev.clientY;
+          const hitSlot = isPointInSlot(ev.clientX, ev.clientY) || isPointInSlot(ev.clientX, visualY);
+          setDragWire(null);
+          if (!moved || hitSlot) {
+            handleCutWire(wire);
+          }
+        };
+
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', onUp);
+      };
+
       const lv13CoachSteps = useMemo(() => {
         if (guideMode === 'manual') {
           return [
-            { desc: '上方第一區（單選）：依畢氏三元數選出目標三角比的絕對值。' },
-            { desc: '上方第二、三區（獨立開關）：依兩個條件點亮對應象限（田字排列即 II｜I / III｜IV）。' },
-            { desc: '三區按錯不扣心也不提示；唯有三區全部正確，下方警戒滑門才會自動打開！' },
-            { desc: '滑門開蓋後，直接對照上方自己點亮的兩個象限盤判斷正負號，點擊剪斷正確電線拆除炸彈！' }
+            { desc: '下方第一區（單選）：依畢氏三元數選出目標三角比的絕對值。' },
+            { desc: '下方第二、三區（獨立開關）：依兩個條件點亮對應象限（田字排列即 II｜I / III｜IV）。' },
+            { desc: '三區按錯不扣心也不提示；唯有三區全部正確，上方防火牆滑門才會自動滑開！' },
+            { desc: '滑門開啟後，對照下方點亮的兩組象限判斷正負號，點選（或拖曳）正確金鑰填入左側空格完成解碼！' }
           ];
         }
         if (bombStage === 'wires') {
@@ -11975,7 +12247,7 @@
             pad: 8,
             shape: 'rect',
             tap: true,
-            desc: '警戒滑門已開！對照上方點亮的兩組象限判斷正負號，剪斷正確電線拆除炸彈！'
+            desc: '防火牆已解鎖！對照下方點亮的兩組象限判斷正負號，點選（或拖曳）正確金鑰完成解碼！'
           }];
         }
         return [{
@@ -11985,28 +12257,19 @@
           pad: 8,
           shape: 'rect',
           tap: false,
-          desc: '設定上方三區按鈕（按錯不扣心），三區全對時下方警戒滑門會自動打開！'
+          desc: '設定下方三區解碼鍵盤（按錯不扣心），三區全對時上方防火牆滑門會自動打開！'
         }];
       }, [guideMode, bombStage]);
 
       const isUnlocking = bombStage === 'unlocking';
       const isOpened = bombStage === 'wires' || bombStage === 'defused';
-      const hatchOpen = isUnlocking || isOpened;
-
-      const hazardStripeStyle = {
-        backgroundImage: 'repeating-linear-gradient(-45deg, #facc15 0px, #facc15 7px, #0f172a 7px, #0f172a 14px)'
-      };
-
-      const screwCorner = (posCls) => (
-        <span className={`pointer-events-none absolute ${posCls} w-2.5 h-2.5 rounded-full bg-gradient-to-br from-slate-400 to-slate-700 border border-slate-900 shadow-inner flex items-center justify-center`}>
-          <span className="w-1.5 h-[1px] bg-slate-900/80 rotate-45" />
-        </span>
-      );
+      const hatchOpen = isArming || doorSliding || isOpened;
+      const lockedDone = isOpened || isUnlocking;
 
       return (
-        <div ref={containerRef} className={`w-full h-full flex flex-col pt-1.5 pb-1.5 px-2.5 gap-1.5 relative ${feedbackAnim}`}>
+        <div ref={containerRef} className={`w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0 ${feedbackAnim}`}>
           {gameState === 'playing' && question && (
-            <div className="flex flex-col flex-1 min-h-0 gap-1.5">
+            <div onClick={handleConfirmSkip} className="flex-1 min-h-0 flex flex-col justify-between gap-2 overflow-hidden pb-0.5">
               <GameHUD
                 lives={lives}
                 maxLives={maxLives}
@@ -12014,345 +12277,584 @@
                 healTarget={healTarget}
                 progress={progress}
                 starsThreshold={starsThreshold}
-                unitLabel="顆"
+                unitLabel="題"
                 onManualEnd={finishNow}
                 onOpenGuide={openGuide}
               />
 
-              {/* 一體式軍事拆彈主機殼 */}
-              <div className="flex-1 min-h-0 flex flex-col bg-slate-900 rounded-3xl border-[3px] border-slate-600 shadow-2xl overflow-hidden relative">
-                <StagePhaseStrip
-                  phase={question.phase}
-                  labels={['P0 直給象限拆彈', 'P1 雙條件交集拆彈', 'P2 進階區間拆彈']}
-                />
+              {/* 真實滑蓋機身容器：收合時整台精巧置中、滑開時自然上下展開，螢幕尺寸 100% 鎖定不變形 */}
+              <div className="flex-1 min-h-0 flex flex-col justify-center overflow-hidden">
+                <div className={`w-full max-h-full bg-gradient-to-b from-slate-100 via-slate-100 to-slate-200/90 rounded-3xl border-3 border-violet-900 shadow-xl flex flex-col overflow-hidden transition-all duration-300 ${bombStage === 'defused' ? 'ring-4 ring-emerald-400/75' : ''}`}>
+                  <StagePhaseStrip
+                    phase={question.phase}
+                    labels={['P0 半圓角度交集解碼', 'P1 單函數正負交集解碼', 'P2 乘積不等式 × 根號壓軸']}
+                  />
 
-                {/* 嵌入式軍事 LCD 儀表螢幕（含 ARMED / READY / DEFUSED 呼吸狀態燈） */}
-                <div
-                  className="relative bg-gradient-to-b from-slate-950 via-[#071512] to-slate-950 text-white px-3 py-1.5 flex items-center justify-between gap-2 shrink-0 border-b-2 border-slate-700/90 shadow-inner"
-                  style={{ backgroundImage: 'repeating-linear-gradient(0deg, rgba(16,185,129,0.04) 0px, rgba(16,185,129,0.04) 1px, transparent 1px, transparent 3px)' }}
-                >
-                  <div className="flex flex-wrap items-center gap-1.5 text-xs sm:text-sm font-black min-w-0">
-                    <span className="inline-flex items-center gap-1 bg-cyan-500/15 border border-cyan-400/45 text-cyan-200 px-2 py-0.5 rounded-md font-serif">
-                      <span>{question.givenFunc} θ =</span>
-                      <FracText value={question.givenValStr} />
-                    </span>
-                    <span className="inline-flex items-center bg-fuchsia-500/15 border border-fuchsia-400/45 text-fuchsia-200 px-2 py-0.5 rounded-md font-serif">
-                      {question.cond2Prompt}
+                  {/* 置頂主題題目列（完整保留原始題目：條件一、條件二、求目標，無膠囊純文字色字排印） */}
+                  <div className="bg-gradient-to-r from-violet-800 to-indigo-800 text-white min-h-[50px] px-3 py-1.5 flex items-center justify-between gap-2 shrink-0 border-b-2 border-violet-950">
+                    <div className="flex-1 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 font-serif font-black text-xs sm:text-sm leading-snug min-w-0">
+                      <span className="inline-flex items-center gap-1 text-sky-200">
+                        <span>{question.givenFunc} θ =</span>
+                        <FracText value={question.givenValStr} />
+                      </span>
+                      <span className="text-violet-300/65">，</span>
+                      <span className="text-fuchsia-200">{question.cond2Prompt}</span>
+                      <span className="text-violet-300/65">，</span>
+                      <span className="text-amber-300 text-sm sm:text-base tracking-wide">求 {question.targetFunc} θ</span>
+                    </div>
+                    <span className="w-6 h-6 inline-flex items-center justify-center shrink-0">
+                      <SuccessBadge show={bombStage === 'defused'} />
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div className="flex items-center gap-1 font-serif font-black text-sm sm:text-base text-amber-300">
-                      <span className="text-[10px] font-sans bg-amber-400/20 border border-amber-400/40 px-1.5 py-0.5 rounded text-amber-200">求</span>
-                      <span>{question.targetFunc} θ</span>
+                  {/* 中段定高上蓋螢幕（鎖定高度 h-[196px] sm:h-[212px]，鍵盤收放時螢幕大小紋絲不動！） */}
+                  <div className="relative z-20 shrink-0 h-[196px] sm:h-[212px] bg-gradient-to-b from-slate-100 to-slate-100/95 shadow-[0_6px_14px_rgba(15,23,42,0.16)] px-2.5 pt-1.5 pb-2 flex flex-col gap-1 select-none overflow-hidden">
+                  <HintBanner tip={conceptTip} />
+
+                  {/* 極簡極客機型絲印列（左上型號 ＋ 右上三區訊號小燈＋小小太陽能紋飾） */}
+                  <div className="flex items-center justify-between px-1 shrink-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-mono font-black tracking-widest text-slate-500">TRI-13</span>
+                      <span className="text-[9px] font-mono font-bold text-slate-400">IC-DECODER</span>
                     </div>
-                    <div className={`px-1.5 py-0.5 rounded border text-[9px] font-mono font-black tracking-wider flex items-center gap-1 ${
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        <span className={`w-1.5 h-1.5 rounded-full transition-all ${lockedDone ? 'bg-emerald-500' : selAbs ? 'bg-amber-400' : 'bg-slate-300'}`} />
+                        <span className={`w-1.5 h-1.5 rounded-full transition-all ${lockedDone ? 'bg-emerald-500' : selCond1.length > 0 ? 'bg-sky-500' : 'bg-slate-300'}`} />
+                        <span className={`w-1.5 h-1.5 rounded-full transition-all ${lockedDone ? 'bg-emerald-500' : selCond2.length > 0 ? 'bg-fuchsia-500' : 'bg-slate-300'}`} />
+                      </div>
+                      <div className="flex h-3 w-11 rounded-[3px] overflow-hidden border border-slate-400/80 bg-[#3a2a24] shadow-inner">
+                        <span className="flex-1 border-r border-amber-200/20" />
+                        <span className="flex-1 border-r border-amber-200/20" />
+                        <span className="flex-1 border-r border-amber-200/20" />
+                        <span className="flex-1" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 凹陷式雙視窗 PCB 終端螢幕：左右 50:50 對稱，左 6 針立體鑲嵌插槽 ｜ 右 1:1 等大 6 針中性黑晶片 */}
+                  <div
+                    className={`flex-1 min-h-0 rounded-2xl border-2 overflow-hidden flex shadow-[inset_0_3px_12px_rgba(0,0,0,0.8)] transition-colors ${
                       bombStage === 'defused'
-                        ? 'bg-emerald-950/90 border-emerald-400 text-emerald-300'
+                        ? 'border-emerald-500 bg-[#061c16]'
                         : isOpened
-                        ? 'bg-amber-950/90 border-amber-400 text-amber-300'
-                        : 'bg-rose-950/90 border-rose-500/70 text-rose-300'
-                    }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        ? 'border-amber-400 bg-[#09131e]'
+                        : 'border-slate-700 bg-[#09131e]'
+                    }`}
+                  >
+                    {/* 左側 50%：立體深內凹 IC 晶片鑲嵌插槽（與右側晶片 1:1 等大、6 對鍍金插孔精準對位） */}
+                    <div
+                      ref={targetSlotRef}
+                      className={`relative w-1/2 shrink-0 border-r-2 border-slate-700/85 bg-[#070f19] px-2 py-2 flex flex-col items-center justify-center text-center gap-1.5 overflow-hidden transition-colors ${
+                        dragWire?.overTarget ? 'bg-amber-500/10' : ''
+                      }`}
+                    >
+                      {/* 左側主機板銅箔走線（插入正確晶片後同步亮翠綠通電） */}
+                      <svg viewBox="0 0 180 160" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 w-full h-full opacity-45">
+                        <g fill="none" stroke={bombStage === 'defused' ? '#10b981' : '#1e3a5f'} strokeWidth="1.6">
+                          <path d="M 0 46 H 26 L 38 58 H 180" />
+                          <path d="M 0 114 H 26 L 38 102 H 180" />
+                          <path d="M 90 0 V 32" />
+                          <path d="M 90 128 V 160" />
+                        </g>
+                        <g fill={bombStage === 'defused' ? '#34d399' : '#d97706'} opacity="0.65">
+                          <circle cx="26" cy="46" r="2.2" /><circle cx="26" cy="114" r="2.2" />
+                        </g>
+                      </svg>
+
+                      <div className="relative z-[1] font-serif font-black text-sm sm:text-base text-slate-200 leading-none">
+                        {question.targetFunc} θ =
+                      </div>
+
+                      {/* 外層略凸起的 IC Socket 金屬底座（左右機械夾扣 ＋ 上下 6 對鍍金針腳插孔 ＋ 深內凹坑洞） */}
+                      <div className={`relative z-[1] p-1.5 rounded-xl border transition-all ${
                         bombStage === 'defused'
-                          ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]'
+                          ? 'bg-[#102620] border-emerald-500/60 shadow-[0_0_16px_rgba(16,185,129,0.28)]'
+                          : dragWire?.overTarget
+                          ? 'bg-[#1a2233] border-amber-400/90 scale-[1.03] shadow-[0_0_18px_rgba(251,191,36,0.4)]'
+                          : 'bg-[#111927] border-slate-700/90 shadow-[0_2px_6px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.06)]'
+                      }`}>
+                        {/* 左右機械固定夾扣：待機微張向外 → 晶片嵌入瞬間向內夾緊鎖死＋亮翠綠光 */}
+                        <span className={`pointer-events-none absolute top-1/2 -translate-y-1/2 w-[5px] h-7 rounded-sm border transition-all duration-300 z-20 ${
+                          bombStage === 'defused'
+                            ? 'left-[2px] bg-emerald-400 border-emerald-100 shadow-[0_0_8px_#34d399]'
+                            : '-left-[4px] bg-slate-500 border-slate-300/60'
+                        }`} />
+                        <span className={`pointer-events-none absolute top-1/2 -translate-y-1/2 w-[5px] h-7 rounded-sm border transition-all duration-300 z-20 ${
+                          bombStage === 'defused'
+                            ? 'right-[2px] bg-emerald-400 border-emerald-100 shadow-[0_0_8px_#34d399]'
+                            : '-right-[4px] bg-slate-500 border-slate-300/60'
+                        }`} />
+                        {/* 拖曳靠近時的四角準星磁吸標記 */}
+                        {dragWire?.overTarget && bombStage !== 'defused' && (
+                          <>
+                            <span className="pointer-events-none absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-amber-300 rounded-tl-sm" />
+                            <span className="pointer-events-none absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-amber-300 rounded-tr-sm" />
+                            <span className="pointer-events-none absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-amber-300 rounded-bl-sm" />
+                            <span className="pointer-events-none absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-amber-300 rounded-br-sm" />
+                          </>
+                        )}
+
+                        {/* 上排 6 顆鍍金針腳插孔（未插入為金圈黑孔心；插入後被 6 根翠綠金腳填滿） */}
+                        <div className="flex items-end justify-center gap-3 w-[122px] sm:w-[136px] mb-[2px]">
+                          {[0, 1, 2, 3, 4, 5].map(n => (
+                            bombStage === 'defused' ? (
+                              <span key={n} className="w-[5px] h-[6px] rounded-t-[1.5px] bg-gradient-to-b from-emerald-200 via-emerald-400 to-emerald-600 shadow-[0_0_5px_#34d399]" />
+                            ) : (
+                              <span key={n} className={`w-[6px] h-[6px] rounded-[2px] border flex items-center justify-center transition-all ${
+                                dragWire?.overTarget
+                                  ? 'border-amber-300 bg-amber-300/35 shadow-[0_0_6px_#fbbf24]'
+                                  : isOpened
+                                  ? 'border-amber-400/80 bg-[#04070d]'
+                                  : 'border-amber-500/35 bg-[#04070d]'
+                              }`}>
+                                <span className="w-[2px] h-[2px] rounded-full bg-black" />
+                              </span>
+                            )
+                          ))}
+                        </div>
+
+                        {/* 中央 1:1 鑲嵌槽本體：空槽極深內凹 → 插入後由立體微凸黑曜石 IC 晶片彈壓填滿＋翠綠通電波紋！ */}
+                        {bombStage === 'defused' ? (
+                          <div className="relative w-[122px] sm:w-[136px] h-[42px] sm:h-[46px]">
+                            {/* 嵌入瞬間向外擴散的翠綠通電波紋 */}
+                            <span className="pointer-events-none absolute -inset-1 rounded-xl border-2 border-emerald-400/90 lv13-power-ring" />
+                            <div className="lv13-chip-seat relative w-full h-full rounded-[7px] border-[1.5px] border-emerald-400 bg-gradient-to-b from-[#1a3a30] via-[#10261f] to-[#0a1a15] flex items-center justify-between px-2.5 shadow-[0_4px_12px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.2)] overflow-hidden">
+                              <span className="absolute -left-[2px] top-1/2 -translate-y-1/2 w-2 h-4 rounded-r-full bg-[#102620] border-y border-r border-emerald-400/70" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_7px_#34d399] ml-1" />
+                              <div className="font-serif font-black text-base sm:text-lg text-emerald-100 leading-none">
+                                <FracText value={question.signedAnsStr} />
+                              </div>
+                              <span className="text-xs">✅</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className={`relative w-[122px] sm:w-[136px] h-[42px] sm:h-[46px] rounded-[7px] border-2 flex items-center justify-center font-serif font-black text-base transition-all overflow-hidden ${
+                            dragWire?.overTarget
+                              ? 'border-amber-300 bg-amber-400/20 text-amber-100 shadow-[inset_0_4px_12px_rgba(0,0,0,0.75)]'
+                              : isOpened
+                              ? 'border-amber-400/85 bg-[#040810] text-amber-200 animate-pulse shadow-[inset_0_5px_12px_rgba(0,0,0,0.92),inset_0_-1px_0_rgba(255,255,255,0.08)]'
+                              : 'border-dashed border-slate-600/80 bg-[#040810] text-slate-600 shadow-[inset_0_5px_12px_rgba(0,0,0,0.92),inset_0_-1px_0_rgba(255,255,255,0.06)]'
+                          }`}>
+                            {/* 凹槽內左側防呆缺口絲印輪廓 */}
+                            <span className="pointer-events-none absolute -left-[2px] top-1/2 -translate-y-1/2 w-2 h-4 rounded-r-full border-y border-r border-slate-500/45 bg-[#111927]" />
+                            {/* 凹槽底板極淡 PCB 虛線對位框 */}
+                            <span className="pointer-events-none absolute inset-1.5 rounded-[4px] border border-dashed border-slate-500/25" />
+                            <span>?</span>
+                          </div>
+                        )}
+
+                        {/* 下排 6 顆鍍金針腳插孔 */}
+                        <div className="flex items-start justify-center gap-3 w-[122px] sm:w-[136px] mt-[2px]">
+                          {[0, 1, 2, 3, 4, 5].map(n => (
+                            bombStage === 'defused' ? (
+                              <span key={n} className="w-[5px] h-[6px] rounded-b-[1.5px] bg-gradient-to-t from-emerald-200 via-emerald-400 to-emerald-600 shadow-[0_0_5px_#34d399]" />
+                            ) : (
+                              <span key={n} className={`w-[6px] h-[6px] rounded-[2px] border flex items-center justify-center transition-all ${
+                                dragWire?.overTarget
+                                  ? 'border-amber-300 bg-amber-300/35 shadow-[0_0_6px_#fbbf24]'
+                                  : isOpened
+                                  ? 'border-amber-400/80 bg-[#04070d]'
+                                  : 'border-amber-500/35 bg-[#04070d]'
+                              }`}>
+                                <span className="w-[2px] h-[2px] rounded-full bg-black" />
+                              </span>
+                            )
+                          ))}
+                        </div>
+                      </div>
+
+                      <span className={`relative z-[1] text-[9px] font-mono font-black tracking-wider ${
+                        bombStage === 'defused'
+                          ? 'text-emerald-400'
                           : isOpened
-                          ? 'bg-amber-400 animate-pulse shadow-[0_0_6px_#fbbf24]'
-                          : 'bg-rose-500 animate-pulse shadow-[0_0_6px_#f43f5e]'
-                      }`} />
-                      <span>{bombStage === 'defused' ? 'SAFE' : isOpened ? 'READY' : 'ARMED'}</span>
+                          ? 'text-amber-300'
+                          : 'text-slate-500'
+                      }`}>
+                        {bombStage === 'defused' ? 'UNLOCKED' : isOpened ? 'INSERT IC' : 'FIREWALL'}
+                      </span>
+                    </div>
+
+                    {/* 右側 50%：主機板 PCB 走線 ＋ 兩顆 1:1 等大 6 針中性黑曜石 IC 晶片 ＋ 防火牆對開滑門 */}
+                    <div
+                      data-coach="lv13-wires"
+                      className="relative w-1/2 min-w-0 h-full overflow-hidden"
+                    >
+                      {/* PCB 主機板直角銅箔走線與過孔底圖 */}
+                      <svg viewBox="0 0 180 160" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 w-full h-full opacity-45">
+                        <g fill="none" stroke={bombStage === 'defused' ? '#10b981' : '#1e3a5f'} strokeWidth="1.6">
+                          <path d="M 0 40 H 24 L 34 28 H 146 L 156 40 H 180" />
+                          <path d="M 0 120 H 24 L 34 132 H 146 L 156 120 H 180" />
+                        </g>
+                        <g fill={bombStage === 'defused' ? '#34d399' : '#d97706'} opacity="0.65">
+                          <circle cx="18" cy="40" r="2.2" /><circle cx="162" cy="40" r="2.2" />
+                          <circle cx="18" cy="120" r="2.2" /><circle cx="162" cy="120" r="2.2" />
+                        </g>
+                      </svg>
+
+                      <div className="relative w-full h-full px-2 py-2 flex flex-col justify-center gap-2">
+                        {question.wires.map((wire, wIdx) => {
+                          const isCut = cutWireId === wire.id;
+                          const isSpark = sparkWireId === wire.id;
+                          const isBeingDragged = dragWire?.isDragging && dragWire?.wire?.id === wire.id;
+                          // 極低調中性電源小燈點（IC-A 柔和琥珀 / IC-B 柔和冰青，避免紅藍誤導正負）
+                          const dotCls = isCut
+                            ? 'bg-emerald-400 shadow-[0_0_7px_#34d399]'
+                            : wIdx === 0
+                            ? 'bg-amber-300/85 shadow-[0_0_5px_rgba(252,211,77,0.7)]'
+                            : 'bg-cyan-300/85 shadow-[0_0_5px_rgba(103,232,249,0.7)]';
+                          const pinColor = isCut
+                            ? 'from-emerald-200 via-emerald-400 to-emerald-600'
+                            : 'from-amber-200 via-amber-400 to-amber-600';
+                          return (
+                            <div
+                              key={wire.id}
+                              role="button"
+                              tabIndex={isOpened && bombStage !== 'defused' ? 0 : -1}
+                              onPointerDown={(e) => handleWirePointerDown(e, wire)}
+                              style={{ touchAction: 'none' }}
+                              className={`group relative w-full flex-1 min-h-0 rounded-xl border transition-all flex items-center justify-center px-1 ${
+                                isCut
+                                  ? 'bg-emerald-950/50 border-emerald-400/75'
+                                  : isSpark
+                                  ? 'bg-rose-950/90 border-rose-400 animate-shake'
+                                  : isOpened && bombStage !== 'defused'
+                                  ? 'bg-slate-900/50 border-slate-600/55 hover:border-amber-300/85 hover:bg-slate-800/65 cursor-grab active:cursor-grabbing'
+                                  : 'bg-slate-900/35 border-slate-800/70 pointer-events-none'
+                              }`}
+                            >
+                              {/* 1:1 等大 6 針中性黑曜石 DIP 加密晶片（選中拔起後留下凹陷空焊盤 EXTRACTED，不再重複顯示！） */}
+                              {isCut ? (
+                                <div className="pointer-events-none w-[122px] sm:w-[136px] h-[42px] sm:h-[46px] rounded-[7px] border border-dashed border-emerald-500/45 bg-[#040a0e]/80 shadow-[inset_0_3px_8px_rgba(0,0,0,0.85)] flex items-center justify-center">
+                                  <span className="text-[9px] font-mono font-black tracking-widest text-emerald-400/75">EXTRACTED</span>
+                                </div>
+                              ) : (
+                              <div className={`pointer-events-none relative flex flex-col items-center transition-all ${
+                                isBeingDragged ? 'opacity-25 scale-95' : isOpened && bombStage !== 'defused' ? 'group-hover:scale-[1.03]' : ''
+                              }`}>
+                                <div className="flex items-end justify-center gap-3 w-[122px] sm:w-[136px]">
+                                  {[0, 1, 2, 3, 4, 5].map(p => (
+                                    <span key={p} className={`w-[5px] h-[6px] rounded-t-[1.5px] bg-gradient-to-b ${pinColor} border-x border-t border-amber-900/50`} />
+                                  ))}
+                                </div>
+
+                                <div className={`relative w-[122px] sm:w-[136px] h-[42px] sm:h-[46px] rounded-[7px] border-[1.5px] flex items-center justify-between px-2.5 shadow-[0_6px_14px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.14)] overflow-hidden ${
+                                  isSpark
+                                    ? 'bg-gradient-to-b from-[#3b1520] via-[#260d15] to-[#1a080e] border-rose-400'
+                                    : 'bg-gradient-to-b from-[#2b3346] via-[#1c2230] to-[#121621] border-slate-500/85'
+                                }`}>
+                                  <span className="absolute -left-[2px] top-1/2 -translate-y-1/2 w-2 h-4 rounded-r-full bg-[#09131e] border-y border-r border-slate-600/80" />
+
+                                  <div className="flex flex-col items-center gap-0.5 pl-1">
+                                    <span className={`w-1.5 h-1.5 rounded-full ${dotCls}`} />
+                                    <span className="text-[7px] font-mono font-bold text-slate-400/90 leading-none">
+                                      {wIdx === 0 ? 'A' : 'B'}
+                                    </span>
+                                  </div>
+
+                                  <div className={`flex items-center gap-0.5 font-serif font-black text-base sm:text-lg leading-none ${
+                                    isOpened ? 'text-white' : 'text-slate-400'
+                                  }`}>
+                                    {isOpened ? (
+                                      <>
+                                        <span>{wire.sign > 0 ? '+' : ''}</span>
+                                        <FracText value={wire.valStr} />
+                                      </>
+                                    ) : (
+                                      <span>?</span>
+                                    )}
+                                  </div>
+
+                                  <div className="w-3.5 flex items-center justify-end">
+                                    <span className="w-2 h-2 rounded-full bg-slate-900/90 border border-slate-600/70 shadow-inner" />
+                                  </div>
+                                </div>
+
+                                <div className="flex items-start justify-center gap-3 w-[122px] sm:w-[136px]">
+                                  {[0, 1, 2, 3, 4, 5].map(p => (
+                                    <span key={p} className={`w-[5px] h-[6px] rounded-b-[1.5px] bg-gradient-to-t ${pinColor} border-x border-b border-amber-900/50`} />
+                                  ))}
+                                </div>
+                              </div>
+                              )}
+
+                              {isSpark && (
+                                <svg viewBox="0 0 120 50" className="pointer-events-none absolute inset-0 w-full h-full">
+                                  <g stroke="#fde047" strokeWidth="2.6" strokeLinecap="round">
+                                    <line x1="60" y1="3" x2="60" y2="14" />
+                                    <line x1="36" y1="10" x2="46" y2="18" />
+                                    <line x1="84" y1="10" x2="74" y2="18" />
+                                    <line x1="38" y1="42" x2="48" y2="34" />
+                                    <line x1="82" y1="42" x2="72" y2="34" />
+                                  </g>
+                                </svg>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* 電影級實心裝甲氣閘雙門（100% 不透明槍鋼漸層＋拉絲紋理＋咬合鎖舌＋180° 旋轉氣密鎖閥＋大片洩壓氣霧） */}
+                      <div className="pointer-events-none absolute inset-0 z-20 flex overflow-hidden">
+                        {/* 左實心裝甲門板（合併底層不透明漸層與上層拉絲紋理，徹底不透光） */}
+                        <div
+                          className={`relative w-1/2 h-full border-r-2 border-slate-950 flex flex-col justify-between transition-transform duration-[680ms] [transition-timing-function:cubic-bezier(0.55,0.05,0.2,1)] shadow-[inset_-6px_0_14px_rgba(0,0,0,0.65)] ${
+                            hatchOpen ? '-translate-x-[108%]' : 'translate-x-0'
+                          }`}
+                          style={{
+                            backgroundColor: '#1e293b',
+                            backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.045) 0px, rgba(255,255,255,0.045) 2px, transparent 2px, transparent 6px), linear-gradient(145deg, #3b495e 0%, #1e293b 52%, #0f172a 100%)'
+                          }}
+                        >
+                          <div className={`h-[4px] w-full transition-colors duration-300 ${isUnlocking ? 'bg-emerald-400 shadow-[0_0_10px_#34d399]' : 'bg-cyan-400/80'}`} />
+                          {/* 四角實心鉚釘＋立體水平加強筋 */}
+                          <span className="absolute top-2.5 left-2 w-2 h-2 rounded-full bg-slate-500 border border-slate-950 shadow-inner" />
+                          <span className="absolute bottom-2.5 left-2 w-2 h-2 rounded-full bg-slate-500 border border-slate-950 shadow-inner" />
+                          <div className="mx-2.5 my-auto flex flex-col gap-3.5 opacity-50">
+                            <span className="h-[3px] w-full bg-slate-950/90 border-b border-slate-400/35 rounded-full" />
+                            <span className="h-[3px] w-full bg-slate-950/90 border-b border-slate-400/35 rounded-full" />
+                            <span className="h-[3px] w-full bg-slate-950/90 border-b border-slate-400/35 rounded-full" />
+                          </div>
+                          {/* 中央凸出咬合鎖舌 */}
+                          <span className="absolute -right-[7px] top-1/2 -translate-y-1/2 w-[8px] h-12 bg-gradient-to-b from-slate-500 via-slate-600 to-slate-800 border-y border-r border-slate-300/60 rounded-r-sm shadow-lg z-10" />
+                          <div className={`h-[4px] w-full transition-colors duration-300 ${isUnlocking ? 'bg-emerald-400 shadow-[0_0_10px_#34d399]' : 'bg-cyan-400/80'}`} />
+                        </div>
+
+                        {/* 右實心裝甲門板 */}
+                        <div
+                          className={`relative w-1/2 h-full border-l-2 border-slate-950 flex flex-col justify-between transition-transform duration-[680ms] [transition-timing-function:cubic-bezier(0.55,0.05,0.2,1)] shadow-[inset_6px_0_14px_rgba(0,0,0,0.65)] ${
+                            hatchOpen ? 'translate-x-[108%]' : 'translate-x-0'
+                          }`}
+                          style={{
+                            backgroundColor: '#1e293b',
+                            backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.045) 0px, rgba(255,255,255,0.045) 2px, transparent 2px, transparent 6px), linear-gradient(215deg, #3b495e 0%, #1e293b 52%, #0f172a 100%)'
+                          }}
+                        >
+                          <div className={`h-[4px] w-full transition-colors duration-300 ${isUnlocking ? 'bg-emerald-400 shadow-[0_0_10px_#34d399]' : 'bg-cyan-400/80'}`} />
+                          <span className="absolute top-2.5 right-2 w-2 h-2 rounded-full bg-slate-500 border border-slate-950 shadow-inner" />
+                          <span className="absolute bottom-2.5 right-2 w-2 h-2 rounded-full bg-slate-500 border border-slate-950 shadow-inner" />
+                          <div className="mx-2.5 my-auto flex flex-col gap-3.5 opacity-50">
+                            <span className="h-[3px] w-full bg-slate-950/90 border-b border-slate-400/35 rounded-full" />
+                            <span className="h-[3px] w-full bg-slate-950/90 border-b border-slate-400/35 rounded-full" />
+                            <span className="h-[3px] w-full bg-slate-950/90 border-b border-slate-400/35 rounded-full" />
+                          </div>
+                          <div className={`h-[4px] w-full transition-colors duration-300 ${isUnlocking ? 'bg-emerald-400 shadow-[0_0_10px_#34d399]' : 'bg-cyan-400/80'}`} />
+                        </div>
+
+                        {/* 門縫高能透光（解鎖退栓 0–380ms 亮耀眼翠綠光；開局合門落鎖瞬間閃冰青電磁光） */}
+                        {isUnlocking && !doorSliding && (
+                          <div className="absolute left-1/2 top-0 bottom-0 -translate-x-1/2 w-[4px] bg-emerald-300 shadow-[0_0_16px_#34d399,0_0_28px_#10b981] z-30" />
+                        )}
+                        {lockFlash > 0 && !hatchOpen && (
+                          <div key={`lf-${lockFlash}`} className="lv13-seam-flash absolute left-1/2 top-0 bottom-0 -translate-x-1/2 w-[4px] bg-cyan-300 shadow-[0_0_14px_#22d3ee] z-30" />
+                        )}
+
+                        {/* 高壓氣閘洩壓大片冷白蒸汽羽煙（開門滑動瞬間自門縫上下強勁噴出消散） */}
+                        {steamBurst > 0 && (
+                          <React.Fragment key={`st-${steamBurst}`}>
+                            <div
+                              className="lv13-steam-up absolute left-1/2 top-1/2 w-28 h-24 rounded-full blur-[2px] z-30"
+                              style={{ background: 'radial-gradient(ellipse, rgba(240,249,255,0.92) 0%, rgba(167,243,208,0.52) 42%, transparent 72%)' }}
+                            />
+                            <div
+                              className="lv13-steam-down absolute left-1/2 top-1/2 w-28 h-24 rounded-full blur-[2px] z-30"
+                              style={{ background: 'radial-gradient(ellipse, rgba(240,249,255,0.92) 0%, rgba(167,243,208,0.52) 42%, transparent 72%)' }}
+                            />
+                          </React.Fragment>
+                        )}
+
+                        {/* 中央圓形氣密鎖閥轉盤（解鎖時 360ms 旋轉 180° 轉翠綠並退栓淡出） */}
+                        <div
+                          className={`absolute inset-0 flex flex-col items-center justify-center gap-1.5 transition-all duration-300 z-30 ${
+                            hatchOpen ? 'opacity-0 scale-75' : 'opacity-100 scale-100'
+                          }`}
+                        >
+                          <div className={`w-12 h-12 rounded-full border-[2.5px] flex items-center justify-center shadow-[0_6px_16px_rgba(0,0,0,0.85)] transition-all duration-[360ms] ease-in-out ${
+                            isUnlocking
+                              ? 'bg-emerald-950 border-emerald-400 rotate-180 shadow-[0_0_22px_#34d399]'
+                              : 'bg-slate-900 border-cyan-400/85 rotate-0'
+                          }`}>
+                            <span className={`absolute w-8 h-[2.5px] rounded-full ${isUnlocking ? 'bg-emerald-400/80' : 'bg-slate-400/75'}`} />
+                            <span className={`absolute h-8 w-[2.5px] rounded-full ${isUnlocking ? 'bg-emerald-400/80' : 'bg-slate-400/75'}`} />
+                            <span className={`relative w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                              isUnlocking ? 'bg-emerald-400 border-emerald-100 shadow-[0_0_12px_#34d399]' : 'bg-slate-800 border-cyan-300'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${isUnlocking ? 'bg-white' : 'bg-cyan-300 animate-pulse'}`} />
+                            </span>
+                          </div>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide border shadow ${
+                            isUnlocking
+                              ? 'bg-emerald-950/95 border-emerald-400 text-emerald-200'
+                              : 'bg-slate-950/95 border-slate-500 text-slate-100'
+                          }`}>
+                            {isUnlocking ? '氣閘洩壓解鎖...' : '三區全對開啟'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* 主金屬底板：上方三區密碼盤（常駐）＋ 下方實體滑蓋剪線艙 */}
+                {/* 底部 shrink-0：真實同步收合背蓋滑軌容器（grid-rows 1fr↔0fr，收回時機身同步收攏聚焦上方螢幕！） */}
                 <div
-                  onClick={handleConfirmSkip}
-                  className="relative flex-1 min-h-0 bg-[linear-gradient(160deg,#1e293b_0%,#0f172a_52%,#090d16_100%)] px-2.5 py-2 flex flex-col gap-2 overflow-hidden select-none"
+                  className={`relative z-10 shrink-0 grid bg-slate-200/75 transition-[grid-template-rows] duration-[560ms] [transition-timing-function:cubic-bezier(0.22,1.08,0.36,1)] ${
+                    keypadReady ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                  }`}
                 >
-                  {screwCorner('top-1.5 left-1.5')}
-                  {screwCorner('top-1.5 right-1.5')}
-                  {screwCorner('bottom-1.5 left-1.5')}
-                  {screwCorner('bottom-1.5 right-1.5')}
-
-                  <HintBanner tip={conceptTip} />
-
-                  {/* ===== 上半部：三區密碼面板（解鎖後常駐發光鎖定，讓玩家直接對照剪線！） ===== */}
-                  <div
-                    data-coach="lv13-panel"
-                    className="flex-[1.22] min-h-0 flex flex-col gap-1.5"
-                  >
-                    {/* 第一區：絕對值單選（琥珀金 3D 互鎖檔位鍵） */}
-                    <div className={`bg-slate-950/80 border-2 rounded-2xl p-1.5 flex flex-col gap-1 shadow-[inset_0_2px_8px_rgba(0,0,0,0.65)] transition-colors ${
-                      hatchOpen ? 'border-emerald-500/45' : 'border-slate-700/90'
-                    }`}>
-                      <div className="flex items-center justify-between px-1">
-                        <span className="text-[11px] sm:text-xs font-black text-amber-300 font-serif flex items-center gap-1.5">
-                          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500/20 border border-amber-400/50 text-[10px] font-sans">1</span>
-                          <span>|{question.targetFunc} θ| 絕對值</span>
-                        </span>
-                        <span className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
-                          <span>{hatchOpen ? '已鎖定' : '單選'}</span>
-                          <span className={`w-2 h-2 rounded-full transition-all ${
-                            hatchOpen
-                              ? 'bg-emerald-400 shadow-[0_0_7px_#34d399]'
-                              : selAbs
-                              ? 'bg-amber-400 shadow-[0_0_6px_#fbbf24]'
-                              : 'bg-slate-700 border border-slate-600'
-                          }`} />
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {question.absOptions.map(opt => {
-                          const active = selAbs === opt;
-                          return (
-                            <button
-                              key={opt}
-                              type="button"
-                              disabled={hatchOpen}
-                              onClick={(e) => { e.stopPropagation(); handlePickAbs(opt); }}
-                              className={`h-9 sm:h-10 rounded-xl border-2 font-serif font-black text-sm sm:text-base flex items-center justify-center transition-all ${
-                                active
-                                  ? 'bg-gradient-to-b from-amber-500/35 to-amber-600/20 border-amber-400 text-amber-100 shadow-[inset_0_3px_8px_rgba(0,0,0,0.55),0_0_12px_rgba(251,191,36,0.35)] translate-y-[1.5px]'
-                                  : hatchOpen
-                                  ? 'bg-slate-900/60 border-slate-800 text-slate-600'
-                                  : 'bg-gradient-to-b from-slate-700 to-slate-800 border-slate-600 border-b-[4px] border-b-slate-950 text-slate-200 hover:brightness-110 active:translate-y-[1.5px] active:border-b-2'
-                              }`}
-                            >
-                              <FracText value={opt} />
-                            </button>
-                          );
-                        })}
-                      </div>
+                  <div className="relative overflow-hidden min-h-0">
+                    {/* 左右極細銀灰金屬滑軌槽線 */}
+                    <span className="pointer-events-none absolute left-1 top-0 bottom-2 w-[2px] rounded-full bg-gradient-to-b from-slate-400/60 via-slate-300/40 to-transparent" />
+                    <span className="pointer-events-none absolute right-1 top-0 bottom-2 w-[2px] rounded-full bg-gradient-to-b from-slate-400/60 via-slate-300/40 to-transparent" />
+                    <div
+                      data-coach="lv13-panel"
+                      className={`px-2.5 pt-1 pb-2 flex flex-col gap-1.5 select-none transition-[transform,opacity] duration-[560ms] [transition-timing-function:cubic-bezier(0.22,1.08,0.36,1)] ${
+                        keypadReady ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'
+                      }`}
+                    >
+                  {/* 第一區：淡琥珀微凹托盤（1×4 絕對值單選） */}
+                  <div className={`rounded-xl border p-1.5 flex flex-col gap-1 transition-colors ${
+                    lockedDone ? 'bg-emerald-50/60 border-emerald-400/80' : 'bg-amber-50/75 border-amber-300/80'
+                  }`}>
+                    <div className="flex items-center justify-between px-0.5">
+                      <span className="text-sm sm:text-base font-black text-amber-900 font-serif flex items-center gap-1.5 leading-tight">
+                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-400 text-amber-950 text-[10px] font-sans font-black shrink-0">1</span>
+                        <span>|{question.targetFunc} θ| 絕對值</span>
+                      </span>
+                      <span className={`text-[11px] font-bold ${lockedDone ? 'text-emerald-700' : 'text-amber-700/80'}`}>
+                        {lockedDone ? '✓ 已鎖定' : '單選'}
+                      </span>
                     </div>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {question.absOptions.map(opt => {
+                        const active = selAbs === opt;
+                        return (
+                          <button
+                            key={opt}
+                            type="button"
+                            disabled={lockedDone}
+                            onClick={(e) => { e.stopPropagation(); handlePickAbs(opt); }}
+                            className={`h-[46px] sm:h-[50px] rounded-xl border-2 border-b-[4px] font-serif font-black text-base flex items-center justify-center transition-all ${
+                              active
+                                ? 'bg-gradient-to-b from-amber-300 to-amber-500 border-amber-600 border-b-amber-700 text-amber-950 shadow-sm translate-y-[1.5px] border-b-[2px]'
+                                : lockedDone
+                                ? 'bg-slate-100/80 border-slate-200 border-b-slate-300 text-slate-400'
+                                : 'bg-white border-slate-300 border-b-slate-400 text-slate-800 shadow-sm hover:bg-amber-50 hover:border-amber-400 active:translate-y-[1.5px] active:border-b-[2px]'
+                            }`}
+                          >
+                            <FracText value={opt} />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-                    {/* 第二、三區並排：四象限田字獨立開關（II｜I / III｜IV，解鎖後保持青藍與洋紅原色由玩家肉眼判交集） */}
-                    <div className="flex-1 min-h-0 grid grid-cols-2 gap-1.5">
-                      {[
-                        {
-                          idx: 2,
-                          title: question.cond1Label,
-                          selected: selCond1,
-                          onToggle: handleToggleCond1,
-                          titleCls: 'text-cyan-300',
-                          badgeCls: 'bg-cyan-500/20 border-cyan-400/50',
-                          onBtnCls: 'bg-gradient-to-b from-cyan-500/35 to-cyan-700/25 border-cyan-400 text-cyan-50 shadow-[inset_0_2px_6px_rgba(0,0,0,0.45),0_0_12px_rgba(34,211,238,0.4)] translate-y-[1px]',
-                          onLedCls: 'bg-cyan-300 shadow-[0_0_7px_rgba(103,232,249,1)]'
-                        },
-                        {
-                          idx: 3,
-                          title: question.cond2Label,
-                          selected: selCond2,
-                          onToggle: handleToggleCond2,
-                          titleCls: 'text-fuchsia-300',
-                          badgeCls: 'bg-fuchsia-500/20 border-fuchsia-400/50',
-                          onBtnCls: 'bg-gradient-to-b from-fuchsia-500/35 to-fuchsia-700/25 border-fuchsia-400 text-fuchsia-50 shadow-[inset_0_2px_6px_rgba(0,0,0,0.45),0_0_12px_rgba(232,121,249,0.4)] translate-y-[1px]',
-                          onLedCls: 'bg-fuchsia-300 shadow-[0_0_7px_rgba(240,171,252,1)]'
-                        }
-                      ].map(panel => (
+                  {/* 第二、三區並排：淡天藍／淡洋紅微凹托盤（放大單行條件標題 ＋ 2×2 象限田字盤） */}
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      {
+                        idx: 2,
+                        title: question.cond1Label,
+                        selected: selCond1,
+                        onToggle: handleToggleCond1,
+                        trayCls: 'bg-sky-50/85 border-sky-300/85',
+                        titleCls: 'text-sky-950',
+                        badgeCls: 'bg-sky-500 text-white',
+                        hoverCls: 'hover:bg-sky-50 hover:border-sky-400',
+                        onBtnCls: 'bg-gradient-to-b from-sky-400 to-sky-600 border-sky-600 border-b-sky-800 text-white shadow-sm translate-y-[1.5px] border-b-[2px]',
+                        axisCls: 'bg-sky-400/65'
+                      },
+                      {
+                        idx: 3,
+                        title: question.cond2Label,
+                        selected: selCond2,
+                        onToggle: handleToggleCond2,
+                        trayCls: 'bg-fuchsia-50/85 border-fuchsia-300/85',
+                        titleCls: 'text-fuchsia-950',
+                        badgeCls: 'bg-fuchsia-500 text-white',
+                        hoverCls: 'hover:bg-fuchsia-50 hover:border-fuchsia-400',
+                        onBtnCls: 'bg-gradient-to-b from-fuchsia-400 to-fuchsia-600 border-fuchsia-600 border-b-fuchsia-800 text-white shadow-sm translate-y-[1.5px] border-b-[2px]',
+                        axisCls: 'bg-fuchsia-400/65'
+                      }
+                    ].map(panel => {
+                      const isLongTitle = panel.title.length >= 12;
+                      return (
                         <div
                           key={panel.idx}
-                          className={`bg-slate-950/80 border-2 rounded-2xl p-1.5 flex flex-col gap-1 shadow-[inset_0_2px_8px_rgba(0,0,0,0.65)] min-h-0 transition-colors ${
-                            hatchOpen ? 'border-emerald-500/45' : 'border-slate-700/90'
+                          className={`rounded-xl border p-1.5 flex flex-col gap-1.5 transition-colors ${
+                            lockedDone ? 'bg-emerald-50/60 border-emerald-400/80' : panel.trayCls
                           }`}
                         >
-                          <div className="flex items-center justify-between gap-1 px-0.5 shrink-0">
-                            <span className={`text-[11px] font-black font-serif truncate flex items-center gap-1 ${panel.titleCls}`}>
-                              <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full border text-[10px] font-sans shrink-0 ${panel.badgeCls}`}>{panel.idx}</span>
-                              <span className="truncate">{panel.title}</span>
-                            </span>
-                            <span className={`w-2 h-2 rounded-full shrink-0 transition-all ${
-                              hatchOpen
-                                ? 'bg-emerald-400 shadow-[0_0_7px_#34d399]'
-                                : panel.selected.length > 0
-                                ? panel.onLedCls
-                                : 'bg-slate-700 border border-slate-600'
-                            }`} />
+                          <div className="flex items-center gap-1 px-0.5 min-w-0">
+                            <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-sans font-black shrink-0 ${panel.badgeCls}`}>{panel.idx}</span>
+                            <span className={`${isLongTitle ? 'text-[12.5px] sm:text-sm tracking-tight' : 'text-[13.5px] sm:text-[15px]'} font-black font-serif leading-tight whitespace-nowrap ${panel.titleCls}`}>{panel.title}</span>
                           </div>
-                          {/* 田字四象限＋十字坐標軸線 */}
-                          <div className="relative flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-1 p-0.5">
-                            <div className="pointer-events-none absolute left-1/2 top-0.5 bottom-0.5 w-[1.5px] -translate-x-1/2 bg-slate-600/60" />
-                            <div className="pointer-events-none absolute top-1/2 left-0.5 right-0.5 h-[1.5px] -translate-y-1/2 bg-slate-600/60" />
+
+                          <div className="relative grid grid-cols-2 grid-rows-2 gap-1.5">
+                            <div className={`pointer-events-none absolute left-1/2 top-0 bottom-0 w-[1.5px] -translate-x-1/2 ${panel.axisCls}`} />
+                            <div className={`pointer-events-none absolute top-1/2 left-0 right-0 h-[1.5px] -translate-y-1/2 ${panel.axisCls}`} />
+                            <span className="pointer-events-none absolute left-1/2 -top-1 translate-x-1 text-[9px] font-serif italic font-bold text-slate-400 leading-none">y</span>
+                            <span className="pointer-events-none absolute -right-0.5 top-1/2 -translate-y-3 text-[9px] font-serif italic font-bold text-slate-400 leading-none">x</span>
+
                             {LV13_QUAD_LAYOUT.map(qNum => {
                               const isOn = panel.selected.includes(qNum);
                               return (
                                 <button
                                   key={qNum}
                                   type="button"
-                                  disabled={hatchOpen}
+                                  disabled={lockedDone}
                                   onClick={(e) => { e.stopPropagation(); panel.onToggle(qNum); }}
-                                  className={`relative rounded-xl border-2 font-serif font-black text-sm sm:text-base flex items-center justify-center transition-all ${
+                                  className={`relative h-[46px] sm:h-[50px] rounded-xl border-2 border-b-[4px] font-serif font-black text-base flex items-center justify-center transition-all ${
                                     isOn
                                       ? panel.onBtnCls
-                                      : hatchOpen
-                                      ? 'bg-slate-900/55 border-slate-800/80 text-slate-600'
-                                      : 'bg-gradient-to-b from-slate-700/95 to-slate-800/95 border-slate-600 border-b-[3px] border-b-slate-950 text-slate-300 hover:brightness-110 active:translate-y-[1px]'
+                                      : lockedDone
+                                      ? 'bg-slate-100/80 border-slate-200 border-b-slate-300 text-slate-400'
+                                      : `bg-white border-slate-300 border-b-slate-400 text-slate-800 shadow-sm ${panel.hoverCls} active:translate-y-[1.5px] active:border-b-[2px]`
                                   }`}
                                 >
-                                  <span
-                                    className={`absolute top-1 right-1 w-1.5 h-1.5 rounded-full transition-all ${
-                                      isOn ? panel.onLedCls : 'bg-slate-700 border border-slate-600'
-                                    }`}
-                                  />
                                   <span>{LV13_QUAD_ROMAN[qNum]}</span>
                                 </button>
                               );
                             })}
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
-
-                  {/* ===== 下半部：固定式實體剪線艙（含對開黑黃警戒滑門） ===== */}
-                  <div
-                    data-coach="lv13-wires"
-                    className={`relative flex-[0.82] min-h-[144px] rounded-2xl border-2 overflow-hidden shadow-[inset_0_4px_14px_rgba(0,0,0,0.85)] transition-colors ${
-                      bombStage === 'defused'
-                        ? 'border-emerald-400/80 bg-[#051a14]'
-                        : isOpened
-                        ? 'border-amber-400/70 bg-slate-950'
-                        : 'border-slate-600 bg-slate-950'
-                    }`}
-                  >
-                    {/* 上下極細黑黃警戒邊條 */}
-                    <div className="pointer-events-none absolute top-0 inset-x-0 h-1 opacity-75 z-10" style={hazardStripeStyle} />
-                    <div className="pointer-events-none absolute bottom-0 inset-x-0 h-1 opacity-75 z-10" style={hazardStripeStyle} />
-
-                    {/* 電路板底紋 */}
-                    <div
-                      className="pointer-events-none absolute inset-0 opacity-20"
-                      style={{ backgroundImage: 'radial-gradient(#38bdf8 1px, transparent 1px)', backgroundSize: '12px 12px' }}
-                    />
-
-                    {/* 內部真實紅藍電線層（未開蓋時透過壓克力視窗隱約可見，開蓋後可直接剪斷） */}
-                    <div className="relative w-full h-full px-2.5 py-2.5 flex flex-col justify-center gap-2">
-                      {question.wires.map(wire => {
-                        const isRed = wire.color === 'red';
-                        const isCut = cutWireId === wire.id;
-                        const isSpark = sparkWireId === wire.id;
-                        const strokeMain = isRed ? '#dc2626' : '#2563eb';
-                        const strokeHi = isRed ? '#fca5a5' : '#93c5fd';
-                        return (
-                          <button
-                            key={wire.id}
-                            type="button"
-                            disabled={!isOpened || bombStage === 'defused'}
-                            onClick={(e) => { e.stopPropagation(); handleCutWire(wire); }}
-                            className={`group relative w-full flex-1 min-h-0 rounded-xl border transition-all flex items-center justify-center px-2 ${
-                              isCut
-                                ? 'bg-emerald-950/50 border-emerald-400/60'
-                                : isSpark
-                                ? 'bg-rose-950/85 border-rose-400 animate-shake'
-                                : isOpened
-                                ? (isRed
-                                    ? 'bg-slate-900/70 border-rose-500/35 hover:border-rose-400 hover:bg-rose-950/35 active:scale-[0.98] cursor-pointer'
-                                    : 'bg-slate-900/70 border-sky-500/35 hover:border-sky-400 hover:bg-sky-950/35 active:scale-[0.98] cursor-pointer')
-                                : 'bg-slate-900/40 border-slate-800/60 pointer-events-none'
-                            }`}
-                          >
-                            <svg viewBox="0 0 320 52" className="w-full h-full overflow-visible">
-                              {/* 左右黃銅螺絲接線端子 */}
-                              <rect x="2" y="13" width="16" height="26" rx="3" fill="#78716c" stroke="#d6d3d1" strokeWidth="1.5" />
-                              <circle cx="10" cy="26" r="4" fill="#d97706" stroke="#451a03" strokeWidth="1.2" />
-                              <rect x="302" y="13" width="16" height="26" rx="3" fill="#78716c" stroke="#d6d3d1" strokeWidth="1.5" />
-                              <circle cx="310" cy="26" r="4" fill="#d97706" stroke="#451a03" strokeWidth="1.2" />
-
-                              {!isCut ? (
-                                <g>
-                                  {/* 電線底板投影 */}
-                                  <path d="M 18 30 Q 160 15 302 30" fill="none" stroke="rgba(0,0,0,0.65)" strokeWidth="11" strokeLinecap="round" />
-                                  {/* 主絕緣外皮 */}
-                                  <path d="M 18 26 Q 160 11 302 26" fill="none" stroke={strokeMain} strokeWidth="9.5" strokeLinecap="round" />
-                                  {/* 高光反光線 */}
-                                  <path d="M 20 24 Q 160 9 300 24" fill="none" stroke={strokeHi} strokeWidth="2.2" strokeLinecap="round" opacity="0.72" />
-                                </g>
-                              ) : (
-                                <g>
-                                  {/* 剪斷後兩端彈開＋金黃銅芯斷面 */}
-                                  <path d="M 18 26 Q 76 18 124 36" fill="none" stroke={strokeMain} strokeWidth="9.5" strokeLinecap="round" />
-                                  <path d="M 196 36 Q 244 18 302 26" fill="none" stroke={strokeMain} strokeWidth="9.5" strokeLinecap="round" />
-                                  <circle cx="127" cy="37" r="3.6" fill="#fbbf24" stroke="#b45309" strokeWidth="1.2" />
-                                  <circle cx="193" cy="37" r="3.6" fill="#fbbf24" stroke="#b45309" strokeWidth="1.2" />
-                                </g>
-                              )}
-
-                              {isSpark && (
-                                <g stroke="#fde047" strokeWidth="2.8" strokeLinecap="round">
-                                  <line x1="160" y1="4" x2="160" y2="15" />
-                                  <line x1="136" y1="12" x2="147" y2="20" />
-                                  <line x1="184" y1="12" x2="173" y2="20" />
-                                  <line x1="138" y1="42" x2="149" y2="34" />
-                                  <line x1="182" y1="42" x2="171" y2="34" />
-                                </g>
-                              )}
-                            </svg>
-
-                            {/* 中央數值膠囊＋剪刀標示（滑門打開後才清晰顯示） */}
-                            <div className={`absolute flex items-center gap-1.5 px-3.5 py-1 rounded-full border-2 font-serif font-black text-base sm:text-lg shadow-xl transition-all ${
-                              !isOpened
-                                ? 'opacity-20 scale-95 bg-slate-800 border-slate-600 text-slate-400'
-                                : isCut
-                                ? 'bg-emerald-500 border-emerald-200 text-emerald-950 scale-105'
-                                : isRed
-                                ? 'bg-rose-600 border-rose-200 text-white group-hover:scale-105'
-                                : 'bg-sky-600 border-sky-200 text-white group-hover:scale-105'
-                            }`}>
-                              <span className="text-sm">{isCut ? '✅' : '✂️'}</span>
-                              <span>{wire.sign > 0 ? '+' : ''}</span>
-                              <FracText value={wire.valStr} />
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* ===== 對開黑黃警戒金屬滑門（三區全對瞬間向左右兩側滑開！） ===== */}
-                    <div className={`pointer-events-none absolute inset-0 z-20 flex overflow-hidden`}>
-                      {/* 左滑門 */}
-                      <div
-                        className={`relative w-1/2 h-full bg-gradient-to-br from-slate-800/95 via-slate-900/92 to-slate-950/95 border-r-2 border-amber-400/70 backdrop-blur-[2px] flex flex-col justify-between transition-transform duration-500 ease-out ${
-                          hatchOpen ? '-translate-x-[106%]' : 'translate-x-0'
-                        }`}
-                      >
-                        <div className="h-2 w-full opacity-85" style={hazardStripeStyle} />
-                        <div className="flex-1 flex items-center justify-end pr-3">
-                          <span className="text-[10px] font-mono font-black tracking-widest text-slate-400/80">WIRE BAY</span>
-                        </div>
-                        <div className="h-2 w-full opacity-85" style={hazardStripeStyle} />
-                      </div>
-
-                      {/* 右滑門 */}
-                      <div
-                        className={`relative w-1/2 h-full bg-gradient-to-bl from-slate-800/95 via-slate-900/92 to-slate-950/95 border-l-2 border-amber-400/70 backdrop-blur-[2px] flex flex-col justify-between transition-transform duration-500 ease-out ${
-                          hatchOpen ? 'translate-x-[106%]' : 'translate-x-0'
-                        }`}
-                      >
-                        <div className="h-2 w-full opacity-85" style={hazardStripeStyle} />
-                        <div className="flex-1 flex items-center justify-start pl-3">
-                          <span className="text-[10px] font-mono font-black tracking-widest text-slate-400/80">SECURED</span>
-                        </div>
-                        <div className="h-2 w-full opacity-85" style={hazardStripeStyle} />
-                      </div>
-
-                      {/* 中央機械鎖扣徽章（開門瞬間轉綠淡出） */}
-                      <div
-                        className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ${
-                          hatchOpen ? 'opacity-0 scale-125' : 'opacity-100 scale-100'
-                        }`}
-                      >
-                        <div className="bg-slate-950/95 border-2 border-amber-400/80 rounded-2xl px-3.5 py-1.5 shadow-[0_0_20px_rgba(0,0,0,0.85)] flex items-center gap-2">
-                          <span className="text-base">🔒</span>
-                          <div className="flex flex-col leading-tight">
-                            <span className="text-[11px] font-black text-amber-300 tracking-wide">剪線艙已鎖定</span>
-                            <span className="text-[10px] font-bold text-slate-400">上方三區全對自動開門（不扣心）</span>
-                          </div>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
+                </div>
               </div>
+
+              {/* Portal 浮動拖曳 1:1 等大 6 針中性黑曜石 IC 晶片（觸控自動上移 46px 防指腹遮擋） */}
+              {dragWire?.isDragging && ReactDOM.createPortal(
+                <div
+                  className="fixed z-[9999] pointer-events-none -translate-x-1/2 -translate-y-1/2"
+                  style={{ left: dragWire.x, top: dragWire.isTouch ? dragWire.y - 46 : dragWire.y }}
+                >
+                  <div className="flex flex-col items-center scale-105 drop-shadow-[0_12px_18px_rgba(0,0,0,0.6)]">
+                    <div className="flex items-end justify-center gap-3 w-[122px] sm:w-[136px]">
+                      {[0, 1, 2, 3, 4, 5].map(p => (
+                        <span key={p} className="w-[5px] h-[6px] rounded-t-[1.5px] bg-gradient-to-b from-amber-200 via-amber-400 to-amber-600" />
+                      ))}
+                    </div>
+                    <div className="relative w-[122px] sm:w-[136px] h-[42px] sm:h-[46px] rounded-[7px] border-2 border-amber-300 bg-gradient-to-b from-[#2b3346] via-[#1c2230] to-[#121621] flex items-center justify-between px-2.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-300 ml-1" />
+                      <div className="flex items-center gap-0.5 font-serif font-black text-base sm:text-lg text-white">
+                        <span>{dragWire.wire.sign > 0 ? '+' : ''}</span>
+                        <FracText value={dragWire.wire.valStr} />
+                      </div>
+                      <span className="w-2 h-2 rounded-full bg-slate-900 border border-slate-600" />
+                    </div>
+                    <div className="flex items-start justify-center gap-3 w-[122px] sm:w-[136px]">
+                      {[0, 1, 2, 3, 4, 5].map(p => (
+                        <span key={p} className="w-[5px] h-[6px] rounded-b-[1.5px] bg-gradient-to-t from-amber-200 via-amber-400 to-amber-600" />
+                      ))}
+                    </div>
+                  </div>
+                </div>,
+                document.body
+              )}
 
               <CoachOverlay
                 containerRef={containerRef}
