@@ -2004,7 +2004,7 @@
       { id: 11, title: "正負傳送帶", subtitle: "三角比正負與無意義分流", island: "四象限祭壇", sea: 2, icon: "⚡", color: "from-rose-500 to-indigo-700", borderColor: "border-indigo-900" },
       { id: 12, title: "廣轉銳密碼輪", subtitle: "廣義角化為銳角變換（四大公式）", island: "星海彼端", sea: 2, icon: "🔑", color: "from-amber-400 to-indigo-600", borderColor: "border-indigo-900" },
       { id: 13, title: "知一解碼終端", subtitle: "三區密鑰驗證 × IC 晶片解碼（廣義角知一求一）", island: "烈日火山", sea: 3, icon: "💻", color: "from-violet-600 to-purple-800", borderColor: "border-purple-950" },
-      { id: 14, title: "極坐標定位儀", subtitle: "極坐標 [r, θ] ↔ (x, y)", island: "極光觀測站", sea: 3, icon: "📡", color: "from-cyan-500 to-indigo-700", borderColor: "border-indigo-950" },
+      { id: 14, title: "極坐標對接站", subtitle: "星際飛船 [r,θ] × 無人機 (x,y) 雙坐標對接", island: "極光觀測站", sea: 3, icon: "🚀", color: "from-cyan-500 to-indigo-700", borderColor: "border-indigo-950" },
       { id: 15, title: "面積公式殿堂", subtitle: "鎖定兩鄰邊與夾角 • Δ = ½ab sin C", island: "翠光神殿", sea: 3, icon: "📐", color: "from-emerald-500 to-teal-700", borderColor: "border-teal-950" },
       { id: 16, title: "正弦定理殿堂", subtitle: "配對對邊與對角 • a/sinA = b/sinB = 2R", island: "星橋高台", sea: 3, icon: "🌉", color: "from-sky-500 to-indigo-700", borderColor: "border-indigo-950" },
       { id: 17, title: "餘弦定理殿堂", subtitle: "鄰邊夾角與對邊代入 • c² = a²+b²−2ab cos C", island: "黃金天平", sea: 3, icon: "⚖️", color: "from-amber-500 to-orange-700", borderColor: "border-amber-950" },
@@ -2666,6 +2666,264 @@
           pGain.connect(this.getSfxDest());
           pop.start(pt);
           pop.stop(pt + 0.16);
+        } catch (e) {}
+      }
+
+      // ===== Lv.14 極坐標對接站專屬科幻音效套件 =====
+      // 1) 油門／滾輪依檔位變頻的清脆機械棘輪聲
+      sfxThrottleStep(level = 0) {
+        if (this.muted) return;
+        this.init();
+        try {
+          const t = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          osc.type = 'triangle';
+          const freq = 340 + Math.max(0, Math.min(12, level)) * 55;
+          osc.frequency.setValueAtTime(freq, t);
+          osc.frequency.exponentialRampToValueAtTime(freq * 1.28, t + 0.045);
+          g.gain.setValueAtTime(0.001, t);
+          g.gain.linearRampToValueAtTime(0.11, t + 0.008);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.055);
+          osc.connect(g); g.connect(this.getSfxDest());
+          osc.start(t); osc.stop(t + 0.06);
+        } catch (e) {}
+      }
+
+      // 2) 火箭／飛彈點火推進（濾波氣流噴射白噪音 ＋ 電漿升頻嗡鳴）
+      sfxRocketThrust(durSec = 0.85) {
+        if (this.muted) return;
+        this.init();
+        try {
+          const t = this.ctx.currentTime;
+          const dur = Math.max(0.28, Math.min(2.2, durSec));
+          const bufLen = Math.floor(this.ctx.sampleRate * dur);
+          const buf = this.ctx.createBuffer(1, bufLen, this.ctx.sampleRate);
+          const data = buf.getChannelData(0);
+          for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1);
+          const noise = this.ctx.createBufferSource();
+          noise.buffer = buf;
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.Q.value = 1.6;
+          filter.frequency.setValueAtTime(190, t);
+          filter.frequency.exponentialRampToValueAtTime(780, t + dur * 0.7);
+          filter.frequency.exponentialRampToValueAtTime(320, t + dur);
+          const ng = this.ctx.createGain();
+          ng.gain.setValueAtTime(0.001, t);
+          ng.gain.linearRampToValueAtTime(0.14, t + 0.08);
+          ng.gain.setValueAtTime(0.12, t + dur * 0.72);
+          ng.gain.exponentialRampToValueAtTime(0.001, t + dur);
+          noise.connect(filter); filter.connect(ng); ng.connect(this.getSfxDest());
+          noise.start(t); noise.stop(t + dur + 0.02);
+
+          // 電漿引擎低頻推力嗡鳴
+          const osc = this.ctx.createOscillator();
+          const og = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(95, t);
+          osc.frequency.exponentialRampToValueAtTime(210, t + dur * 0.75);
+          og.gain.setValueAtTime(0.001, t);
+          og.gain.linearRampToValueAtTime(0.045, t + 0.06);
+          og.gain.exponentialRampToValueAtTime(0.001, t + dur);
+          osc.connect(og); og.connect(this.getSfxDest());
+          osc.start(t); osc.stop(t + dur + 0.02);
+        } catch (e) {}
+      }
+
+      // 3) 四軸無人機旋翼輕快推進聲
+      sfxDroneWhir(durSec = 0.65) {
+        if (this.muted) return;
+        this.init();
+        try {
+          const t = this.ctx.currentTime;
+          const dur = Math.max(0.25, Math.min(1.6, durSec));
+          const osc = this.ctx.createOscillator();
+          const lfo = this.ctx.createOscillator();
+          const lfoGain = this.ctx.createGain();
+          const g = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(165, t);
+          osc.frequency.linearRampToValueAtTime(215, t + dur * 0.5);
+          osc.frequency.linearRampToValueAtTime(175, t + dur);
+          lfo.frequency.value = 26;
+          lfoGain.gain.value = 18;
+          lfo.connect(lfoGain); lfoGain.connect(osc.frequency);
+          g.gain.setValueAtTime(0.001, t);
+          g.gain.linearRampToValueAtTime(0.075, t + 0.06);
+          g.gain.setValueAtTime(0.065, t + dur * 0.78);
+          g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+          osc.connect(g); g.connect(this.getSfxDest());
+          osc.start(t); lfo.start(t);
+          osc.stop(t + dur + 0.02); lfo.stop(t + dur + 0.02);
+        } catch (e) {}
+      }
+
+      // 4) 正交雷射掃描鎖定雙音「嗶─嗶！」
+      sfxRadarScan() {
+        if (this.muted) return;
+        this.init();
+        try {
+          const t = this.ctx.currentTime;
+          [880, 1320].forEach((f, idx) => {
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            const st = t + idx * 0.095;
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(f, st);
+            g.gain.setValueAtTime(0.001, st);
+            g.gain.linearRampToValueAtTime(0.11, st + 0.01);
+            g.gain.exponentialRampToValueAtTime(0.001, st + 0.11);
+            osc.connect(g); g.connect(this.getSfxDest());
+            osc.start(st); osc.stop(st + 0.12);
+          });
+        } catch (e) {}
+      }
+
+      // 5) 無人機對接咬合「喀噠」＋明亮勝利和弦
+      sfxDockSuccess() {
+        if (this.muted) return;
+        this.init();
+        try {
+          const t = this.ctx.currentTime;
+          [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            const st = t + i * 0.055;
+            osc.type = i === 0 ? 'triangle' : 'sine';
+            osc.frequency.setValueAtTime(f, st);
+            g.gain.setValueAtTime(0.001, st);
+            g.gain.linearRampToValueAtTime(0.13, st + 0.012);
+            g.gain.exponentialRampToValueAtTime(0.001, st + 0.32);
+            osc.connect(g); g.connect(this.getSfxDest());
+            osc.start(st); osc.stop(st + 0.34);
+          });
+        } catch (e) {}
+      }
+
+      // 6) 極光飛彈命中敵方要塞重低音爆破 ＋ 結晶勝利餘韻
+      sfxLaserHit() {
+        if (this.muted) return;
+        this.init();
+        try {
+          const t = this.ctx.currentTime;
+          // 重低音衝擊下掃
+          const sub = this.ctx.createOscillator();
+          const sg = this.ctx.createGain();
+          sub.type = 'sine';
+          sub.frequency.setValueAtTime(185, t);
+          sub.frequency.exponentialRampToValueAtTime(38, t + 0.36);
+          sg.gain.setValueAtTime(0.24, t);
+          sg.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+          sub.connect(sg); sg.connect(this.getSfxDest());
+          sub.start(t); sub.stop(t + 0.4);
+
+          // 爆破白噪音
+          const bufLen = Math.floor(this.ctx.sampleRate * 0.32);
+          const buf = this.ctx.createBuffer(1, bufLen, this.ctx.sampleRate);
+          const data = buf.getChannelData(0);
+          for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufLen * 0.35));
+          const noise = this.ctx.createBufferSource();
+          noise.buffer = buf;
+          const lp = this.ctx.createBiquadFilter();
+          lp.type = 'lowpass';
+          lp.frequency.setValueAtTime(1400, t);
+          lp.frequency.exponentialRampToValueAtTime(180, t + 0.3);
+          const ng = this.ctx.createGain();
+          ng.gain.setValueAtTime(0.18, t);
+          ng.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+          noise.connect(lp); lp.connect(ng); ng.connect(this.getSfxDest());
+          noise.start(t); noise.stop(t + 0.33);
+
+          // 結晶勝利音
+          [659.25, 880, 1318.5].forEach((f, i) => {
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            const st = t + 0.14 + i * 0.06;
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(f, st);
+            g.gain.setValueAtTime(0.001, st);
+            g.gain.linearRampToValueAtTime(0.11, st + 0.015);
+            g.gain.exponentialRampToValueAtTime(0.001, st + 0.34);
+            osc.connect(g); g.connect(this.getSfxDest());
+            osc.start(st); osc.stop(st + 0.36);
+          });
+        } catch (e) {}
+      }
+
+      // 7) 飛彈飛過頭／撲空啞火空爆警示
+      sfxMissBoom() {
+        if (this.muted) return;
+        this.init();
+        try {
+          const t = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(210, t);
+          osc.frequency.exponentialRampToValueAtTime(72, t + 0.24);
+          g.gain.setValueAtTime(0.12, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
+          osc.connect(g); g.connect(this.getSfxDest());
+          osc.start(t); osc.stop(t + 0.28);
+        } catch (e) {}
+      }
+
+      // 8) 帝國主力戰艦畫面外迫近入侵（低沉威壓次低音引擎降頻轟鳴）
+      sfxBattleshipWarp() {
+        if (this.muted) return;
+        this.init();
+        try {
+          const t = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const sub = this.ctx.createOscillator();
+          const lp = this.ctx.createBiquadFilter();
+          const g = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          sub.type = 'sine';
+          osc.frequency.setValueAtTime(132, t);
+          osc.frequency.exponentialRampToValueAtTime(58, t + 0.68);
+          sub.frequency.setValueAtTime(66, t);
+          sub.frequency.exponentialRampToValueAtTime(36, t + 0.68);
+          lp.type = 'lowpass';
+          lp.frequency.setValueAtTime(360, t);
+          lp.frequency.exponentialRampToValueAtTime(130, t + 0.68);
+          g.gain.setValueAtTime(0.001, t);
+          g.gain.linearRampToValueAtTime(0.14, t + 0.1);
+          g.gain.setValueAtTime(0.12, t + 0.45);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.72);
+          osc.connect(lp); sub.connect(lp); lp.connect(g); g.connect(this.getSfxDest());
+          osc.start(t); sub.start(t);
+          osc.stop(t + 0.74); sub.stop(t + 0.74);
+        } catch (e) {}
+      }
+
+      // 9) 重裝軌道離子主砲開火（清脆爆發電磁離子出膛脈衝）
+      sfxRailgunFire() {
+        if (this.muted) return;
+        this.init();
+        try {
+          const t = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(1480, t);
+          osc.frequency.exponentialRampToValueAtTime(190, t + 0.22);
+          g.gain.setValueAtTime(0.001, t);
+          g.gain.linearRampToValueAtTime(0.16, t + 0.012);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+          osc.connect(g); g.connect(this.getSfxDest());
+          osc.start(t); osc.stop(t + 0.26);
+
+          const snap = this.ctx.createOscillator();
+          const sg = this.ctx.createGain();
+          snap.type = 'triangle';
+          snap.frequency.setValueAtTime(320, t);
+          snap.frequency.exponentialRampToValueAtTime(75, t + 0.14);
+          sg.gain.setValueAtTime(0.2, t);
+          sg.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+          snap.connect(sg); sg.connect(this.getSfxDest());
+          snap.start(t); snap.stop(t + 0.16);
         } catch (e) {}
       }
     }
@@ -4674,6 +4932,7 @@
       const draggedRef = useRef(false);
       const isDraggingRef = useRef(false);
       const bumpTimerRef = useRef(null);
+      const lastWheelAtRef = useRef(0);
       useEffect(() => () => clearTimeout(bumpTimerRef.current), []);
       useEffect(() => { isDraggingRef.current = isDragging; }, [isDragging]);
       useEffect(() => {
@@ -4733,6 +4992,9 @@
         }
         if (disabled) return;
         e.preventDefault();
+        const now = Date.now();
+        if (now - lastWheelAtRef.current < 80) return;
+        lastWheelAtRef.current = now;
         onStep(e.deltaY > 0 ? 1 : -1);
       };
 
@@ -10527,6 +10789,7 @@
       const {
         gameState, progress, lives, healStreak, correctCount, wrongCount, elapsedSec,
         earnedStars, baseScore, lifeBonus, accuracyBonus, speedBonus, finalScore,
+        startSession, recordCorrect, recordWrong, finishNow
       } = useLivesLevelSession({ starThresholds: starsThreshold, maxLives, healTarget, currentStars, onUpdateStars });
 
       const [question, setQuestion] = useState(null);
@@ -11798,6 +12061,8 @@
       const [steamBurst, setSteamBurst] = useState(0); // 氣閘洩壓白霧特效觸發戳記
       const [lockFlash, setLockFlash] = useState(0); // 關門落鎖電磁閃光戳記
       const [keypadReady, setKeypadReady] = useState(true); // 滑蓋式背蓋鍵盤滑出／收回
+      const [keypadSettled, setKeypadSettled] = useState(false); // 待鍵盤 560ms 滑出定位後再量測聚光框
+      useEffect(() => { if (!keypadReady) { setKeypadSettled(false); return; } const id = setTimeout(() => setKeypadSettled(true), 600); return () => clearTimeout(id); }, [keypadReady]);
       const [cutWireId, setCutWireId] = useState(null);
       const [sparkWireId, setSparkWireId] = useState(null);
       const [dragWire, setDragWire] = useState(null); // { wire, x, y, startX, startY, isDragging, isTouch, overTarget }
@@ -11811,7 +12076,7 @@
         onMarkGuideSeen,
         activeStageKey: !question ? null : (bombStage === 'wires' ? 'wires' : `locked_p${qPhase}`),
         phase: qPhase,
-        enabled: gameState === 'playing',
+        enabled: gameState === 'playing' && (bombStage === 'wires' || keypadSettled),
         finalStageKey: 'wires'
       });
 
@@ -12246,8 +12511,8 @@
             anchorY: 0.5,
             pad: 8,
             shape: 'rect',
-            tap: true,
-            desc: '防火牆已解鎖！對照下方點亮的兩組象限判斷正負號，點選（或拖曳）正確金鑰完成解碼！'
+            tap: false,
+            desc: '氣閘已開啟！對照下方點亮的兩組象限交集判斷正負號，點選（或拖曳）正確 IC 晶片插入左側插槽！'
           }];
         }
         return [{
@@ -12257,7 +12522,7 @@
           pad: 8,
           shape: 'rect',
           tap: false,
-          desc: '設定下方三區解碼鍵盤（按錯不扣心），三區全對時上方防火牆滑門會自動打開！'
+          desc: '設定下方三區解碼鍵盤（按錯不扣心），三區全部正確時上方氣閘門會自動滑開！'
         }];
       }, [guideMode, bombStage]);
 
@@ -12308,8 +12573,8 @@
               {/* 真實獨立滑蓋機身容器：收合時整台精巧置中、滑開時自然上下展開，絕不牽動上方題目 */}
               <div className="flex-1 min-h-0 flex flex-col justify-center overflow-hidden">
                 <div className={`w-full max-h-full bg-gradient-to-b from-slate-100 via-slate-100 to-slate-200/95 rounded-[26px] border-[3px] border-slate-500/90 shadow-[0_12px_28px_rgba(15,23,42,0.28),inset_0_1px_0_rgba(255,255,255,0.85)] flex flex-col overflow-hidden transition-all duration-300 ${feedbackAnim} ${bombStage === 'defused' ? 'ring-4 ring-emerald-400/75 border-emerald-600' : ''}`}>
-                  {/* 中段定高上蓋螢幕（鎖定高度 h-[208px] sm:h-[222px]，略高於下方滑蓋鍵盤以符合物理收納比例！） */}
-                  <div className="relative z-20 shrink-0 h-[208px] sm:h-[222px] bg-gradient-to-b from-slate-100 to-slate-100/95 shadow-[0_6px_14px_rgba(15,23,42,0.16)] px-2.5 pt-1.5 pb-1.5 flex flex-col gap-1 select-none overflow-hidden">
+                  {/* 中段定高上蓋螢幕（鎖定高度 h-[218px] sm:h-[234px]，略高於下方正方形鍵盤以符合物理收納比例！） */}
+                  <div className="relative z-20 shrink-0 h-[218px] sm:h-[234px] bg-gradient-to-b from-slate-100 to-slate-100/95 shadow-[0_6px_14px_rgba(15,23,42,0.16)] px-2.5 pt-1.5 pb-1.5 flex flex-col gap-1 select-none overflow-hidden">
                   <HintBanner tip={conceptTip} />
 
                   {/* 極簡極客機型絲印列（左上型號 ＋ 右上三區訊號小燈＋小小太陽能紋飾） */}
@@ -12725,7 +12990,7 @@
                         {lockedDone ? '✓ 已鎖定' : '單選'}
                       </span>
                     </div>
-                    <div className="grid grid-cols-4 gap-1.5">
+                    <div className="mx-auto w-[196px] sm:w-[214px] grid grid-cols-4 gap-1.5">
                       {question.absOptions.map(opt => {
                         const active = selAbs === opt;
                         return (
@@ -12734,7 +12999,7 @@
                             type="button"
                             disabled={lockedDone}
                             onClick={(e) => { e.stopPropagation(); handlePickAbs(opt); }}
-                            className={`h-[36px] sm:h-[38px] rounded-xl border-2 border-b-[3px] font-serif font-black text-sm sm:text-base flex items-center justify-center transition-all ${
+                            className={`aspect-square w-full rounded-xl border-2 border-b-[3px] font-serif font-black text-sm sm:text-base flex items-center justify-center transition-all ${
                               active
                                 ? 'bg-gradient-to-b from-amber-300 to-amber-500 border-amber-600 border-b-amber-700 text-amber-950 shadow-sm translate-y-[1.5px] border-b-[2px]'
                                 : lockedDone
@@ -13756,54 +14021,750 @@
     };
 
 
-    // ==================== 第 16 關組件：極坐標定位儀 ====================
-    const generateLevel16Question = (phase, bagState = null) => {
-      const specs = [
-        { r: 4, deg: 30, x: '2√3', y: '2', q: 1 },
-        { r: 4, deg: 60, x: '2', y: '2√3', q: 1 },
-        { r: 4, deg: 120, x: '-2', y: '2√3', q: 2 },
-        { r: 4, deg: 150, x: '-2√3', y: '2', q: 2 },
-        { r: 4, deg: 210, x: '-2√3', y: '-2', q: 3 },
-        { r: 4, deg: 240, x: '-2', y: '-2√3', q: 3 },
-        { r: 4, deg: 300, x: '2', y: '-2√3', q: 4 },
-        { r: 4, deg: 330, x: '2√3', y: '-2', q: 4 },
-        { r: 2, deg: 45, x: '√2', y: '√2', q: 1 },
-        { r: 2, deg: 135, x: '-√2', y: '√2', q: 2 },
-        { r: 2, deg: 225, x: '-√2', y: '-√2', q: 3 },
-        { r: 2, deg: 315, x: '√2', y: '-√2', q: 4 }
+    // ==================== 第 14 關組件：極坐標對接站（3:3 雙任務 × 科幻音效 × 側面滾輪＆油門推桿 × 三載具精工模型） ====================
+    const LV14_MAG_VALS = {
+      '0': 0, '1': 1, '√2': Math.SQRT2, '√3': Math.sqrt(3),
+      '2': 2, '2√2': 2 * Math.SQRT2, '2√3': 2 * Math.sqrt(3),
+      '3': 3, '3√2': 3 * Math.SQRT2, '3√3': 3 * Math.sqrt(3),
+      '4': 4, '4√2': 4 * Math.SQRT2,
+      '6': 6, '6√2': 6 * Math.SQRT2
+    };
+    const LV14_WHEEL_POOLS = {
+      2: ['0', '1', '√2', '√3', '2', '2√2', '2√3', '4'],
+      4: ['0', '1', '√2', '√3', '2', '2√2', '2√3', '4'],
+      6: ['0', '2', '2√3', '3', '3√2', '3√3', '4', '6']
+    };
+    const LV14_THROTTLE_STEPS = [1, 2, 3, 4, 5, 6, 8];
+    const LV14_SPECIAL_DEGS = [0, 30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330];
+
+    const lv14FormatSignedMag = (mag, sign) => {
+      if (!mag || mag === '0') return '0';
+      if (sign === -1) return `-${mag}`;
+      if (sign === 1) return `+${mag}`;
+      return mag;
+    };
+    const lv14ParseVal = (str) => {
+      if (!str || str === '0') return 0;
+      const neg = str.startsWith('-');
+      const mag = neg ? str.slice(1) : str;
+      const v = LV14_MAG_VALS[mag] ?? (parseFloat(mag) || 0);
+      return neg ? -v : v;
+    };
+    const lv14FormatLive = (n) => {
+      if (Math.abs(n) < 0.05) return '0';
+      const r = Math.round(n * 10) / 10;
+      return Number.isInteger(r) ? `${r}` : r.toFixed(1);
+    };
+
+    // 360° 標籤防出界定位工具（確保任何角度、任何長度字樣都穩穩落在安全框內且不壓頂部按鈕）
+    const lv14PlaceLabel = (sx, sy, text, dirX = 1, dirY = -1) => {
+      const estW = Math.max(42, String(text || '').length * 7.2 + 10);
+      const padL = 8, padR = 312, padT = 30, padB = 286;
+      const gapX = 16;
+      let anchor = dirX >= 0 ? 'start' : 'end';
+      let lx = dirX >= 0 ? sx + gapX : sx - gapX;
+
+      if (anchor === 'start' && lx + estW > padR) {
+        anchor = 'end';
+        lx = sx - gapX;
+      } else if (anchor === 'end' && lx - estW < padL) {
+        anchor = 'start';
+        lx = sx + gapX;
+      }
+      if (anchor === 'start') lx = Math.max(padL, Math.min(padR - estW, lx));
+      else lx = Math.max(padL + estW, Math.min(padR, lx));
+
+      let ly = dirY >= 0 ? sy + 20 : sy - 15;
+      if (ly < padT) ly = sy + 22;
+      if (ly > padB) ly = sy - 16;
+      ly = Math.max(padT, Math.min(padB, ly));
+      return { x: lx, y: ly, anchor };
+    };
+
+    // 3:3 完美均衡出題：P0(0,1 極轉直) → P1(2,3 直轉極要塞反擊) → P2(4 極轉直遠距/軸上角, 5 直轉極隱形要塞盲射)
+    const generateLevel16Question = (curProg, bagState = null) => {
+      const quadSpecs = [
+        { r: 4, deg: 30,  x: '2√3', y: '2',    q: 1 },
+        { r: 4, deg: 60,  x: '2',   y: '2√3',  q: 1 },
+        { r: 4, deg: 120, x: '-2',  y: '2√3',  q: 2 },
+        { r: 4, deg: 150, x: '-2√3',y: '2',    q: 2 },
+        { r: 4, deg: 210, x: '-2√3',y: '-2',   q: 3 },
+        { r: 4, deg: 240, x: '-2',  y: '-2√3', q: 3 },
+        { r: 4, deg: 300, x: '2',   y: '-2√3', q: 4 },
+        { r: 4, deg: 330, x: '2√3', y: '-2',   q: 4 },
+        { r: 2, deg: 45,  x: '√2',  y: '√2',   q: 1 },
+        { r: 2, deg: 135, x: '-√2', y: '√2',   q: 2 },
+        { r: 2, deg: 225, x: '-√2', y: '-√2',  q: 3 },
+        { r: 2, deg: 315, x: '√2',  y: '-√2',  q: 4 }
       ];
+      const axisSpecs = [
+        { r: 4, deg: 90,  x: '0',  y: '4',  q: 5 },
+        { r: 4, deg: 180, x: '-4', y: '0',  q: 6 },
+        { r: 4, deg: 270, x: '0',  y: '-4', q: 7 },
+        { r: 6, deg: 180, x: '-6', y: '0',  q: 6 },
+        { r: 6, deg: 90,  x: '0',  y: '6',  q: 5 }
+      ];
+      const r6Specs = [
+        { r: 6, deg: 60,  x: '3',   y: '3√3',  q: 1 },
+        { r: 6, deg: 120, x: '-3',  y: '3√3',  q: 2 },
+        { r: 6, deg: 240, x: '-3',  y: '-3√3', q: 3 },
+        { r: 6, deg: 300, x: '3',   y: '-3√3', q: 4 }
+      ];
+
+      const phase = curProg >= 4 ? 2 : curProg >= 2 ? 1 : 0;
+      const mode = (curProg === 2 || curProg === 3 || curProg >= 5) ? 'rect2polar' : 'polar2rect';
+      const stealth = curProg >= 5; // 第 6 題：終極光學迷彩隱形要塞盲射
+
+      const pool = curProg <= 1
+        ? quadSpecs
+        : curProg <= 3
+        ? quadSpecs
+        : curProg === 4
+        ? [...quadSpecs.filter(s => s.r === 4), ...r6Specs]
+        : [...quadSpecs.filter(s => s.r === 4), ...r6Specs];
+
       const used = new Set(bagState?.usedKeys || []);
-      let cands = specs.filter(s => !used.has(`${s.r}_${s.deg}`) && s.q !== bagState?.lastQuad);
-      if (cands.length === 0) cands = specs.filter(s => !used.has(`${s.r}_${s.deg}`));
-      if (cands.length === 0) cands = specs;
+      let cands = pool.filter(s => !used.has(`${s.r}_${s.deg}`) && s.q !== bagState?.lastQuad);
+      if (cands.length === 0) cands = pool.filter(s => !used.has(`${s.r}_${s.deg}`));
+      if (cands.length === 0) cands = pool;
       const picked = cands[Math.floor(Math.random() * cands.length)];
       if (bagState) {
         bagState.lastQuad = picked.q;
         bagState.usedKeys = [...(bagState.usedKeys || []), `${picked.r}_${picked.deg}`];
       }
 
-      const mode = phase === 2 ? 'rect2polar' : 'polar2rect';
-      const opts = mode === 'polar2rect'
-        ? (picked.r === 4
-            ? ['-2√3', '-2', '2', '2√3']
-            : ['-√2', '√2', '-2', '2'])
-        : [String(picked.r), String(picked.r === 4 ? 2 : 4), `${picked.deg}°`, `${(picked.deg + 60) % 360 || 30}°`, `${360 - picked.deg}°`].slice(0, 5);
+      const nx = lv14ParseVal(picked.x);
+      const ny = lv14ParseVal(picked.y);
 
       return {
-        key: `lv16_${picked.r}_${picked.deg}_${Date.now()}`,
+        key: `lv14_${curProg}_${picked.r}_${picked.deg}_${Date.now()}`,
         phase,
+        stepIdx: curProg,
         mode,
+        stealth,
         r: picked.r,
         deg: picked.deg,
         xStr: picked.x,
         yStr: picked.y,
+        nx,
+        ny,
         quad: picked.q,
-        ansSlot1: mode === 'polar2rect' ? picked.x : String(picked.r),
-        ansSlot2: mode === 'polar2rect' ? picked.y : `${picked.deg}°`,
-        options: opts,
-        tip: `[${picked.r}, ${picked.deg}°] 對應直角坐標 (${picked.x}, ${picked.y})`
+        wheelPool: LV14_WHEEL_POOLS[picked.r] || LV14_WHEEL_POOLS[4],
+        tip: mode === 'polar2rect'
+          ? `x = ${picked.r}·cos ${picked.deg}° = ${picked.x}，y = ${picked.r}·sin ${picked.deg}° = ${picked.y}`
+          : `(${picked.x}, ${picked.y}) 距原點 r = ${picked.r}，方向角 θ = ${picked.deg}° ⇒ [${picked.r}, ${picked.deg}°]`
       };
     };
+
+    // ===== 緊湊純淨 3D 數值轉輪（移除 ▲▼ 雜訊，純三排數字＋跟手拖曳＋80ms 滾輪節流＋點中央快選泡泡） =====
+    const Lv14MiniDrumWheel = ({ label, items, index, sign = null, onChange, color = 'cyan', disabled = false }) => {
+      const [dragOffset, setDragOffset] = useState(0);
+      const [isDragging, setIsDragging] = useState(false);
+      const [pickerOpen, setPickerOpen] = useState(false);
+      const dragRef = useRef({ active: false, startY: 0, moved: false });
+      const lastWheelRef = useRef(0);
+      const wrapBoxRef = useRef(null);
+
+      useEffect(() => {
+        if (!pickerOpen) return;
+        const onDocDown = (e) => {
+          if (wrapBoxRef.current && !wrapBoxRef.current.contains(e.target)) setPickerOpen(false);
+        };
+        document.addEventListener('pointerdown', onDocDown);
+        return () => document.removeEventListener('pointerdown', onDocDown);
+      }, [pickerOpen]);
+
+      useEffect(() => { if (disabled) setPickerOpen(false); }, [disabled]);
+
+      const n = items.length;
+      const wrap = (i) => ((i % n) + n) % n;
+      const step = (delta) => {
+        if (disabled) return;
+        const next = wrap(index + delta);
+        if (next !== index) {
+          audio.sfxThrottleStep(next);
+          onChange(next);
+        }
+      };
+
+      const onPointerDown = (e) => {
+        if (disabled) return;
+        e.stopPropagation();
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        dragRef.current = { active: true, startY: e.clientY, moved: false };
+        setIsDragging(true);
+      };
+      const onPointerMove = (e) => {
+        if (!dragRef.current.active || disabled) return;
+        e.stopPropagation();
+        const dy = e.clientY - dragRef.current.startY;
+        if (Math.abs(dy) >= 5) dragRef.current.moved = true;
+        if (Math.abs(dy) >= 18) {
+          step(dy < 0 ? 1 : -1);
+          dragRef.current.startY = e.clientY;
+          setDragOffset(0);
+        } else {
+          setDragOffset(dy * 0.7);
+        }
+      };
+      const onPointerUp = (e) => {
+        if (!dragRef.current.active) return;
+        e.stopPropagation();
+        const wasMoved = dragRef.current.moved;
+        dragRef.current.active = false;
+        setIsDragging(false);
+        setDragOffset(0);
+        if (!wasMoved && !disabled) {
+          audio.sfxClick();
+          setPickerOpen(o => !o);
+        }
+      };
+
+      const handleWheel = (e) => {
+        if (disabled) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const now = Date.now();
+        if (now - lastWheelRef.current < 80) return;
+        lastWheelRef.current = now;
+        step(e.deltaY > 0 ? 1 : -1);
+      };
+
+      const isCyan = color === 'cyan';
+      const prevVal = lv14FormatSignedMag(items[wrap(index - 1)], sign);
+      const curVal = lv14FormatSignedMag(items[wrap(index)], sign);
+      const nextVal = lv14FormatSignedMag(items[wrap(index + 1)], sign);
+
+      return (
+        <div ref={wrapBoxRef} className="relative flex flex-col items-center gap-0.5 flex-1 min-w-[68px]">
+          <span className={`text-[9px] font-black tracking-wider ${isCyan ? 'text-cyan-300' : 'text-amber-300'}`}>
+            {label}
+          </span>
+
+          {pickerOpen && !disabled && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              className={`absolute bottom-[88px] left-1/2 -translate-x-1/2 z-40 w-[160px] p-1.5 rounded-2xl bg-slate-900/95 border-2 ${isCyan ? 'border-cyan-400/85 shadow-[0_8px_24px_rgba(34,211,238,0.35)]' : 'border-amber-400/85 shadow-[0_8px_24px_rgba(251,191,36,0.35)]'} backdrop-blur-sm`}
+            >
+              <div className="grid grid-cols-4 gap-1">
+                {items.map((mag, i) => {
+                  const formatted = lv14FormatSignedMag(mag, sign);
+                  const active = i === index;
+                  return (
+                    <button
+                      key={mag}
+                      type="button"
+                      onClick={() => { audio.sfxThrottleStep(i); onChange(i); setPickerOpen(false); }}
+                      className={`h-[28px] rounded-lg font-serif font-black text-[11px] flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
+                        active
+                          ? isCyan ? 'bg-cyan-400 text-slate-950 shadow' : 'bg-amber-400 text-slate-950 shadow'
+                          : 'bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700'
+                      }`}
+                    >
+                      <SqrtText text={formatted} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div
+            onWheel={handleWheel}
+            className={`relative w-full h-[84px] rounded-xl bg-gradient-to-b from-slate-950 via-slate-800 to-slate-950 border-2 ${isCyan ? 'border-cyan-500/50' : 'border-amber-500/50'} shadow-[inset_0_10px_14px_rgba(0,0,0,0.85),inset_0_-10px_14px_rgba(0,0,0,0.85)] flex flex-col items-center justify-between overflow-hidden select-none ${disabled ? 'opacity-50' : ''}`}
+          >
+            {/* 純淨上格（滑鼠 hover 亮底色，點一下 -1） */}
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={(e) => { e.stopPropagation(); setPickerOpen(false); step(-1); }}
+              className="w-full h-[24px] flex items-center justify-center text-[10.5px] font-serif font-bold text-slate-400/80 hover:text-white hover:bg-white/10 active:bg-white/15 transition-colors cursor-pointer leading-none z-10"
+              title="點擊向上微調"
+            >
+              <SqrtText text={prevVal} />
+            </button>
+
+            <div className="w-[82%] h-[1px] bg-gradient-to-r from-transparent via-slate-500/45 to-transparent pointer-events-none" />
+
+            {/* 中央金屬高光選中窗（上下拖曳或點擊開快選） */}
+            <div
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
+              style={{ transform: `translateY(${dragOffset}px)` }}
+              className={`w-[92%] h-[32px] rounded-md border flex items-center justify-center font-serif font-black text-[13px] shadow-inner touch-none cursor-grab active:cursor-grabbing ${isDragging ? '' : 'transition-transform duration-150 ease-out'} ${
+                isCyan
+                  ? 'bg-cyan-400/20 border-cyan-300/85 text-cyan-100 shadow-[0_0_8px_rgba(34,211,238,0.35)]'
+                  : 'bg-amber-400/20 border-amber-300/85 text-amber-100 shadow-[0_0_8px_rgba(251,191,36,0.35)]'
+              }`}
+              title="上下拖曳、滾輪或點擊快選"
+            >
+              <SqrtText text={curVal} />
+            </div>
+
+            <div className="w-[82%] h-[1px] bg-gradient-to-r from-transparent via-slate-500/45 to-transparent pointer-events-none" />
+
+            {/* 純淨下格（滑鼠 hover 亮底色，點一下 +1） */}
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={(e) => { e.stopPropagation(); setPickerOpen(false); step(1); }}
+              className="w-full h-[24px] flex items-center justify-center text-[10.5px] font-serif font-bold text-slate-400/80 hover:text-white hover:bg-white/10 active:bg-white/15 transition-colors cursor-pointer leading-none z-10"
+              title="點擊向下微調"
+            >
+              <SqrtText text={nextVal} />
+            </button>
+          </div>
+        </div>
+      );
+    };
+
+    // ===== 側面滾花拇指旋鈕（控制方向角 θ，上下滑動齒紋捲動＋LED 讀數屏點擊快選，零方位洩密） =====
+    const Lv14SideThumbwheel = ({ deg, onChange, disabled = false }) => {
+      const [pickerOpen, setPickerOpen] = useState(false);
+      const dragRef = useRef({ active: false, startY: 0 });
+      const lastWheelRef = useRef(0);
+      const boxRef = useRef(null);
+
+      useEffect(() => {
+        if (!pickerOpen) return;
+        const onDocDown = (e) => {
+          if (boxRef.current && !boxRef.current.contains(e.target)) setPickerOpen(false);
+        };
+        document.addEventListener('pointerdown', onDocDown);
+        return () => document.removeEventListener('pointerdown', onDocDown);
+      }, [pickerOpen]);
+
+      useEffect(() => { if (disabled) setPickerOpen(false); }, [disabled]);
+
+      const stepDeg = (delta) => {
+        if (disabled) return;
+        const next = (deg + delta + 360) % 360;
+        audio.sfxThrottleStep(Math.floor(next / 30));
+        onChange(next);
+      };
+
+      const onPointerDown = (e) => {
+        if (disabled) return;
+        e.stopPropagation();
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        dragRef.current = { active: true, startY: e.clientY };
+      };
+      const onPointerMove = (e) => {
+        if (!dragRef.current.active || disabled) return;
+        e.stopPropagation();
+        const dy = dragRef.current.startY - e.clientY; // 往上滑角度增加
+        if (Math.abs(dy) >= 14) {
+          const steps = Math.trunc(dy / 14);
+          stepDeg(steps * 15);
+          dragRef.current.startY = e.clientY;
+        }
+      };
+      const onPointerUp = (e) => {
+        if (!dragRef.current.active) return;
+        e.stopPropagation();
+        dragRef.current.active = false;
+      };
+
+      const onWheel = (e) => {
+        if (disabled) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const now = Date.now();
+        if (now - lastWheelRef.current < 75) return;
+        lastWheelRef.current = now;
+        stepDeg(e.deltaY < 0 ? 15 : -15);
+      };
+
+      // 齒紋隨角度真實捲動
+      const ribOffset = (deg / 15) * 7;
+
+      return (
+        <div ref={boxRef} className="relative flex-1 bg-slate-800/80 border border-slate-700/90 rounded-xl px-2 py-1.5 flex items-center justify-between gap-2 shadow-inner">
+          {/* 點擊 LED 讀數屏彈出 16 特殊角快選泡泡 */}
+          {pickerOpen && !disabled && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="absolute bottom-[98px] left-0 z-40 w-[212px] p-1.5 rounded-2xl bg-slate-900/95 border-2 border-cyan-400/85 shadow-[0_10px_28px_rgba(34,211,238,0.38)] backdrop-blur-sm"
+            >
+              <div className="text-[9px] font-black text-cyan-300 text-center mb-1">快選方向角 θ</div>
+              <div className="grid grid-cols-4 gap-1">
+                {LV14_SPECIAL_DEGS.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => { audio.sfxThrottleStep(Math.floor(d / 30)); onChange(d); setPickerOpen(false); }}
+                    className={`h-[26px] rounded-md font-mono font-black text-[11px] transition-all active:scale-95 cursor-pointer ${
+                      deg === d
+                        ? 'bg-cyan-400 text-slate-950 shadow'
+                        : 'bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700'
+                    }`}
+                  >
+                    {d}°
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 左側：LED 角度讀數屏（可點開快選） ＋ ±15° 微調 */}
+          <div className="flex-1 flex flex-col justify-between gap-1.5 min-w-0">
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => { audio.sfxClick(); setPickerOpen(o => !o); }}
+              className="w-full rounded-lg bg-slate-950 border border-cyan-500/50 px-2 py-1 flex flex-col items-center justify-center shadow-inner hover:border-cyan-300 transition-colors cursor-pointer"
+              title="點擊快選特殊角"
+            >
+              <span className="text-[8px] font-bold text-cyan-300/80 tracking-wider leading-none">方向角 θ ▾</span>
+              <span className="font-mono font-black text-lg text-amber-300 leading-tight mt-0.5">{deg}°</span>
+            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => stepDeg(-15)}
+                className="flex-1 h-[24px] rounded-md bg-slate-900 border border-slate-700 text-cyan-200 font-mono font-black text-[11px] hover:bg-slate-700 active:scale-95 cursor-pointer"
+              >
+                −15°
+              </button>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => stepDeg(15)}
+                className="flex-1 h-[24px] rounded-md bg-slate-900 border border-slate-700 text-cyan-200 font-mono font-black text-[11px] hover:bg-slate-700 active:scale-95 cursor-pointer"
+              >
+                +15°
+              </button>
+            </div>
+          </div>
+
+          {/* 右側：擬真側面滾花拇指旋鈕（上下滑動齒紋滾動） */}
+          <div className="flex flex-col items-center gap-0.5 shrink-0">
+            <div
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
+              onWheel={onWheel}
+              className={`relative w-[34px] h-[80px] rounded-xl bg-slate-950 p-[3px] border-2 border-slate-600 shadow-[inset_0_3px_8px_rgba(0,0,0,0.9)] touch-none cursor-ns-resize ${disabled ? 'opacity-50' : ''}`}
+              title="上下滑動或滾輪調整 θ"
+            >
+              <div
+                className="w-full h-full rounded-lg border border-slate-500/70 shadow-[inset_0_12px_14px_rgba(0,0,0,0.75),inset_0_-12px_14px_rgba(0,0,0,0.75)]"
+                style={{
+                  backgroundColor: '#334155',
+                  backgroundImage: 'repeating-linear-gradient(to bottom, rgba(248,250,252,0.42) 0px, rgba(248,250,252,0.42) 2px, rgba(15,23,42,0.85) 2px, rgba(15,23,42,0.85) 7px)',
+                  backgroundPositionY: `${ribOffset}px`
+                }}
+              />
+              {/* 中央橘金刻度定位線 */}
+              <div className="absolute left-0.5 right-0.5 top-1/2 -translate-y-1/2 h-[2px] bg-amber-400/90 shadow-[0_0_6px_rgba(251,191,36,0.9)] pointer-events-none" />
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ===== 7 檔直立發光油門加速推桿（r ∈ {1,2,3,4,5,6,8}，支援上下拖曳、滾輪與點擊快選） =====
+    const Lv14ThrottleLever = ({ rVal, onChange, disabled = false }) => {
+      const [pickerOpen, setPickerOpen] = useState(false);
+      const trackRef = useRef(null);
+      const boxRef = useRef(null);
+      const draggingRef = useRef(false);
+      const lastWheelRef = useRef(0);
+
+      useEffect(() => {
+        if (!pickerOpen) return;
+        const onDocDown = (e) => {
+          if (boxRef.current && !boxRef.current.contains(e.target)) setPickerOpen(false);
+        };
+        document.addEventListener('pointerdown', onDocDown);
+        return () => document.removeEventListener('pointerdown', onDocDown);
+      }, [pickerOpen]);
+
+      useEffect(() => { if (disabled) setPickerOpen(false); }, [disabled]);
+
+      const idx = Math.max(0, LV14_THROTTLE_STEPS.indexOf(rVal));
+      const n = LV14_THROTTLE_STEPS.length;
+
+      const setByIdx = (nextIdx) => {
+        const clamped = Math.max(0, Math.min(n - 1, nextIdx));
+        const nextR = LV14_THROTTLE_STEPS[clamped];
+        if (nextR !== rVal) {
+          audio.sfxThrottleStep(clamped * 1.4);
+          onChange(nextR);
+        }
+      };
+
+      const updateFromClientY = (clientY) => {
+        if (!trackRef.current) return;
+        const rect = trackRef.current.getBoundingClientRect();
+        const ratio = 1 - Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+        const targetIdx = Math.round(ratio * (n - 1));
+        setByIdx(targetIdx);
+      };
+
+      const onPointerDown = (e) => {
+        if (disabled) return;
+        e.stopPropagation();
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        draggingRef.current = true;
+        updateFromClientY(e.clientY);
+      };
+      const onPointerMove = (e) => {
+        if (!draggingRef.current || disabled) return;
+        e.stopPropagation();
+        updateFromClientY(e.clientY);
+      };
+      const onPointerUp = (e) => {
+        if (!draggingRef.current) return;
+        e.stopPropagation();
+        draggingRef.current = false;
+      };
+      const onWheel = (e) => {
+        if (disabled) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const now = Date.now();
+        if (now - lastWheelRef.current < 80) return;
+        lastWheelRef.current = now;
+        setByIdx(idx + (e.deltaY < 0 ? 1 : -1));
+      };
+
+      const ratioPct = (idx / (n - 1)) * 100;
+      const barColors = [
+        'bg-emerald-400', 'bg-teal-400', 'bg-cyan-400', 'bg-sky-400',
+        'bg-amber-400', 'bg-orange-400', 'bg-rose-500'
+      ];
+
+      return (
+        <div ref={boxRef} className="relative w-[96px] shrink-0 bg-slate-800/80 border border-slate-700/90 rounded-xl px-2 py-1.5 flex items-center justify-between gap-1.5 shadow-inner">
+          {pickerOpen && !disabled && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="absolute bottom-[98px] left-1/2 -translate-x-1/2 z-40 w-[142px] p-1.5 rounded-2xl bg-slate-900/95 border-2 border-amber-400/85 shadow-[0_10px_28px_rgba(251,191,36,0.35)] backdrop-blur-sm"
+            >
+              <div className="text-[9px] font-black text-amber-300 text-center mb-1">快選射程 r</div>
+              <div className="grid grid-cols-4 gap-1">
+                {LV14_THROTTLE_STEPS.map((val, i) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => { audio.sfxThrottleStep(i * 1.4); onChange(val); setPickerOpen(false); }}
+                    className={`h-[26px] rounded-md font-mono font-black text-xs transition-all active:scale-95 cursor-pointer ${
+                      rVal === val
+                        ? 'bg-amber-400 text-slate-950 shadow'
+                        : 'bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700'
+                    }`}
+                  >
+                    {val}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 左側：r 數位讀數 ＋ 7 格蓄力光條 */}
+          <div className="flex flex-col items-center justify-between h-[80px] gap-1">
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => { audio.sfxClick(); setPickerOpen(o => !o); }}
+              className="w-[44px] py-0.5 rounded-md bg-slate-950 border border-amber-400/50 text-center hover:border-amber-300 cursor-pointer"
+              title="點擊快選射程"
+            >
+              <div className="text-[7.5px] font-bold text-amber-300/85 leading-none">油門▾</div>
+              <div className="font-mono font-black text-xs text-amber-200 leading-tight">r={rVal}</div>
+            </button>
+            <div className="w-[38px] flex-1 flex flex-col-reverse justify-between gap-[2px] py-0.5">
+              {LV14_THROTTLE_STEPS.map((val, i) => (
+                <div
+                  key={val}
+                  className={`w-full flex-1 rounded-[2px] transition-all ${
+                    i <= idx ? `${barColors[i]} shadow-[0_0_5px_rgba(251,191,36,0.55)]` : 'bg-slate-950 border border-slate-800'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* 右側：可上下推拉之節流閥實體推桿 */}
+          <div
+            ref={trackRef}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            onWheel={onWheel}
+            className={`relative w-[34px] h-[80px] rounded-xl bg-slate-950 border-2 border-slate-600 shadow-inner flex items-center justify-center touch-none cursor-ns-resize ${disabled ? 'opacity-50' : ''}`}
+            title="上下推拉油門推桿調整射程 r"
+          >
+            {/* 中央凹槽軌道 */}
+            <div className="w-[6px] h-[64px] rounded-full bg-slate-800 border border-slate-700 shadow-inner" />
+            {/* 立體油門推桿把手 */}
+            <div
+              className="absolute left-[2px] right-[2px] h-[18px] rounded-md bg-gradient-to-b from-amber-200 via-amber-400 to-amber-600 border border-amber-100 shadow-[0_2px_8px_rgba(0,0,0,0.85)] flex items-center justify-center pointer-events-none transition-all duration-75"
+              style={{ bottom: `calc(${ratioPct * 0.72}% + 3px)` }}
+            >
+              <div className="w-[16px] h-[2px] rounded-full bg-amber-950/70" />
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ===== 載具 1：精修迷你星際飛船 SVG 模型 =====
+    const Lv14MiniStarship = ({ accent = '#38bdf8', thrusterOn = false, scale = 1.18 }) => (
+      <g transform={`scale(${scale})`}>
+        {thrusterOn && (
+          <g>
+            <polygon points="-4.6,10 0,25 4.6,10" fill="#fbbf24" opacity="0.92" />
+            <polygon points="-2.5,10 0,19 2.5,10" fill="#fef08a" opacity="0.95" />
+            <polygon points="-1.2,10 0,14 1.2,10" fill="#ffffff" />
+          </g>
+        )}
+        {/* 後掠雙主翼 ＋ 導流切面 */}
+        <polygon points="0,-6 -12,8.5 -5.5,10.5 0,5.5" fill="#0e7490" stroke="#bae6fd" strokeWidth="0.9" strokeLinejoin="round" />
+        <polygon points="0,-6 12,8.5 5.5,10.5 0,5.5" fill="#0e7490" stroke="#bae6fd" strokeWidth="0.9" strokeLinejoin="round" />
+        <polygon points="-2,-1 -8.5,7 -4.5,7.8 -1.5,3.5" fill="#38bdf8" opacity="0.55" />
+        <polygon points="2,-1 8.5,7 4.5,7.8 1.5,3.5" fill="#38bdf8" opacity="0.55" />
+        {/* 翼尖紅綠導航燈 */}
+        <circle cx="-10.5" cy="8" r="1.4" fill="#fb7185" />
+        <circle cx="10.5" cy="8" r="1.4" fill="#34d399" />
+        {/* 流線裝甲機身 */}
+        <polygon points="0,-14 5,6.5 3,10.5 -3,10.5 -5,6.5" fill="#f0f9ff" stroke={accent} strokeWidth="1.2" strokeLinejoin="round" />
+        <polygon points="0,-14 2.2,6 0,9 -2.2,6" fill="#bae6fd" opacity="0.65" />
+        {/* 高光玻璃座艙罩 */}
+        <ellipse cx="0" cy="-2.8" rx="2.2" ry="4.4" fill="#0369a1" stroke="#7dd3fc" strokeWidth="0.85" />
+        <ellipse cx="-0.7" cy="-4.6" rx="0.7" ry="1.6" fill="#ffffff" opacity="0.85" />
+        {/* 雙噴射尾管 */}
+        <rect x="-3.6" y="9.5" width="2.5" height="2.2" rx="0.6" fill="#334155" stroke="#94a3b8" strokeWidth="0.4" />
+        <rect x="1.1" y="9.5" width="2.5" height="2.2" rx="0.6" fill="#334155" stroke="#94a3b8" strokeWidth="0.4" />
+      </g>
+    );
+
+    // ===== 載具 2：精巧微型四軸無人機（去大圓環防干擾坐標點，正中央白芯亮金圓點對齊幾何坐標，起飛才轉槳） =====
+    const Lv14MiniQuadDrone = ({ status = 'flying', spinning = false, scale = 0.78 }) => {
+      const bodyFill = status === 'missed' ? '#f43f5e' : status === 'docked' ? '#10b981' : '#f59e0b';
+      const rotorStroke = status === 'missed' ? '#fda4af' : status === 'docked' ? '#6ee7b7' : '#fde68a';
+      const rotors = [[-8.2, -8.2], [8.2, -8.2], [-8.2, 8.2], [8.2, 8.2]];
+      return (
+        <g transform={`scale(${scale})`}>
+          {/* 俐落細長碳纖 X 型機臂 */}
+          <line x1="-8.2" y1="-8.2" x2="8.2" y2="8.2" stroke="#334155" strokeWidth="2.2" strokeLinecap="round" />
+          <line x1="8.2" y1="-8.2" x2="-8.2" y2="8.2" stroke="#334155" strokeWidth="2.2" strokeLinecap="round" />
+          <line x1="-8.2" y1="-8.2" x2="8.2" y2="8.2" stroke="#94a3b8" strokeWidth="0.9" strokeLinecap="round" />
+          <line x1="8.2" y1="-8.2" x2="-8.2" y2="8.2" stroke="#94a3b8" strokeWidth="0.9" strokeLinecap="round" />
+          {/* 四角輕盈雙葉旋翼（待命靜止，起飛飛行中才啟動原生 SVG 高速旋轉） */}
+          {rotors.map(([rx, ry], idx) => (
+            <g key={idx} transform={`translate(${rx}, ${ry})`}>
+              <g>
+                {spinning && (
+                  <animateTransform
+                    attributeName="transform"
+                    type="rotate"
+                    from={idx % 2 === 0 ? '0 0 0' : '360 0 0'}
+                    to={idx % 2 === 0 ? '360 0 0' : '0 0 0'}
+                    dur={idx % 2 === 0 ? '0.2s' : '0.23s'}
+                    repeatCount="indefinite"
+                  />
+                )}
+                <line x1="-4.5" y1="0" x2="4.5" y2="0" stroke={rotorStroke} strokeWidth="1.6" strokeLinecap="round" opacity={spinning ? 0.92 : 0.55} />
+                <line x1="0" y1="-4.5" x2="0" y2="4.5" stroke="#ffffff" strokeWidth="1.15" strokeLinecap="round" opacity={spinning ? 0.62 : 0.32} />
+              </g>
+              <circle r="1.4" fill="#0f172a" stroke="#cbd5e1" strokeWidth="0.6" />
+            </g>
+          ))}
+          {/* 精巧菱形核心裝甲 */}
+          <polygon points="0,-6.5 6.5,0 0,6.5 -6.5,0" fill="#1e293b" stroke={bodyFill} strokeWidth="1.4" strokeLinejoin="round" />
+          {/* 正中央高對比坐標中心鎖定點 */}
+          <circle cx="0" cy="0" r="2.8" fill={bodyFill} />
+          <circle cx="0" cy="0" r="1.35" fill="#ffffff" />
+        </g>
+      );
+    };
+
+    // ===== 載具 3：帝國主力戰艦（直轉極入侵反派，尖銳箭矢艦體、階梯艦橋、翼砲台與三推進噴嘴） =====
+    const Lv14EnemyBattleship = ({ headingDeg = 0, thrusting = false, destroyed = false, stealth = false }) => (
+      <g
+        transform={`rotate(${90 - headingDeg})`}
+        opacity={destroyed ? 0.22 : stealth ? 0.08 : 1}
+        style={{ transition: 'opacity 420ms ease' }}
+      >
+        {/* 入侵迫近時的紅紫推進尾焰 */}
+        {thrusting && (
+          <g>
+            <polygon points="-5.5,14 -3.5,24 -1.5,14" fill="#f43f5e" opacity="0.9" />
+            <polygon points="-2,14.5 0,28 2,14.5" fill="#fb7185" opacity="0.95" />
+            <polygon points="1.5,14 3.5,24 5.5,14" fill="#f43f5e" opacity="0.9" />
+            <polygon points="-1,14.5 0,21 1,14.5" fill="#fff1f2" />
+          </g>
+        )}
+        {/* 外層重裝甲三角箭矢主艦體 */}
+        <polygon points="0,-19 13.5,10 8.5,14 -8.5,14 -13.5,10" fill="#3b0764" stroke="#f43f5e" strokeWidth="1.3" strokeLinejoin="round" />
+        {/* 兩側副翼重裝甲切面 */}
+        <polygon points="0,-16 10.5,8.5 5.5,11 0,5" fill="#581c87" opacity="0.88" />
+        <polygon points="0,-16 -10.5,8.5 -5.5,11 0,5" fill="#581c87" opacity="0.88" />
+        {/* 兩側重型翼砲台 */}
+        <rect x="-11.5" y="1" width="3.2" height="7" rx="0.8" fill="#1e1b4b" stroke="#c084fc" strokeWidth="0.8" />
+        <rect x="8.3" y="1" width="3.2" height="7" rx="0.8" fill="#1e1b4b" stroke="#c084fc" strokeWidth="0.8" />
+        {/* 中央艦脊與階梯狀指揮艦橋 */}
+        <polygon points="0,-17 3.8,9 -3.8,9" fill="#881337" stroke="#fda4af" strokeWidth="0.9" />
+        <rect x="-4.2" y="2.5" width="8.4" height="4.2" rx="1" fill="#1e293b" stroke="#fb7185" strokeWidth="0.9" />
+        {/* 艦首紅光主砲核心槽 */}
+        <line x1="0" y1="-15" x2="0" y2="-4" stroke="#fb7185" strokeWidth="1.8" strokeLinecap="round" />
+        <circle cx="0" cy="-6" r="2.2" fill="#fda4af" />
+        {/* 尾部三具推進噴嘴 */}
+        <rect x="-6" y="13.2" width="3" height="2" rx="0.5" fill="#1e293b" stroke="#f43f5e" strokeWidth="0.5" />
+        <rect x="-1.5" y="13.5" width="3" height="2.2" rx="0.5" fill="#1e293b" stroke="#fb7185" strokeWidth="0.6" />
+        <rect x="3" y="13.2" width="3" height="2" rx="0.5" fill="#1e293b" stroke="#f43f5e" strokeWidth="0.5" />
+      </g>
+    );
+
+    // ===== 原點重裝軌道離子主砲（八角裝甲底座＋雙平行電磁導軌＋中央蓄能電漿槽） =====
+    const Lv14PolarTurret = ({ deg = 0, charging = false, firing = false }) => (
+      <g>
+        {/* 固定八角重裝甲底座與四腳固定支架 */}
+        <circle r="11.5" fill="none" stroke="rgba(56,189,248,0.35)" strokeWidth="1" strokeDasharray="2 3" />
+        {[-45, 45, 135, 225].map(a => (
+          <rect key={a} x="-1.6" y="-12.5" width="3.2" height="5" rx="0.8" fill="#334155" stroke="#64748b" strokeWidth="0.6" transform={`rotate(${a})`} />
+        ))}
+        <polygon points="-5,-9 5,-9 9,-5 9,5 5,9 -5,9 -9,5 -9,-5" fill="#0f172a" stroke="#38bdf8" strokeWidth="1.3" />
+
+        {/* 旋轉電磁軌道砲塔本體 */}
+        <g transform={`rotate(${90 - deg})`}>
+          {/* 兩側裝甲護盾翼 */}
+          <polygon points="-7.5,-3 -4.5,-7 -4.5,6.5 -7.5,4.5" fill="#1e293b" stroke="#64748b" strokeWidth="0.8" />
+          <polygon points="7.5,-3 4.5,-7 4.5,6.5 7.5,4.5" fill="#1e293b" stroke="#64748b" strokeWidth="0.8" />
+          {/* 雙平行金屬電磁導軌 */}
+          <rect x="-4.5" y="-17.5" width="2.8" height="15" rx="0.8" fill="#e2e8f0" stroke="#475569" strokeWidth="0.8" />
+          <rect x="1.7" y="-17.5" width="2.8" height="15" rx="0.8" fill="#e2e8f0" stroke="#475569" strokeWidth="0.8" />
+          {/* 中央蓄能電漿導軌槽 */}
+          <rect
+            x="-1.2" y="-16" width="2.4" height="13" rx="0.8"
+            fill={firing ? '#fef08a' : charging ? '#fbbf24' : '#38bdf8'}
+            opacity={firing || charging ? 1 : 0.72}
+          />
+          {/* 開火砲口十字能量閃光 */}
+          {firing && (
+            <g transform="translate(0, -18.5)">
+              <circle r="5.5" fill="#fbbf24" opacity="0.85" />
+              <circle r="2.8" fill="#ffffff" />
+              <line x1="-9" y1="0" x2="9" y2="0" stroke="#fef08a" strokeWidth="1.6" strokeLinecap="round" />
+              <line x1="0" y1="-9" x2="0" y2="5" stroke="#fef08a" strokeWidth="1.6" strokeLinecap="round" />
+            </g>
+          )}
+          {/* 砲塔旋轉核心艙 */}
+          <circle r="5.4" fill="#1e293b" stroke="#7dd3fc" strokeWidth="1.3" />
+          <circle r="2.4" fill={charging || firing ? '#fbbf24' : '#0ea5e9'} />
+        </g>
+      </g>
+    );
 
     const Level16PolarRadarMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
@@ -13817,33 +14778,232 @@
       } = useLivesLevelSession({ starThresholds: starsThreshold, maxLives, healTarget, currentStars, onUpdateStars });
 
       const [question, setQuestion] = useState(null);
-      const [radarLocked, setRadarLocked] = useState(false);
-      const [slots, setSlots] = useState({ a: null, b: null });
-      const [activeSlot, setActiveSlot] = useState('a');
-      const [wrongSlotKey, setWrongSlotKey] = useState(null);
-      const [optDragState, setOptDragState] = useState(null);
+      // 極轉直：十字方向控制 (+1 / -1 / null) ＋ 雙數值轉輪索引
+      const [xSign, setXSign] = useState(null);
+      const [ySign, setYSign] = useState(null);
+      const [xWheelIdx, setXWheelIdx] = useState(0);
+      const [yWheelIdx, setYWheelIdx] = useState(0);
+
+      // 飛船／主砲飛彈動畫狀態
+      const [shipAnim, setShipAnim] = useState({ stage: 'idle', deg: 0, r: 0 });
+      // 無人機折線動畫狀態
+      const [droneAnim, setDroneAnim] = useState({ x: 0, y: 0, trail: [[0, 0]], label: '(0, 0)', active: false, done: false });
+      // 直轉極：帝國主力戰艦畫面外入侵 ＋ 機場雷達式線性螢光掃描狀態
+      const [enemyAnim, setEnemyAnim] = useState({
+        stage: 'waiting', // 'waiting' | 'approaching' | 'scanX' | 'pauseScan' | 'scanY' | 'locked'
+        x: 0, y: 0,
+        scanX: 0, scanY: 0,
+        pingX: false, pingY: false
+      });
+      // 敵方戰艦隱形控制（第 6 題掃描完啟動光學迷彩，開火時顯形）
+      const [enemyCloaked, setEnemyCloaked] = useState(false);
+      // 爆破／空爆視覺特效座標
+      const [burstEffect, setBurstEffect] = useState(null); // { x, y, kind: 'hit' | 'miss' }
+      // 總飛行狀態：'idle' | 'flying' | 'docked' | 'missed' | 'firingPolar'
+      const [flightState, setFlightState] = useState('idle');
+
+      // 直轉極：側面滾花旋鈕 θ ＋ 7 檔油門推桿 r
+      const [aimDeg, setAimDeg] = useState(0);
+      const [aimR, setAimR] = useState(4);
+
       const [solved, setSolved] = useState(false);
       const [conceptTip, setConceptTip] = useState(null);
       const [feedbackAnim, setFeedbackAnim] = useState('');
 
       const qPhase = question ? question.phase : 0;
+      const isPolar2Rect = question?.mode === 'polar2rect';
+      const isRect2Polar = question?.mode === 'rect2polar';
+      const introDone = isPolar2Rect ? shipAnim.stage === 'parked' : enemyAnim.stage === 'locked';
+      const lv14StageKey = !question
+        ? null
+        : qPhase === 0
+        ? (introDone ? 'p0_ctrl' : 'p0_pre')
+        : qPhase === 1
+        ? (introDone ? 'p1_ctrl' : 'p1_pre')
+        : 'p2_pre';
+
       const { showGuide, guideMode, openGuide, dismissGuide } = useStagedLevelGuide({
         currentStars,
         hasSeenGuide,
         onMarkGuideSeen,
-        activeStageKey: !question ? null : !radarLocked ? 'radar' : 'fill',
+        activeStageKey: lv14StageKey,
         phase: qPhase,
-        enabled: gameState === 'playing',
-        finalStageKey: 'radar'
+        enabled: gameState === 'playing' && !solved,
+        finalStageKey: 'p2_pre'
       });
 
       const containerRef = useRef(null);
       const bagRef = useRef({ usedKeys: [], lastQuad: null });
-      const slotARef = useRef(null);
-      const slotBRef = useRef(null);
       const questionMissedRef = useRef(false);
       const pendingNextRef = useRef(null);
       const justSolvedAtRef = useRef(0);
+      const introPlayedKeyRef = useRef(null);
+      const animTimersRef = useRef([]);
+      const shipRafRef = useRef(null);
+      const droneRafRef = useRef(null);
+
+      const ANGULAR_SPEED = 105; // 度 / 秒
+      const LINEAR_SPEED = 2.2;  // 單位 / 秒
+
+      const clearAllAnims = () => {
+        animTimersRef.current.forEach(id => clearTimeout(id));
+        animTimersRef.current = [];
+        if (shipRafRef.current) { cancelAnimationFrame(shipRafRef.current); shipRafRef.current = null; }
+        if (droneRafRef.current) { cancelAnimationFrame(droneRafRef.current); droneRafRef.current = null; }
+      };
+      const addAnimTimer = (fn, ms) => {
+        const id = setTimeout(fn, ms);
+        animTimersRef.current.push(id);
+        return id;
+      };
+
+      useEffect(() => () => clearAllAnims(), []);
+
+      // ===== 極轉直開場動畫：飛船 ① 等角速度轉向 θ (105°/s) → 停頓 (320ms) → ② 等線速度推進 r (2.2/s) =====
+      const runShipIntro = (q) => {
+        if (!q || q.mode !== 'polar2rect') return;
+        if (shipRafRef.current) cancelAnimationFrame(shipRafRef.current);
+        const TURN_MS = q.deg > 0 ? Math.max(240, (q.deg / ANGULAR_SPEED) * 1000) : 0;
+        const PAUSE_MS = 320;
+        const THRUST_MS = (q.r / LINEAR_SPEED) * 1000;
+        const startAt = performance.now();
+        let thrustSoundPlayed = false;
+
+        setShipAnim({ stage: TURN_MS > 0 ? 'turning' : 'pause', deg: 0, r: 0 });
+        const step = (now) => {
+          const el = now - startAt;
+          if (el < TURN_MS) {
+            const t = el / TURN_MS;
+            setShipAnim({ stage: 'turning', deg: q.deg * t, r: 0 });
+            shipRafRef.current = requestAnimationFrame(step);
+          } else if (el < TURN_MS + PAUSE_MS) {
+            setShipAnim({ stage: 'pause', deg: q.deg, r: 0 });
+            shipRafRef.current = requestAnimationFrame(step);
+          } else if (el < TURN_MS + PAUSE_MS + THRUST_MS) {
+            if (!thrustSoundPlayed) {
+              thrustSoundPlayed = true;
+              audio.sfxRocketThrust(THRUST_MS / 1000);
+            }
+            const t = (el - TURN_MS - PAUSE_MS) / THRUST_MS;
+            setShipAnim({ stage: 'thrusting', deg: q.deg, r: q.r * t });
+            shipRafRef.current = requestAnimationFrame(step);
+          } else {
+            setShipAnim({ stage: 'parked', deg: q.deg, r: q.r });
+            shipRafRef.current = null;
+          }
+        };
+        shipRafRef.current = requestAnimationFrame(step);
+      };
+
+      // ===== 直轉極開場三幕劇：① 帝國戰艦畫面外迫近 → ② 軍機雷達高速貫穿掠過掃描 X → ③ 高速貫穿掠過掃描 Y =====
+      const runEnemyScan = (q) => {
+        if (!q || q.mode !== 'rect2polar') return;
+        if (droneRafRef.current) cancelAnimationFrame(droneRafRef.current);
+        setEnemyCloaked(false);
+
+        const vr = q.r <= 4 ? 5.2 : 7.4;
+        const angleRad = (q.deg * Math.PI) / 180;
+        const startR = vr * 1.48;
+        const sx = startR * Math.cos(angleRad);
+        const sy = startR * Math.sin(angleRad);
+        const tx = q.nx, ty = q.ny;
+        const maxSweep = vr * 1.18; // 一路貫穿掃出畫面邊緣
+        const dirX = tx >= 0 ? 1 : -1;
+        const dirY = ty >= 0 ? 1 : -1;
+
+        const APPROACH_MS = 760;
+        const SCAN_X_MS = 540;
+        const PAUSE_MS = 180;
+        const SCAN_Y_MS = 540;
+
+        const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+        const startAt = performance.now();
+        let pingedX = false;
+        let pingedY = false;
+
+        audio.sfxBattleshipWarp();
+        setEnemyAnim({ stage: 'approaching', x: sx, y: sy, scanX: 0, scanY: 0, pingX: false, pingY: false });
+
+        const step = (now) => {
+          const el = now - startAt;
+          if (el < APPROACH_MS) {
+            const t = easeOut(el / APPROACH_MS);
+            setEnemyAnim({
+              stage: 'approaching',
+              x: sx + (tx - sx) * t,
+              y: sy + (ty - sy) * t,
+              scanX: 0, scanY: 0, pingX: false, pingY: false
+            });
+            droneRafRef.current = requestAnimationFrame(step);
+          } else if (el < APPROACH_MS + SCAN_X_MS) {
+            const t = (el - APPROACH_MS) / SCAN_X_MS;
+            const curScanX = dirX * maxSweep * t;
+            const passed = Math.abs(curScanX) >= Math.abs(tx);
+            if (passed && !pingedX) {
+              pingedX = true;
+              audio.sfxThrottleStep(8);
+            }
+            setEnemyAnim({
+              stage: 'scanX',
+              x: tx, y: ty,
+              scanX: curScanX, scanY: 0,
+              pingX: passed, pingY: false
+            });
+            droneRafRef.current = requestAnimationFrame(step);
+          } else if (el < APPROACH_MS + SCAN_X_MS + PAUSE_MS) {
+            setEnemyAnim({
+              stage: 'pauseScan',
+              x: tx, y: ty,
+              scanX: dirX * maxSweep, scanY: 0,
+              pingX: true, pingY: false
+            });
+            droneRafRef.current = requestAnimationFrame(step);
+          } else if (el < APPROACH_MS + SCAN_X_MS + PAUSE_MS + SCAN_Y_MS) {
+            const t = (el - APPROACH_MS - SCAN_X_MS - PAUSE_MS) / SCAN_Y_MS;
+            const curScanY = dirY * maxSweep * t;
+            const passed = Math.abs(curScanY) >= Math.abs(ty);
+            if (passed && !pingedY) {
+              pingedY = true;
+              audio.sfxRadarScan();
+            }
+            setEnemyAnim({
+              stage: 'scanY',
+              x: tx, y: ty,
+              scanX: dirX * maxSweep, scanY: curScanY,
+              pingX: true, pingY: passed
+            });
+            droneRafRef.current = requestAnimationFrame(step);
+          } else {
+            setEnemyAnim({
+              stage: 'locked',
+              x: tx, y: ty,
+              scanX: dirX * maxSweep, scanY: dirY * maxSweep,
+              pingX: true, pingY: true
+            });
+            droneRafRef.current = null;
+            if (q.stealth) {
+              addAnimTimer(() => setEnemyCloaked(true), 680);
+            }
+          }
+        };
+        droneRafRef.current = requestAnimationFrame(step);
+      };
+
+      // ===== 根治聚光後才啟動動畫：加 80ms 緩衝計時器，若 useStagedLevelGuide 下一幀切為 showGuide=true 立即取消 =====
+      useEffect(() => {
+        if (!question || gameState !== 'playing') return;
+        if (showGuide) return;
+        if (introPlayedKeyRef.current === question.key) return;
+        const delayId = setTimeout(() => {
+          introPlayedKeyRef.current = question.key;
+          if (question.mode === 'polar2rect') {
+            runShipIntro(question);
+          } else {
+            runEnemyScan(question);
+          }
+        }, 80);
+        return () => clearTimeout(delayId);
+      }, [question?.key, showGuide, gameState]);
 
       const handleConfirmSkip = () => {
         if (!pendingNextRef.current) return;
@@ -13855,24 +15015,35 @@
       };
 
       const nextQuestion = (curProg) => {
-        const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
-        const q = generateLevel16Question(phase, bagRef.current);
+        clearAllAnims();
+        const q = generateLevel16Question(curProg, bagRef.current);
         questionMissedRef.current = false;
+        introPlayedKeyRef.current = null;
         setQuestion(q);
-        setRadarLocked(phase === 0);
-        setSlots({ a: null, b: null });
-        setActiveSlot('a');
-        setWrongSlotKey(null);
-        setOptDragState(null);
+        setXSign(null);
+        setYSign(null);
+        setXWheelIdx(0);
+        setYWheelIdx(0);
+        setFlightState('idle');
+        setShipAnim({ stage: 'idle', deg: 0, r: 0 });
+        setDroneAnim({ x: 0, y: 0, trail: [[0, 0]], label: '(0, 0)', active: false, done: false });
+        setEnemyAnim({ stage: 'waiting', x: 99, y: 99, scanX: 0, scanY: 0, pingX: false, pingY: false });
+        setEnemyCloaked(false);
+        setBurstEffect(null);
+        setAimDeg(0);
+        setAimR(4);
         setSolved(false);
         setConceptTip(null);
+        setFeedbackAnim('');
+        pendingNextRef.current = null;
       };
 
       const startGame = () => {
+        clearAllAnims();
         pendingNextRef.current = null;
+        introPlayedKeyRef.current = null;
         bagRef.current = { usedKeys: [], lastQuad: null };
         questionMissedRef.current = false;
-        setFeedbackAnim('');
         const initProg = startSession();
         nextQuestion(initProg);
         audio.init();
@@ -13880,363 +15051,862 @@
 
       useEffect(() => { startGame(); }, []);
 
-      const lv16CoachSteps = useMemo(() => {
-        if (guideMode === 'manual') {
-          return [
-            { desc: '若雷達點尚未鎖定，先依題目 [r, θ] 或 (x, y) 點擊雷達上對應的交點。' },
-            { desc: '點選下方琥珀金膠囊填入上方兩個呼吸槽（亦支援拖曳）！' }
-          ];
-        }
-        if (!radarLocked) {
-          return [{
-            target: 'lv16-board',
-            anchorX: 0.5,
-            anchorY: 0.5,
-            pad: 8,
-            shape: 'rect',
-            tap: false,
-            desc: qPhase === 2
-              ? '依直角坐標 (x, y) 的象限與長度，在極坐標雷達上點擊對應星點！'
-              : '依極坐標 [r, θ]，點擊極坐標雷達上對應半徑圈與角度線的交點！'
-          }];
-        }
-        return [{
-          target: 'lv16-opts',
-          anchorX: 0.5,
-          anchorY: 0.5,
-          pad: 8,
-          shape: 'rect',
-          tap: false,
-          desc: '觀察雷達上的投影，點選下方膠囊填入上方呼吸槽（亦支援拖曳）'
-        }];
-      }, [guideMode, radarLocked, qPhase]);
-
-      const handleRadarNodeClick = (rVal, degVal) => {
-        if (gameState !== 'playing' || !question || radarLocked || (!isRelaxMode && lives <= 0)) return;
-        if (showGuide) dismissGuide();
-        if (rVal === question.r && degVal === question.deg) {
-          audio.sfxBonus();
-          setRadarLocked(true);
-          setConceptTip(null);
-        } else {
-          audio.sfxError();
-          const alreadyMissed = questionMissedRef.current;
-          questionMissedRef.current = true;
-          const gameOver = alreadyMissed ? false : recordWrong({ delayEndMs: 480 }).gameOver;
-          setConceptTip({
-            text: question.mode === 'polar2rect'
-              ? `請找半徑 r = ${question.r}（${question.r === 2 ? '內圈' : '外圈'}）與 ${question.deg}° 射線交點！`
-              : `(${question.xStr}, ${question.yStr}) 在第 ${['I','II','III','IV'][question.quad - 1]} 象限、半徑 r = ${question.r}！`,
-            id: Date.now()
-          });
-          setFeedbackAnim('animate-shake');
-          if (!gameOver) setTimeout(() => setFeedbackAnim(''), 360);
-        }
-      };
-
-      const attemptFillSlot = (slotKey, val) => {
-        if (gameState !== 'playing' || !question || !radarLocked || solved || (!isRelaxMode && lives <= 0)) return;
-        if (slots[slotKey] !== null) return;
-        const expected = slotKey === 'a' ? question.ansSlot1 : question.ansSlot2;
-        if (val === expected) {
-          if (showGuide) dismissGuide();
-          const nextSlots = { ...slots, [slotKey]: val };
-          setSlots(nextSlots);
-          setWrongSlotKey(null);
-          setConceptTip(null);
-          if (nextSlots.a !== null && nextSlots.b !== null) {
-            justSolvedAtRef.current = Date.now();
-            audio.sfxBonus();
-            setSolved(true);
-            setFeedbackAnim('animate-correct');
-            const { completed, nextProgress } = recordCorrect({ wasMissed: questionMissedRef.current, delayEndMs: null });
-            setConceptTip({
-              node: <SqrtText text={question.tip} className="font-serif font-black" />,
-              tone: 'success',
-              canSkip: true,
-              skipLabel: completed ? '輕點查看結算 ▸' : '輕點繼續 ▸',
-              id: Date.now()
-            });
-            pendingNextRef.current = () => {
-              pendingNextRef.current = null;
-              setFeedbackAnim('');
-              if (completed) finishNow();
-              else nextQuestion(nextProgress);
-            };
-          } else {
-            audio.sfxSelect();
-            setActiveSlot(slotKey === 'a' ? 'b' : 'a');
-          }
-        } else {
-          audio.sfxError();
-          const alreadyMissed = questionMissedRef.current;
-          questionMissedRef.current = true;
-          const gameOver = alreadyMissed ? false : recordWrong({ delayEndMs: 480 }).gameOver;
-          setWrongSlotKey(slotKey);
-          setConceptTip({
-            text: question.mode === 'polar2rect'
-              ? `x = r cos(${question.deg}°)、y = r sin(${question.deg}°)，再對照圖上第 ${['I','II','III','IV'][question.quad - 1]} 象限符號！`
-              : `半徑 r = √(x² + y²)、角度由正 X 軸逆時針算至終邊！`,
-            id: Date.now()
-          });
-          setFeedbackAnim('animate-shake');
-          if (!gameOver) setTimeout(() => { setFeedbackAnim(''); setWrongSlotKey(null); }, 380);
-        }
-      };
-
-      const findSlotHit = (clientX, clientY) => {
-        const hit = (el) => {
-          if (!el) return false;
-          const r = el.getBoundingClientRect();
-          return clientX >= r.left - 18 && clientX <= r.right + 18 && clientY >= r.top - 14 && clientY <= r.bottom + 14;
-        };
-        if (slots.a === null && hit(slotARef.current)) return 'a';
-        if (slots.b === null && hit(slotBRef.current)) return 'b';
-        if (hit(slotARef.current)) return 'a';
-        if (hit(slotBRef.current)) return 'b';
-        return null;
-      };
-
-      const handleOptDown = (e, val) => {
-        if (gameState !== 'playing' || !question || !radarLocked || solved || (!isRelaxMode && lives <= 0)) return;
-        e.preventDefault();
-        audio.init();
-        const touchOffsetY = e.pointerType === 'touch' ? 46 : 0;
-        setOptDragState({
-          val,
-          startX: e.clientX,
-          startY: e.clientY,
-          clientX: e.clientX,
-          clientY: e.clientY,
-          touchOffsetY,
-          moved: false,
-          hoverSlot: findSlotHit(e.clientX, e.clientY - touchOffsetY)
+      const triggerSuccess = (isWeaponHit = false) => {
+        if (isWeaponHit) audio.sfxLaserHit();
+        else audio.sfxDockSuccess();
+        justSolvedAtRef.current = Date.now();
+        setSolved(true);
+        setEnemyCloaked(false);
+        setFlightState('docked');
+        setBurstEffect({ x: question.nx, y: question.ny, kind: 'hit' });
+        setFeedbackAnim('animate-correct');
+        const { completed, nextProgress } = recordCorrect({ wasMissed: questionMissedRef.current, delayEndMs: null });
+        setConceptTip({
+          tone: 'success',
+          canSkip: true,
+          skipLabel: completed ? '輕點查看結算 ▸' : '輕點繼續 ▸',
+          text: `${isWeaponHit ? '精準攔截擊毀！' : '無人機對接成功！'}${question.tip}`,
+          id: Date.now()
         });
+        pendingNextRef.current = () => {
+          pendingNextRef.current = null;
+          setFeedbackAnim('');
+          if (completed) finishNow();
+          else nextQuestion(nextProgress);
+        };
       };
 
-      useEffect(() => {
-        if (!optDragState) return;
-        const onMove = (e) => {
-          const offsetY = e.pointerType === 'touch' ? 46 : optDragState.touchOffsetY || 0;
-          const dist = Math.hypot(e.clientX - optDragState.startX, e.clientY - optDragState.startY);
-          const moved = optDragState.moved || dist >= 8;
-          setOptDragState(prev => prev ? {
-            ...prev,
-            clientX: e.clientX,
-            clientY: e.clientY,
-            touchOffsetY: offsetY,
-            moved,
-            hoverSlot: findSlotHit(e.clientX, e.clientY - offsetY)
-          } : null);
-        };
-        const onUp = (e) => {
-          const cur = optDragState;
-          setOptDragState(null);
-          if (!cur) return;
-          if (!cur.moved) {
-            const target = slots[activeSlot] === null ? activeSlot : slots.a === null ? 'a' : 'b';
-            attemptFillSlot(target, cur.val);
+      const triggerMiss = (errMsg, missX = 0, missY = 0) => {
+        audio.sfxMissBoom();
+        const alreadyMissed = questionMissedRef.current;
+        questionMissedRef.current = true;
+        const { gameOver } = alreadyMissed ? { gameOver: false } : recordWrong({ delayEndMs: 650 });
+        setFlightState('missed');
+        setBurstEffect({ x: missX, y: missY, kind: 'miss' });
+        setFeedbackAnim('animate-shake');
+        setConceptTip({ text: errMsg, id: Date.now() });
+        if (!gameOver) {
+          addAnimTimer(() => {
+            setFeedbackAnim('');
+            setFlightState('idle');
+            setBurstEffect(null);
+            if (question?.mode === 'polar2rect') {
+              setDroneAnim({ x: 0, y: 0, trail: [[0, 0]], label: '(0, 0)', active: false, done: false });
+            } else {
+              setShipAnim({ stage: 'idle', deg: 0, r: 0 });
+              if (question?.stealth) setEnemyCloaked(true);
+            }
+          }, 960);
+        }
+      };
+
+      // ===== 極轉直：無人機等線速度 (2.2 單位/s) 兩段折線飛行 =====
+      const launchDrone = (xStr, yStr) => {
+        if (!question) return;
+        if (droneRafRef.current) cancelAnimationFrame(droneRafRef.current);
+        const tx = lv14ParseVal(xStr);
+        const ty = lv14ParseVal(yStr);
+        const isCorrect = xStr === question.xStr && yStr === question.yStr;
+
+        const hasX = Math.abs(tx) > 0.01;
+        const hasY = Math.abs(ty) > 0.01;
+        const X_MS = hasX ? (Math.abs(tx) / LINEAR_SPEED) * 1000 : 0;
+        const TURN_PAUSE_MS = (hasX && hasY) ? 300 : 0;
+        const Y_MS = hasY ? (Math.abs(ty) / LINEAR_SPEED) * 1000 : 0;
+
+        setFlightState('flying');
+        setBurstEffect(null);
+        setConceptTip(null);
+        if (hasX) audio.sfxDroneWhir(X_MS / 1000);
+        else if (hasY) audio.sfxDroneWhir(Y_MS / 1000);
+
+        const startAt = performance.now();
+        let turnedBeeped = false;
+        let yWhirPlayed = false;
+
+        const step = (now) => {
+          const el = now - startAt;
+          if (el < X_MS) {
+            const t = el / X_MS;
+            const cx = tx * t;
+            setDroneAnim({ x: cx, y: 0, trail: [[0, 0], [cx, 0]], label: `(${lv14FormatLive(cx)}, 0)`, active: true, done: false });
+            droneRafRef.current = requestAnimationFrame(step);
+          } else if (el < X_MS + TURN_PAUSE_MS) {
+            if (!turnedBeeped) { turnedBeeped = true; audio.sfxClick(); }
+            setDroneAnim({ x: tx, y: 0, trail: [[0, 0], [tx, 0]], label: `(${xStr}, 0)`, active: true, done: false });
+            droneRafRef.current = requestAnimationFrame(step);
+          } else if (el < X_MS + TURN_PAUSE_MS + Y_MS) {
+            if (hasX && !yWhirPlayed) { yWhirPlayed = true; audio.sfxDroneWhir(Y_MS / 1000); }
+            const t = (el - X_MS - TURN_PAUSE_MS) / Y_MS;
+            const cy = ty * t;
+            const tr = hasX ? [[0, 0], [tx, 0], [tx, cy]] : [[0, 0], [0, cy]];
+            setDroneAnim({ x: tx, y: cy, trail: tr, label: `(${xStr}, ${lv14FormatLive(cy)})`, active: true, done: false });
+            droneRafRef.current = requestAnimationFrame(step);
           } else {
-            const offsetY = e.pointerType === 'touch' ? 46 : cur.touchOffsetY || 0;
-            const hit = findSlotHit(e.clientX, e.clientY - offsetY);
-            if (hit) attemptFillSlot(hit, cur.val);
+            const tr = hasX && hasY ? [[0, 0], [tx, 0], [tx, ty]] : [[0, 0], [tx, ty]];
+            setDroneAnim({ x: tx, y: ty, trail: tr, label: `(${xStr}, ${yStr})`, active: true, done: true });
+            droneRafRef.current = null;
+            addAnimTimer(() => {
+              if (isCorrect) {
+                triggerSuccess(false);
+              } else {
+                let reason = `無人機飛到 (${xStr}, ${yStr}) 撲空了！調整十字方向或轉輪再起飛！`;
+                if (xStr === question.yStr && yStr === question.xStr) {
+                  reason = `x 與 y 顛倒囉！水平是 r·cos θ、鉛直是 r·sin θ！`;
+                } else if (Math.abs(tx - question.nx) < 0.05 && Math.abs(ty + question.ny) < 0.05) {
+                  reason = `y 的正負號相反了！用十字鍵切換上／下方向！`;
+                } else if (Math.abs(tx + question.nx) < 0.05 && Math.abs(ty - question.ny) < 0.05) {
+                  reason = `x 的正負號相反了！用十字鍵切換左／右方向！`;
+                }
+                triggerMiss(reason, tx, ty);
+              }
+            }, 160);
           }
         };
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
-        window.addEventListener('pointercancel', onUp);
-        return () => {
-          window.removeEventListener('pointermove', onMove);
-          window.removeEventListener('pointerup', onUp);
-          window.removeEventListener('pointercancel', onUp);
-        };
-      }, [optDragState, question, radarLocked, solved, slots, activeSlot, lives, isRelaxMode]);
+        droneRafRef.current = requestAnimationFrame(step);
+      };
 
-      const radarAngles = [30, 45, 60, 120, 135, 150, 210, 225, 240, 300, 315, 330];
+      const curXMag = question ? question.wheelPool[xWheelIdx] : '0';
+      const curYMag = question ? question.wheelPool[yWheelIdx] : '0';
+      const composedX = curXMag === '0' ? '0' : (xSign === -1 ? `-${curXMag}` : xSign === 1 ? curXMag : null);
+      const composedY = curYMag === '0' ? '0' : (ySign === -1 ? `-${curYMag}` : ySign === 1 ? curYMag : null);
+
+      const handleLaunchDroneBtn = () => {
+        if (gameState !== 'playing' || !question || !isPolar2Rect || solved || flightState !== 'idle' || (!isRelaxMode && lives <= 0)) return;
+        if (showGuide) dismissGuide();
+        if (composedX === null) {
+          audio.sfxClick();
+          setConceptTip({ text: '請先按左側十字鍵（◀ / ▶）決定 X 的正負方向！', id: Date.now() });
+          return;
+        }
+        if (composedY === null) {
+          audio.sfxClick();
+          setConceptTip({ text: '請先按左側十字鍵（▲ / ▼）決定 Y 的正負方向！', id: Date.now() });
+          return;
+        }
+        if (composedX === '0' && composedY === '0') {
+          audio.sfxClick();
+          setConceptTip({ text: '請撥動數值轉輪設定無人機移動距離！', id: Date.now() });
+          return;
+        }
+        launchDrone(composedX, composedY);
+      };
+
+      // ===== 直轉極：按下「⚡ 開火」才轉砲 ① 等角速度轉向 aimDeg → 蓄力 → ② 轟出飛彈等線速度推進 aimR =====
+      const handleFirePolarWeapon = () => {
+        if (gameState !== 'playing' || !question || !isRect2Polar || solved || flightState !== 'idle' || (!isRelaxMode && lives <= 0)) return;
+        if (showGuide) dismissGuide();
+        if (shipRafRef.current) cancelAnimationFrame(shipRafRef.current);
+        setFlightState('firingPolar');
+        setBurstEffect(null);
+        setConceptTip(null);
+        setEnemyCloaked(false); // 開火瞬間解除敵艦隱形讓玩家驗證！
+
+        const TURN_MS = aimDeg > 0 ? Math.max(220, (aimDeg / ANGULAR_SPEED) * 1000) : 0;
+        const PAUSE_MS = 220;
+        const THRUST_MS = (aimR / LINEAR_SPEED) * 1000;
+        const startAt = performance.now();
+        let thrustPlayed = false;
+
+        const okDeg = (aimDeg % 360) === (question.deg % 360);
+        const okR = aimR === question.r;
+        const endRad = (aimDeg * Math.PI) / 180;
+        const endX = aimR * Math.cos(endRad);
+        const endY = aimR * Math.sin(endRad);
+
+        const step = (now) => {
+          const el = now - startAt;
+          if (el < TURN_MS) {
+            const t = el / TURN_MS;
+            setShipAnim({ stage: 'turning', deg: aimDeg * t, r: 0 });
+            shipRafRef.current = requestAnimationFrame(step);
+          } else if (el < TURN_MS + PAUSE_MS) {
+            setShipAnim({ stage: 'pause', deg: aimDeg, r: 0 });
+            shipRafRef.current = requestAnimationFrame(step);
+          } else if (el < TURN_MS + PAUSE_MS + THRUST_MS) {
+            if (!thrustPlayed) {
+              thrustPlayed = true;
+              audio.sfxRailgunFire();
+            }
+            const t = (el - TURN_MS - PAUSE_MS) / THRUST_MS;
+            setShipAnim({ stage: 'thrusting', deg: aimDeg, r: aimR * t });
+            shipRafRef.current = requestAnimationFrame(step);
+          } else {
+            setShipAnim({ stage: 'parked', deg: aimDeg, r: aimR });
+            shipRafRef.current = null;
+            addAnimTimer(() => {
+              if (okDeg && okR) {
+                triggerSuccess(true);
+              } else if (!okR && okDeg) {
+                const over = aimR > question.r;
+                triggerMiss(
+                  over
+                    ? `方向角 ${aimDeg}° 完全對準，但油門催過頭飛過目標囉！用 r = √(x² + y²) 算射程！`
+                    : `方向角 ${aimDeg}° 完全對準，但油門射程 r = ${aimR} 不夠遠！用 r = √(x² + y²) 算射程！`,
+                  endX, endY
+                );
+              } else if (okR && !okDeg) {
+                triggerMiss(`油門射程 r = ${aimR} 正確，但方向角 ${aimDeg}° 偏掉了！確認目標在第幾象限！`, endX, endY);
+              } else {
+                triggerMiss(`飛彈在 [${aimR}, ${aimDeg}°] 空爆撲空！先由 (x, y) 算距離 r 與方向角 θ！`, endX, endY);
+              }
+            }, 140);
+          }
+        };
+        shipRafRef.current = requestAnimationFrame(step);
+      };
+
+      // ===== 放大版動態視野（直轉極不隨 aimR 縮放以免洩漏目標半徑） =====
+      const viewRange = !question
+        ? 4.8
+        : isPolar2Rect
+        ? (question.r <= 2 ? 2.6 : question.r <= 4 ? 4.8 : 6.9)
+        : (question.r <= 4 ? 5.2 : 7.4);
+      const CX = 160, CY = 148;
+      const UNIT = 126 / viewRange;
+      const toSvg = (mx, my) => ({ sx: CX + mx * UNIT, sy: CY - my * UNIT });
+
+      const visibleRings = viewRange <= 3 ? [1, 2] : viewRange <= 5.5 ? [2, 4] : [2, 4, 6];
+
+      const activeDeg = shipAnim.deg;
+      const activeR = shipAnim.r;
+      const rad = (activeDeg * Math.PI) / 180;
+      const shipX = activeR * Math.cos(rad);
+      const shipY = activeR * Math.sin(rad);
+      const shipSvg = toSvg(shipX, shipY);
+      const targetSvg = question ? toSvg(question.nx, question.ny) : { sx: CX, sy: CY };
+      const droneSvg = toSvg(droneAnim.x, droneAnim.y);
+      const burstSvg = burstEffect ? toSvg(burstEffect.x, burstEffect.y) : null;
+
+      // 即時飛船／飛彈極坐標標籤
+      const shipLiveLabel = isPolar2Rect
+        ? (shipAnim.stage === 'idle'
+            ? ''
+            : shipAnim.stage === 'parked'
+            ? `[${question?.r}, ${question?.deg}°]`
+            : `[${lv14FormatLive(shipAnim.r)}, ${Math.round(shipAnim.deg)}°]`)
+        : (flightState === 'firingPolar' || flightState === 'docked' || flightState === 'missed'
+            ? (shipAnim.stage === 'parked'
+                ? `[${aimR}, ${aimDeg}°]`
+                : `[${lv14FormatLive(shipAnim.r)}, ${Math.round(shipAnim.deg)}°]`)
+            : '');
+
+      // 動態角度扇形（極轉直隨飛船展開；直轉極僅於開火轉砲時展開，絕不提前洩漏方位）
+      const showSector = isPolar2Rect
+        ? (shipAnim.stage !== 'idle' && shipAnim.deg > 1)
+        : (flightState !== 'idle' && shipAnim.deg > 1);
+      const arcR = 32;
+      const arcEnd = { x: CX + arcR * Math.cos(rad), y: CY - arcR * Math.sin(rad) };
+      const largeArc = activeDeg > 180 ? 1 : 0;
+      const sectorPath = showSector
+        ? `M ${CX} ${CY} L ${CX + arcR} ${CY} A ${arcR} ${arcR} 0 ${largeArc} 0 ${arcEnd.x} ${arcEnd.y} Z`
+        : '';
+
+      const showPolarRings = isPolar2Rect || flightState === 'firingPolar' || flightState === 'docked' || flightState === 'missed' || solved;
+
+      // 360° 安全框計算所有標籤位置
+      const shipLbl = lv14PlaceLabel(shipSvg.sx, shipSvg.sy, shipLiveLabel, shipX >= -0.05 ? 1 : -1, shipY >= -0.05 ? -1 : 1);
+      const droneLbl = lv14PlaceLabel(droneSvg.sx, droneSvg.sy, droneAnim.label, droneAnim.x >= -0.05 ? 1 : -1, droneAnim.y >= 0.05 ? 1 : -1);
+      const enemyLabelText = question ? `(${question.xStr}, ${question.yStr})` : '';
+      const enemyLbl = lv14PlaceLabel(targetSvg.sx, targetSvg.sy, enemyLabelText, (question?.nx ?? 1) >= -0.05 ? 1 : -1, (question?.ny ?? 1) >= -0.05 ? -1 : 1);
 
       return (
-        <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
+        <div ref={containerRef} className={`w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0 ${feedbackAnim}`}>
           {gameState === 'playing' && question && (
-            <div className={`flex-1 min-h-0 flex flex-col justify-between gap-2 overflow-hidden pb-0.5 ${feedbackAnim}`}>
+            <div onClick={handleConfirmSkip} className="flex-1 min-h-0 flex flex-col justify-between gap-1 overflow-hidden pb-0.5">
               <GameHUD
-                progress={progress}
-                starsThreshold={starsThreshold}
-                lives={lives}
-                maxLives={maxLives}
-                healStreak={healStreak}
-                healTarget={healTarget}
-                onManualEnd={finishNow}
-                onOpenGuide={openGuide}
+                progress={progress} starsThreshold={starsThreshold} lives={lives} maxLives={maxLives}
+                healStreak={healStreak} healTarget={healTarget} unitLabel="次"
+                onManualEnd={finishNow} onOpenGuide={openGuide}
               />
 
-              <div className={`relative flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${solved ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                <StagePhaseStrip phase={qPhase} labels={['極坐標 [r, θ] ➔ (x, y) • 已知雷達點', '先在雷達點擊 [r, θ] • 再求 (x, y)', '逆向轉換 (x, y) ➔ [r, θ]']} />
-                <div className="bg-gradient-to-r from-cyan-700 to-indigo-800 min-h-[66px] py-2 px-3 flex items-center justify-center gap-2 text-white border-b-2 border-indigo-950 shrink-0">
-                  <div className="flex items-center gap-1.5 font-serif font-black text-base sm:text-lg flex-wrap justify-center">
-                    <span>
-                      {question.mode === 'polar2rect'
-                        ? `[${question.r}, ${question.deg}°] = (`
-                        : <span className="inline-flex items-center gap-0.5">(<SqrtText text={question.xStr} />, <SqrtText text={question.yStr} />) = [</span>}
-                    </span>
-                    {[
-                      { key: 'a', refObj: slotARef, label: question.mode === 'polar2rect' ? 'x' : 'r' },
-                      { key: 'b', refObj: slotBRef, label: question.mode === 'polar2rect' ? 'y' : 'θ' }
-                    ].map((sl, idx) => {
-                      const val = slots[sl.key];
-                      const isFilled = val !== null;
-                      const isFocused = radarLocked && activeSlot === sl.key && !isFilled;
-                      const isHovered = optDragState?.moved && optDragState?.hoverSlot === sl.key;
-                      const isWrong = wrongSlotKey === sl.key;
-                      return (
-                        <React.Fragment key={sl.key}>
-                          {idx === 1 && <span>,</span>}
-                          <button
-                            ref={sl.refObj}
-                            type="button"
-                            onClick={() => { if (radarLocked && !isFilled) { audio.sfxClick(); setActiveSlot(sl.key); } }}
-                            className={`min-w-[54px] h-[30px] px-2 rounded-full border-2 text-sm font-black inline-flex items-center justify-center transition-all ${
-                              isFilled
-                                ? 'bg-emerald-400 border-emerald-200 text-emerald-950 shadow-sm'
-                                : isWrong
-                                ? 'bg-rose-500/80 border-rose-200 text-white animate-shake'
-                                : isHovered
-                                ? 'bg-amber-300/45 border-amber-200 scale-110'
-                                : isFocused
-                                ? 'border-amber-300 bg-amber-400/30 text-amber-100 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]'
-                                : 'border-dashed border-white/40 bg-white/5'
-                            }`}
-                          >
-                            {isFilled ? <SqrtText text={val} /> : <span className="text-xs font-sans text-amber-100/80">{sl.label}</span>}
-                          </button>
-                        </React.Fragment>
-                      );
-                    })}
-                    <span>{question.mode === 'polar2rect' ? ')' : ']'}</span>
-                    <span className="w-6 h-6 inline-flex items-center justify-center shrink-0">
-                      <SuccessBadge show={solved} />
-                    </span>
+              <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-cyan-900 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${solved ? 'ring-4 ring-emerald-400/75' : ''}`}>
+                <StagePhaseStrip
+                  phase={qPhase}
+                  labels={['極轉直補給 • 觀察飛船 [r,θ] 派無人機', '直轉極防衛 • 掃描要塞 (x,y) 主砲反擊', '全域實戰 • 遠距補給 × 隱形要塞盲射']}
+                />
+
+                {/* 置頂緊湊單行任務欄（純淨無膠囊：作答中僅顯示未知符號，驗證成功才亮出正解與打勾） */}
+                <div data-coach="lv14-prompt" className={`h-[44px] px-3 flex justify-between items-center text-white border-b-2 shrink-0 gap-2 ${isRect2Polar ? 'bg-gradient-to-r from-rose-900 via-fuchsia-900 to-indigo-950 border-rose-950' : 'bg-gradient-to-r from-cyan-800 via-sky-800 to-indigo-900 border-cyan-950'}`}>
+                  <div className="flex items-center gap-1.5 font-serif font-black text-sm sm:text-base leading-none min-w-0">
+                    {isPolar2Rect ? (
+                      <>
+                        <span className="text-[10px] font-sans font-bold text-cyan-200/85 shrink-0">極坐標</span>
+                        <span className="text-cyan-100 font-mono">[{question.r}, {question.deg}°]</span>
+                        <span className="text-cyan-300">➔</span>
+                        <span className="text-[10px] font-sans font-bold text-amber-200/90 shrink-0">直角坐標</span>
+                        {solved ? (
+                          <span className="text-emerald-200 font-mono inline-flex items-center gap-0.5">
+                            (<SqrtText text={question.xStr} />, <SqrtText text={question.yStr} />)
+                          </span>
+                        ) : (
+                          <span className="text-amber-200/95 font-serif italic tracking-wide">(x, y)</span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[10px] font-sans font-bold text-rose-200/90 shrink-0">直角坐標</span>
+                        <span className="text-rose-100 inline-flex items-center gap-0.5 font-mono">
+                          (<SqrtText text={question.xStr} />, <SqrtText text={question.yStr} />)
+                        </span>
+                        <span className="text-rose-300">➔</span>
+                        <span className="text-[10px] font-sans font-bold text-amber-200/90 shrink-0">極坐標</span>
+                        {solved ? (
+                          <span className="text-emerald-200 font-mono">[{question.r}, {question.deg}°]</span>
+                        ) : (
+                          <span className="text-amber-200/95 font-serif italic tracking-wide">[r, θ]</span>
+                        )}
+                      </>
+                    )}
                   </div>
+                  <span className="w-6 h-6 inline-flex items-center justify-center shrink-0">
+                    <SuccessBadge show={solved} />
+                  </span>
                 </div>
 
-                <div onClick={handleConfirmSkip} className="relative w-full flex-1 min-h-0 bg-white flex items-center justify-center overflow-hidden">
+                {/* 主畫板：放大版深空雙坐標雷達 */}
+                <div
+                  data-coach="lv14-radar"
+                  className="relative flex-1 min-h-0 flex items-center justify-center overflow-hidden"
+                  style={{
+                    background: isRect2Polar
+                      ? 'radial-gradient(circle at 50% 50%, #24102b 0%, #12091c 58%, #07040d 100%)'
+                      : 'radial-gradient(circle at 50% 50%, #0d2b3e 0%, #071926 58%, #040d16 100%)'
+                  }}
+                >
                   <HintBanner tip={conceptTip} />
-                  <svg data-coach="lv16-board" viewBox="0 0 500 500" className="w-full h-full object-contain select-none">
-                    <circle cx="250" cy="250" r="95" fill="none" stroke="#cbd5e1" strokeWidth="2" strokeDasharray="5 4" />
-                    <circle cx="250" cy="250" r="190" fill="none" stroke="#94a3b8" strokeWidth="2" />
-                    <text x="348" y="242" fill="#64748b" fontSize="11" fontWeight="900">r=2</text>
-                    <text x="444" y="242" fill="#475569" fontSize="11" fontWeight="900">r=4</text>
-                    <line x1="25" y1="250" x2="475" y2="250" stroke="#64748b" strokeWidth="2.2" />
-                    <line x1="250" y1="25" x2="250" y2="475" stroke="#64748b" strokeWidth="2.2" />
 
-                    {radarAngles.map(deg => {
-                      const rad = (deg * Math.PI) / 180;
+                  {/* 左上角重播鈕 */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      audio.sfxClick();
+                      if (isPolar2Rect) runShipIntro(question);
+                      else runEnemyScan(question);
+                    }}
+                    className={`absolute top-1.5 left-2 z-10 px-2 py-0.5 rounded-md bg-slate-950/75 hover:bg-slate-900 border text-[10px] font-bold active:scale-95 transition-all cursor-pointer ${isRect2Polar ? 'border-rose-400/45 text-rose-200' : 'border-cyan-400/45 text-cyan-200'}`}
+                  >
+                    {isPolar2Rect ? '↺ 重播飛船' : '↺ 重播掃描'}
+                  </button>
+
+                  {/* 右上角動態階段狀態提示 */}
+                  {isPolar2Rect && shipAnim.stage !== 'parked' && shipAnim.stage !== 'idle' && (
+                    <div className="absolute top-1.5 right-2 z-10 px-2 py-0.5 rounded-md bg-cyan-950/85 border border-cyan-400/50 text-[10px] font-bold text-cyan-200 pointer-events-none">
+                      {shipAnim.stage === 'turning' ? '① 原地轉向 θ…' : shipAnim.stage === 'pause' ? '方向鎖定！點火…' : '② 直線推進 r…'}
+                    </div>
+                  )}
+                  {isRect2Polar && enemyCloaked && !solved && (
+                    <div className="absolute top-1.5 right-2 z-10 px-2 py-0.5 rounded-md bg-fuchsia-950/85 border border-fuchsia-400/60 text-[10px] font-bold text-fuchsia-200 animate-pulse pointer-events-none">
+                      👁️ 敵艦光學迷彩隱形中！
+                    </div>
+                  )}
+
+                  <svg viewBox="0 0 320 296" className="w-full h-full select-none touch-none">
+                    <defs>
+                      {/* 軍機雷達式高速貫穿線性螢光掃描尾焰漸層（右掃 / 左掃 / 上掃 / 下掃） */}
+                      <linearGradient id="lv14SweepRight" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="rgba(34,211,238,0)" />
+                        <stop offset="100%" stopColor="rgba(34,211,238,0.38)" />
+                      </linearGradient>
+                      <linearGradient id="lv14SweepLeft" x1="100%" y1="0%" x2="0%" y2="0%">
+                        <stop offset="0%" stopColor="rgba(34,211,238,0)" />
+                        <stop offset="100%" stopColor="rgba(34,211,238,0.38)" />
+                      </linearGradient>
+                      <linearGradient id="lv14SweepUp" x1="0%" y1="100%" x2="0%" y2="0%">
+                        <stop offset="0%" stopColor="rgba(244,114,182,0)" />
+                        <stop offset="100%" stopColor="rgba(244,114,182,0.38)" />
+                      </linearGradient>
+                      <linearGradient id="lv14SweepDown" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="rgba(244,114,182,0)" />
+                        <stop offset="100%" stopColor="rgba(244,114,182,0.38)" />
+                      </linearGradient>
+                    </defs>
+
+                    {/* 極坐標同心圓環（無 x 軸數字提示；直轉極於開火瞬間才浮現印證） */}
+                    {showPolarRings && visibleRings.map(rVal => {
+                      const isTargetRing = rVal === question.r;
                       return (
-                        <g key={deg}>
-                          <line x1="250" y1="250" x2={250 + 195 * Math.cos(rad)} y2={250 - 195 * Math.sin(rad)} stroke="#e2e8f0" strokeWidth="1.4" />
-                          <text x={250 + 214 * Math.cos(rad)} y={250 - 214 * Math.sin(rad)} fill="#64748b" fontSize="11.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">{deg}°</text>
-                        </g>
+                        <circle
+                          key={`ring_${rVal}`}
+                          cx={CX} cy={CY} r={rVal * UNIT}
+                          fill="none"
+                          stroke={isTargetRing ? 'rgba(56,189,248,0.45)' : 'rgba(56,189,248,0.18)'}
+                          strokeWidth={isTargetRing ? '1.3' : '0.9'}
+                          strokeDasharray="4 4"
+                        />
                       );
                     })}
 
-                    {/* 可點擊雷達交點（尚未鎖定時顯示對應 r 圈的候選交點） */}
-                    {!radarLocked && radarAngles.map(deg => {
-                      const rPx = question.r === 2 ? 95 : 190;
-                      const rad = (deg * Math.PI) / 180;
-                      const cx = 250 + rPx * Math.cos(rad);
-                      const cy = 250 - rPx * Math.sin(rad);
+                    {/* 30° 間隔極淡放射線（僅極轉直顯示） */}
+                    {isPolar2Rect && [30, 60, 120, 150, 210, 240, 300, 330].map(d => {
+                      const rr = (d * Math.PI) / 180;
                       return (
-                        <g key={`pt_${deg}`} className="cursor-pointer" onClick={(e) => { e.stopPropagation(); handleRadarNodeClick(question.r, deg); }}>
-                          <circle cx={cx} cy={cy} r="18" fill="transparent" />
-                          <circle cx={cx} cy={cy} r="7" fill="#bae6fd" stroke="#0284c7" strokeWidth="2.5" />
-                        </g>
+                        <line
+                          key={`ray_${d}`}
+                          x1={CX} y1={CY}
+                          x2={CX + 132 * Math.cos(rr)} y2={CY - 132 * Math.sin(rr)}
+                          stroke="rgba(56,189,248,0.11)" strokeWidth="0.85"
+                        />
                       );
                     })}
 
-                    {/* 鎖定後的投影直角三角形 */}
-                    {radarLocked && (() => {
-                      const rPx = question.r === 2 ? 95 : 190;
-                      const rad = (question.deg * Math.PI) / 180;
-                      const px = 250 + rPx * Math.cos(rad);
-                      const py = 250 - rPx * Math.sin(rad);
+                    {/* X / Y 主坐標軸 */}
+                    <line x1={CX - 142} y1={CY} x2={CX + 142} y2={CY} stroke="rgba(226,232,240,0.58)" strokeWidth="1.4" />
+                    <line x1={CX} y1={CY - 136} x2={CX} y2={CY + 136} stroke="rgba(226,232,240,0.58)" strokeWidth="1.4" />
+                    <text x={CX + 146} y={CY + 4} fill="#e2e8f0" fontSize="12" fontWeight="900" fontFamily="serif" fontStyle="italic">x</text>
+                    <text x={CX - 4} y={CY - 139} fill="#e2e8f0" fontSize="12" fontWeight="900" fontFamily="serif" fontStyle="italic">y</text>
+
+                    {/* 動態角度扇形標示 */}
+                    {sectorPath && (
+                      <path
+                        d={sectorPath}
+                        fill={isRect2Polar ? 'rgba(251,191,36,0.22)' : 'rgba(34,211,238,0.22)'}
+                        stroke={isRect2Polar ? '#fbbf24' : '#22d3ee'}
+                        strokeWidth="1.4"
+                      />
+                    )}
+
+                    {/* 答對印證時亮出翠綠直角投影線 */}
+                    {solved && (
+                      <g opacity="0.72">
+                        <line x1={targetSvg.sx} y1={targetSvg.sy} x2={targetSvg.sx} y2={CY} stroke="#34d399" strokeWidth="1.3" strokeDasharray="4 3" />
+                        <line x1={targetSvg.sx} y1={targetSvg.sy} x2={CX} y2={targetSvg.sy} stroke="#34d399" strokeWidth="1.3" strokeDasharray="4 3" />
+                      </g>
+                    )}
+
+                    {/* ===== 模式 1：極轉直（星際飛船停泊 ＋ 護環四軸無人機對接） ===== */}
+                    {isPolar2Rect && (
+                      <g>
+                        {/* 預備方向青色虛線航道 */}
+                        {(shipAnim.stage === 'turning' || shipAnim.stage === 'pause') && (
+                          <g opacity="0.8">
+                            <line
+                              x1={CX} y1={CY}
+                              x2={CX + 132 * Math.cos(rad)} y2={CY - 132 * Math.sin(rad)}
+                              stroke="#22d3ee" strokeWidth="1.6" strokeDasharray="6 4" strokeLinecap="round"
+                            />
+                            <circle cx={CX + 132 * Math.cos(rad)} cy={CY - 132 * Math.sin(rad)} r="3" fill="#67e8f9" />
+                          </g>
+                        )}
+                        {shipAnim.r > 0.02 && (
+                          <line x1={CX} y1={CY} x2={shipSvg.sx} y2={shipSvg.sy} stroke="#22d3ee" strokeWidth="2.4" strokeLinecap="round" opacity="0.82" />
+                        )}
+                        <g transform={`translate(${shipSvg.sx}, ${shipSvg.sy}) rotate(${90 - shipAnim.deg})`}>
+                          <Lv14MiniStarship accent="#38bdf8" thrusterOn={shipAnim.stage === 'thrusting' || shipAnim.stage === 'pause'} />
+                        </g>
+                        {shipLiveLabel && (
+                          <text
+                            x={shipLbl.x} y={shipLbl.y} textAnchor={shipLbl.anchor}
+                            fill="#a5f3fc" fontSize="11.5" fontWeight="900" className="font-mono"
+                            style={{ paintOrder: 'stroke', stroke: '#04121e', strokeWidth: '3.5px', strokeLinejoin: 'round' }}
+                          >
+                            {shipLiveLabel}
+                          </text>
+                        )}
+
+                        {/* 四軸無人機折線軌跡與機身（飛船進場期間隱藏，停穩後才於原點發射墊待命） */}
+                        {droneAnim.trail.length >= 2 && (
+                          <polyline
+                            points={droneAnim.trail.map(([px, py]) => { const p = toSvg(px, py); return `${p.sx},${p.sy}`; }).join(' ')}
+                            fill="none"
+                            stroke={flightState === 'missed' ? '#fb7185' : flightState === 'docked' ? '#34d399' : '#fbbf24'}
+                            strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"
+                          />
+                        )}
+                        {(shipAnim.stage === 'parked' || flightState !== 'idle') && (
+                          <g transform={`translate(${droneSvg.sx}, ${droneSvg.sy})`}>
+                            <Lv14MiniQuadDrone
+                              status={flightState === 'missed' ? 'missed' : flightState === 'docked' ? 'docked' : 'flying'}
+                              spinning={flightState === 'flying'}
+                            />
+                          </g>
+                        )}
+                        {droneAnim.active && (
+                          <text
+                            x={droneLbl.x} y={droneLbl.y} textAnchor={droneLbl.anchor}
+                            fill={flightState === 'missed' ? '#fda4af' : flightState === 'docked' ? '#6ee7b7' : '#fde68a'}
+                            fontSize="11.5" fontWeight="900" className="font-mono"
+                            style={{ paintOrder: 'stroke', stroke: '#04121e', strokeWidth: '3.5px', strokeLinejoin: 'round' }}
+                          >
+                            {droneAnim.label}
+                          </text>
+                        )}
+                      </g>
+                    )}
+
+                    {/* ===== 模式 2：直轉極（帝國主力戰艦畫面外入侵 ＋ 軍機雷達高速貫穿掠過掃描 ＋ 重裝離子主砲） ===== */}
+                    {isRect2Polar && (() => {
+                      const eSvg = toSvg(enemyAnim.x, enemyAnim.y);
+                      const scanXSvg = CX + enemyAnim.scanX * UNIT;
+                      const scanYSvg = CY - enemyAnim.scanY * UNIT;
+                      const headingToOrigin = (question.deg + 180) % 360;
+                      const sweepW = Math.min(48, Math.abs(scanXSvg - CX));
+                      const sweepH = Math.min(48, Math.abs(scanYSvg - CY));
+                      const isRight = enemyAnim.scanX >= 0;
+                      const isUp = enemyAnim.scanY >= 0;
+                      const showSweepX = enemyAnim.stage === 'scanX';
+                      const showSweepY = enemyAnim.stage === 'scanY';
+                      const showBattleship = enemyAnim.stage !== 'waiting';
                       return (
-                        <g className="pointer-events-none animate-jelly">
-                          <polygon points={`250,250 ${px},250 ${px},${py}`} fill="rgba(14,165,233,0.14)" />
-                          <line x1="250" y1="250" x2={px} y2="250" stroke="#2563eb" strokeWidth="4.5" strokeLinecap="round" />
-                          <line x1={px} y1="250" x2={px} y2={py} stroke="#e11d48" strokeWidth="4.5" strokeLinecap="round" />
-                          <line x1="250" y1="250" x2={px} y2={py} stroke="#f59e0b" strokeWidth="5.5" strokeLinecap="round" />
-                          <circle cx={px} cy={py} r="10" fill="#0284c7" stroke="#ffffff" strokeWidth="3" />
+                        <g>
+                          {/* 軍機雷達高速貫穿掃描 ①：垂直青色螢光光幕自 y 軸一路掠過戰艦掃出邊緣 */}
+                          {showSweepX && (
+                            <g>
+                              <line x1={CX} y1={CY - 134} x2={CX} y2={CY + 134} stroke="#22d3ee" strokeWidth="2" opacity="0.65" />
+                              {sweepW > 1 && (
+                                <rect
+                                  x={isRight ? scanXSvg - sweepW : scanXSvg}
+                                  y={CY - 134}
+                                  width={sweepW}
+                                  height={268}
+                                  fill={isRight ? 'url(#lv14SweepRight)' : 'url(#lv14SweepLeft)'}
+                                />
+                              )}
+                              <line x1={scanXSvg} y1={CY - 134} x2={scanXSvg} y2={CY + 134} stroke="#cffafe" strokeWidth="2.4" opacity="0.96" />
+                            </g>
+                          )}
+
+                          {/* 掃描 ① 掠過戰艦瞬間：原地留存 y 軸測距尺與 x 讀數（直到掃描 ② 完成） */}
+                          {enemyAnim.pingX && (enemyAnim.stage === 'scanX' || enemyAnim.stage === 'pauseScan' || enemyAnim.stage === 'scanY') && (
+                            <g>
+                              <line x1={CX} y1={targetSvg.sy} x2={targetSvg.sx} y2={targetSvg.sy} stroke="#67e8f9" strokeWidth="1.4" strokeDasharray="4 3" opacity="0.85" />
+                              <text
+                                x={(CX + targetSvg.sx) / 2}
+                                y={Math.max(28, targetSvg.sy - 8)}
+                                textAnchor="middle"
+                                fill="#a5f3fc" fontSize="11" fontWeight="900" className="font-mono"
+                                style={{ paintOrder: 'stroke', stroke: '#12091c', strokeWidth: '3.5px', strokeLinejoin: 'round' }}
+                              >
+                                x = {question.xStr}
+                              </text>
+                            </g>
+                          )}
+
+                          {/* 軍機雷達高速貫穿掃描 ②：水平洋紅螢光光幕自 x 軸一路掠過戰艦掃出上下邊緣 */}
+                          {showSweepY && (
+                            <g>
+                              <line x1={CX - 140} y1={CY} x2={CX + 140} y2={CY} stroke="#f472b6" strokeWidth="2" opacity="0.65" />
+                              {sweepH > 1 && (
+                                <rect
+                                  x={CX - 138}
+                                  y={isUp ? scanYSvg : scanYSvg - sweepH}
+                                  width={276}
+                                  height={sweepH}
+                                  fill={isUp ? 'url(#lv14SweepUp)' : 'url(#lv14SweepDown)'}
+                                />
+                              )}
+                              <line x1={CX - 138} y1={scanYSvg} x2={CX + 138} y2={scanYSvg} stroke="#fce7f3" strokeWidth="2.4" opacity="0.96" />
+                            </g>
+                          )}
+
+                          {/* 掃描 ② 掠過戰艦瞬間：原地留存 x 軸測距尺與 y 讀數 */}
+                          {enemyAnim.pingY && enemyAnim.stage === 'scanY' && (
+                            <g>
+                              <line x1={targetSvg.sx} y1={CY} x2={targetSvg.sx} y2={targetSvg.sy} stroke="#f472b6" strokeWidth="1.4" strokeDasharray="4 3" opacity="0.85" />
+                              <text
+                                x={Math.max(36, Math.min(284, targetSvg.sx + (question.nx >= 0 ? 10 : -10)))}
+                                y={(CY + targetSvg.sy) / 2 + 4}
+                                textAnchor={question.nx >= 0 ? 'start' : 'end'}
+                                fill="#fbcfe8" fontSize="11" fontWeight="900" className="font-mono"
+                                style={{ paintOrder: 'stroke', stroke: '#12091c', strokeWidth: '3.5px', strokeLinejoin: 'round' }}
+                              >
+                                y = {question.yStr}
+                              </text>
+                            </g>
+                          )}
+
+                          {/* 掠過回波 Blip 閃光環 */}
+                          {((enemyAnim.pingX && enemyAnim.stage === 'scanX') || enemyAnim.stage === 'pauseScan' || (enemyAnim.pingY && enemyAnim.stage === 'scanY')) && (
+                            <circle
+                              cx={targetSvg.sx} cy={targetSvg.sy}
+                              r={enemyAnim.pingY ? 20 : 18}
+                              fill="none"
+                              stroke={enemyAnim.pingY ? '#f472b6' : '#22d3ee'}
+                              strokeWidth="1.8" strokeDasharray="4 3" opacity="0.85"
+                            />
+                          )}
+
+                          {/* 帝國主力戰艦（畫面外迫近入侵 → 停駐目標點，艦首指向基地） */}
+                          {showBattleship && (
+                            <g transform={`translate(${eSvg.sx}, ${eSvg.sy})`}>
+                              <Lv14EnemyBattleship
+                                headingDeg={headingToOrigin}
+                                thrusting={enemyAnim.stage === 'approaching'}
+                                destroyed={solved}
+                                stealth={enemyCloaked}
+                              />
+                            </g>
+                          )}
+
+                          {/* 掃描鎖定完成後顯示精確坐標（360° 安全框防出界） */}
+                          {enemyAnim.stage === 'locked' && !enemyCloaked && (
+                            <text
+                              x={enemyLbl.x} y={enemyLbl.y} textAnchor={enemyLbl.anchor}
+                              fill="#fecdd3" fontSize="11.5" fontWeight="900" className="font-mono"
+                              style={{ paintOrder: 'stroke', stroke: '#12091c', strokeWidth: '3.5px', strokeLinejoin: 'round' }}
+                            >
+                              {enemyLabelText}
+                            </text>
+                          )}
+
+                          {/* 開火轉砲預備方向虛線（開火前絕不顯示，杜絕瞄準作弊） */}
+                          {(shipAnim.stage === 'turning' || shipAnim.stage === 'pause') && (
+                            <g opacity="0.82">
+                              <line
+                                x1={CX} y1={CY}
+                                x2={CX + 132 * Math.cos(rad)} y2={CY - 132 * Math.sin(rad)}
+                                stroke="#fbbf24" strokeWidth="1.6" strokeDasharray="6 4" strokeLinecap="round"
+                              />
+                              <circle cx={CX + 132 * Math.cos(rad)} cy={CY - 132 * Math.sin(rad)} r="3" fill="#fde68a" />
+                            </g>
+                          )}
+
+                          {/* 高能離子攔截飛彈 */}
+                          {shipAnim.r > 0.02 && (
+                            <g>
+                              <line
+                                x1={CX} y1={CY} x2={shipSvg.sx} y2={shipSvg.sy}
+                                stroke={flightState === 'missed' ? '#fb7185' : '#fbbf24'}
+                                strokeWidth="3.2" strokeLinecap="round"
+                              />
+                              <g transform={`translate(${shipSvg.sx}, ${shipSvg.sy}) rotate(${90 - shipAnim.deg})`}>
+                                <polygon points="0,-9.5 4.8,5.5 0,2 -4.8,5.5" fill="#fef08a" stroke="#f59e0b" strokeWidth="1.2" />
+                                {shipAnim.stage === 'thrusting' && (
+                                  <polygon points="-3.2,5.5 0,16 3.2,5.5" fill="#fb923c" opacity="0.9" />
+                                )}
+                              </g>
+                            </g>
+                          )}
+
+                          {/* 開火途中即時極坐標標籤 */}
+                          {shipLiveLabel && (
+                            <text
+                              x={shipLbl.x} y={shipLbl.y} textAnchor={shipLbl.anchor}
+                              fill="#fde68a" fontSize="11.5" fontWeight="900" className="font-mono"
+                              style={{ paintOrder: 'stroke', stroke: '#12091c', strokeWidth: '3.5px', strokeLinejoin: 'round' }}
+                            >
+                              {shipLiveLabel}
+                            </text>
+                          )}
+
+                          {/* 原點重裝軌道離子主砲 */}
+                          <g transform={`translate(${CX}, ${CY})`}>
+                            <Lv14PolarTurret
+                              deg={shipAnim.deg}
+                              charging={shipAnim.stage === 'turning' || shipAnim.stage === 'pause'}
+                              firing={shipAnim.stage === 'thrusting'}
+                            />
+                          </g>
                         </g>
                       );
                     })()}
-                  </svg>
 
-                  {radarLocked && !solved && (
-                    <div
-                      data-coach="lv16-opts"
-                      onClick={(e) => e.stopPropagation()}
-                      className="absolute bottom-2 left-2 right-2 z-20 bg-slate-900/92 backdrop-blur-sm border border-white/15 rounded-2xl p-1.5 flex items-center justify-center gap-1.5 shadow-xl"
-                    >
-                      {question.options.map(opt => (
-                        <button
-                          key={opt}
-                          type="button"
-                          onPointerDown={(e) => handleOptDown(e, opt)}
-                          className={`flex-1 min-w-0 py-2 rounded-xl bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-serif font-black text-sm sm:text-base shadow active:scale-95 touch-none select-none cursor-grab active:cursor-grabbing flex items-center justify-center transition-transform hover:brightness-105 ${
-                            optDragState?.val === opt && optDragState.moved ? 'opacity-45 scale-95' : ''
-                          }`}
-                        >
-                          <SqrtText text={opt} />
-                        </button>
-                      ))}
+                    {/* 克制區分成功特效：極轉直僅優雅翡翠對接環；直轉極為收斂衝擊細環＋小星芒 */}
+                    {burstSvg && (
+                      <g transform={`translate(${burstSvg.sx}, ${burstSvg.sy})`}>
+                        {burstEffect.kind === 'hit' ? (
+                          isPolar2Rect ? (
+                            <circle r="16" fill="none" stroke="#34d399" strokeWidth="2" opacity="0.9" />
+                          ) : (
+                            <g>
+                              <circle r="16" fill="none" stroke="#34d399" strokeWidth="1.8" opacity="0.9" />
+                              <circle r="23" fill="none" stroke="#fde047" strokeWidth="1.1" strokeDasharray="4 4" opacity="0.75" />
+                              {[0, 60, 120, 180, 240, 300].map(a => {
+                                const ar = (a * Math.PI) / 180;
+                                return (
+                                  <line
+                                    key={a}
+                                    x1={Math.cos(ar) * 11} y1={Math.sin(ar) * 11}
+                                    x2={Math.cos(ar) * 19} y2={Math.sin(ar) * 19}
+                                    stroke="#fef08a" strokeWidth="1.3" strokeLinecap="round" opacity="0.88"
+                                  />
+                                );
+                              })}
+                            </g>
+                          )
+                        ) : (
+                          <g>
+                            <circle r="13" fill="rgba(244,63,94,0.22)" stroke="#fb7185" strokeWidth="1.8" strokeDasharray="3 3" />
+                            <line x1="-6" y1="-6" x2="6" y2="6" stroke="#fecdd3" strokeWidth="1.8" strokeLinecap="round" />
+                            <line x1="6" y1="-6" x2="-6" y2="6" stroke="#fecdd3" strokeWidth="1.8" strokeLinecap="round" />
+                          </g>
+                        )}
+                      </g>
+                    )}
+
+                    {/* 極轉直原點發射墊 */}
+                    {isPolar2Rect && <circle cx={CX} cy={CY} r="4" fill="#e2e8f0" stroke="#0f172a" strokeWidth="1.6" />}
+                  </svg>
+                </div>
+
+                {/* 底部擬真遙控面板（z-30 支援快選泡泡上浮） */}
+                <div
+                  data-coach="lv14-controls"
+                  className="relative z-30 bg-gradient-to-b from-slate-900 to-slate-950 border-t-2 border-slate-700/80 px-2.5 py-2 shrink-0 select-none"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {isPolar2Rect ? (
+                    /* ===== 遙控器 A（極轉直）：🎮 純箭頭十字鍵 ＋ 8 格純淨帶正負號轉輪 ＋ 起飛大鈕 ===== */
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-col items-center gap-0.5 shrink-0">
+                        <span className="text-[9px] font-black text-slate-300 tracking-wider">十字方向</span>
+                        <div className="relative w-[86px] h-[84px] flex items-center justify-center">
+                          <button
+                            type="button" aria-label="Y 正方向"
+                            disabled={solved || flightState !== 'idle'}
+                            onClick={() => { if (showGuide) dismissGuide(); audio.sfxThrottleStep(6); setYSign(1); setConceptTip(null); }}
+                            className={`absolute top-0 left-1/2 -translate-x-1/2 w-[28px] h-[30px] rounded-t-lg border-2 font-black text-xs flex items-center justify-center leading-none transition-all active:scale-95 cursor-pointer ${
+                              curYMag !== '0' && ySign === 1
+                                ? 'bg-amber-400 border-amber-200 text-slate-950 shadow-[0_0_10px_rgba(251,191,36,0.85)] z-20'
+                                : ySign === 1
+                                ? 'bg-amber-500/45 border-amber-300/80 text-amber-100'
+                                : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'
+                            }`}
+                          >▲</button>
+                          <button
+                            type="button" aria-label="Y 負方向"
+                            disabled={solved || flightState !== 'idle'}
+                            onClick={() => { if (showGuide) dismissGuide(); audio.sfxThrottleStep(3); setYSign(-1); setConceptTip(null); }}
+                            className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-[28px] h-[30px] rounded-b-lg border-2 font-black text-xs flex items-center justify-center leading-none transition-all active:scale-95 cursor-pointer ${
+                              curYMag !== '0' && ySign === -1
+                                ? 'bg-amber-400 border-amber-200 text-slate-950 shadow-[0_0_10px_rgba(251,191,36,0.85)] z-20'
+                                : ySign === -1
+                                ? 'bg-amber-500/45 border-amber-300/80 text-amber-100'
+                                : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'
+                            }`}
+                          >▼</button>
+                          <button
+                            type="button" aria-label="X 負方向"
+                            disabled={solved || flightState !== 'idle'}
+                            onClick={() => { if (showGuide) dismissGuide(); audio.sfxThrottleStep(3); setXSign(-1); setConceptTip(null); }}
+                            className={`absolute left-0 top-1/2 -translate-y-1/2 w-[30px] h-[28px] rounded-l-lg border-2 font-black text-xs flex items-center justify-center leading-none transition-all active:scale-95 cursor-pointer ${
+                              curXMag !== '0' && xSign === -1
+                                ? 'bg-cyan-400 border-cyan-200 text-slate-950 shadow-[0_0_10px_rgba(34,211,238,0.85)] z-20'
+                                : xSign === -1
+                                ? 'bg-cyan-500/45 border-cyan-300/80 text-cyan-100'
+                                : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'
+                            }`}
+                          >◀</button>
+                          <button
+                            type="button" aria-label="X 正方向"
+                            disabled={solved || flightState !== 'idle'}
+                            onClick={() => { if (showGuide) dismissGuide(); audio.sfxThrottleStep(6); setXSign(1); setConceptTip(null); }}
+                            className={`absolute right-0 top-1/2 -translate-y-1/2 w-[30px] h-[28px] rounded-r-lg border-2 font-black text-xs flex items-center justify-center leading-none transition-all active:scale-95 cursor-pointer ${
+                              curXMag !== '0' && xSign === 1
+                                ? 'bg-cyan-400 border-cyan-200 text-slate-950 shadow-[0_0_10px_rgba(34,211,238,0.85)] z-20'
+                                : xSign === 1
+                                ? 'bg-cyan-500/45 border-cyan-300/80 text-cyan-100'
+                                : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'
+                            }`}
+                          >▶</button>
+                          <div className="w-[24px] h-[24px] rounded-full bg-slate-900 border border-slate-700 z-10 flex items-center justify-center pointer-events-none">
+                            <span className={`w-2.5 h-2.5 rounded-full ${composedX !== null && composedY !== null && !(composedX === '0' && composedY === '0') ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.9)]' : 'bg-slate-600'}`} />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 flex items-center gap-1.5 min-w-0">
+                        <Lv14MiniDrumWheel
+                          label="x 水平"
+                          items={question.wheelPool}
+                          index={xWheelIdx}
+                          sign={xSign}
+                          onChange={(idx) => { if (showGuide) dismissGuide(); setXWheelIdx(idx); setConceptTip(null); }}
+                          color="cyan"
+                          disabled={solved || flightState !== 'idle'}
+                        />
+                        <Lv14MiniDrumWheel
+                          label="y 鉛直"
+                          items={question.wheelPool}
+                          index={yWheelIdx}
+                          sign={ySign}
+                          onChange={(idx) => { if (showGuide) dismissGuide(); setYWheelIdx(idx); setConceptTip(null); }}
+                          color="amber"
+                          disabled={solved || flightState !== 'idle'}
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={solved || flightState !== 'idle'}
+                        onClick={handleLaunchDroneBtn}
+                        className={`w-[74px] h-[94px] shrink-0 rounded-xl font-black text-sm flex flex-col items-center justify-center gap-1 px-1 shadow-lg transition-all active:scale-95 cursor-pointer ${
+                          solved
+                            ? 'bg-emerald-400 border-b-[4px] border-emerald-700 text-emerald-950'
+                            : flightState !== 'idle'
+                            ? 'bg-slate-700 border-b-[4px] border-slate-900 text-slate-300'
+                            : 'bg-gradient-to-b from-amber-300 to-amber-500 border-b-[4px] border-amber-700 text-amber-950 hover:brightness-105 shadow-[0_0_12px_rgba(251,191,36,0.35)]'
+                        }`}
+                      >
+                        <span className="text-2xl leading-none">{solved ? '✓' : '🚁'}</span>
+                        <span className="text-xs font-black tracking-wide">{solved ? '已對接' : flightState !== 'idle' ? '飛行中' : '起飛'}</span>
+                      </button>
+                    </div>
+                  ) : (
+                    /* ===== 遙控器 B（直轉極）：🛞 側面滾花拇指旋鈕 θ ＋ ⚡ 7 檔直立油門推桿 r ＋ 開火大鈕 ===== */
+                    <div className="flex items-stretch justify-between gap-2">
+                      <Lv14SideThumbwheel
+                        deg={aimDeg}
+                        onChange={(d) => { if (showGuide) dismissGuide(); setAimDeg(d); setConceptTip(null); }}
+                        disabled={solved || flightState !== 'idle'}
+                      />
+                      <Lv14ThrottleLever
+                        rVal={aimR}
+                        onChange={(r) => { if (showGuide) dismissGuide(); setAimR(r); setConceptTip(null); }}
+                        disabled={solved || flightState !== 'idle'}
+                      />
+                      <button
+                        type="button"
+                        disabled={solved || flightState !== 'idle'}
+                        onClick={handleFirePolarWeapon}
+                        className={`w-[74px] shrink-0 rounded-xl font-black text-sm flex flex-col items-center justify-center gap-1 px-1 shadow-lg transition-all active:scale-95 cursor-pointer ${
+                          solved
+                            ? 'bg-emerald-400 border-b-[4px] border-emerald-700 text-emerald-950'
+                            : flightState !== 'idle'
+                            ? 'bg-slate-700 border-b-[4px] border-slate-900 text-slate-300'
+                            : 'bg-gradient-to-b from-rose-400 via-orange-400 to-amber-500 border-b-[4px] border-rose-800 text-slate-950 hover:brightness-105 shadow-[0_0_14px_rgba(244,63,94,0.42)]'
+                        }`}
+                      >
+                        <span className="text-2xl leading-none">{solved ? '✓' : '⚡'}</span>
+                        <span className="text-xs font-black tracking-wide">{solved ? '已擊毀' : flightState !== 'idle' ? '攔截中' : '開火'}</span>
+                      </button>
                     </div>
                   )}
                 </div>
               </div>
+
               <CoachOverlay
                 containerRef={containerRef}
                 active={guideMode === 'manual' || (gameState === 'playing' && showGuide && !solved)}
                 mode={guideMode || 'spotlight'}
-                steps={lv16CoachSteps}
                 onDismiss={dismissGuide}
+                steps={guideMode === 'manual' ? [
+                  { desc: '極轉直補給：飛船先轉向 θ 再推進 r，用十字鍵決定正負並撥動轉輪（點中央可快選）派出無人機對接！' },
+                  { desc: '直轉極防衛：軍機雷達會掃出帝國戰艦 (x, y)，用側面滾花輪調 θ、拉油門推桿調 r，按下「開火」發射主砲攔截！' }
+                ] : lv14StageKey === 'p0_pre' ? [
+                  { target: 'lv14-prompt', shape: 'pill', pad: 6, tap: false, desc: '星際飛船即將依極坐標 [r, θ] 進場：先原地轉向 θ，再直線推進距離 r！' }
+                ] : lv14StageKey === 'p0_ctrl' ? [
+                  { target: 'lv14-controls', shape: 'pill', pad: 6, tap: false, desc: '飛船已停泊！先按十字鍵決定正負方向，再上下撥動轉輪（或點中央快選）設定數值，按「起飛」派無人機對接！' }
+                ] : lv14StageKey === 'p1_pre' ? [
+                  { target: 'lv14-prompt', shape: 'pill', pad: 6, tap: false, desc: '帝國主力戰艦入侵！軍機雷達即將貫穿掃出它的直角坐標 (x, y)，請反推距離 r 與方向角 θ！' }
+                ] : lv14StageKey === 'p1_ctrl' ? [
+                  { target: 'lv14-controls', shape: 'pill', pad: 6, tap: false, desc: '戰艦已鎖定！上下滑動側面滾花輪設定 θ（點角度屏可快選），推拉油門設定射程 r，按「開火」攔截！' }
+                ] : [
+                  { target: 'lv14-prompt', shape: 'pill', pad: 6, tap: false, desc: '最終全域實戰！融合遠距補給與光學迷彩隱形戰艦盲射，展現雙坐標轉換實力！' }
+                ]}
               />
             </div>
           )}
 
           {gameState === 'ended' && (
             <LevelResultScreen
-              score={finalScore}
-              baseScore={baseScore}
-              earnedStars={earnedStars}
-              correctCount={correctCount}
-              wrongCount={wrongCount}
-              lives={lives}
-              progress={progress}
-              targetTotal={starsThreshold[2]}
-              elapsedSec={elapsedSec}
-              lifeBonus={lifeBonus}
-              accuracyBonus={accuracyBonus}
-              speedBonus={speedBonus}
-              accentClass="text-cyan-700"
-              onCompleteLevel={onCompleteLevel}
-              onRestart={startGame}
-              onBackToMap={onBackToMap}
+              score={finalScore} baseScore={baseScore} earnedStars={earnedStars}
+              correctCount={correctCount} wrongCount={wrongCount} lives={lives}
+              progress={progress} targetTotal={starsThreshold[2]} elapsedSec={elapsedSec}
+              lifeBonus={lifeBonus} accuracyBonus={accuracyBonus} speedBonus={speedBonus}
+              accentClass="text-cyan-600" onCompleteLevel={onCompleteLevel} onRestart={startGame} onBackToMap={onBackToMap}
             />
-          )}
-
-          {typeof document !== 'undefined' && ReactDOM.createPortal(
-            <>
-              {optDragState && optDragState.moved && (
-                <div
-                  className={`fixed z-[150] pointer-events-none -translate-x-1/2 -translate-y-1/2 px-3.5 py-1.5 rounded-xl border-2 font-serif font-black text-base shadow-2xl ${
-                    optDragState.hoverSlot ? 'bg-emerald-400 border-emerald-200 text-emerald-950 scale-110' : 'bg-amber-400 border-white text-amber-950'
-                  }`}
-                  style={{ left: optDragState.clientX, top: optDragState.clientY - (optDragState.touchOffsetY || 0) }}
-                >
-                  <SqrtText text={optDragState.val} />
-                </div>
-              )}
-            </>,
-            document.body
           )}
         </div>
       );
