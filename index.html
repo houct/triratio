@@ -2792,6 +2792,137 @@
         } catch (e) {}
       }
 
+      // ===== 終章迪士尼星弧 × 3D 星空煙火 × 凱旋交響專屬音效 =====
+      sfxDisneyArc() {
+        if (!this.ctx || !this.sfxEnabled) return;
+        try {
+          const t = this.ctx.currentTime;
+          const lp = this.ctx.createBiquadFilter();
+          lp.type = 'lowpass';
+          lp.frequency.setValueAtTime(2400, t);
+          lp.connect(this.getSfxDest());
+          // 橫越塔尖的魔幻豎琴滑音
+          const notes = [523.25, 587.33, 659.25, 783.99, 880.00, 1046.50, 1174.66, 1318.51, 1567.98, 2093.00];
+          notes.forEach((f, i) => {
+            const st = t + i * 0.085;
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(f, st);
+            g.gain.setValueAtTime(0.0005, st);
+            g.gain.linearRampToValueAtTime(i === notes.length - 1 ? 0.095 : 0.045, st + 0.025);
+            g.gain.exponentialRampToValueAtTime(0.0004, st + (i === notes.length - 1 ? 1.8 : 0.65));
+            osc.connect(g); g.connect(lp);
+            osc.start(st); osc.stop(st + (i === notes.length - 1 ? 1.9 : 0.7));
+          });
+        } catch (e) {}
+      }
+
+      sfxFireworkLaunch() {
+        if (!this.ctx || !this.sfxEnabled) return;
+        try {
+          const t = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          osc.type = 'sine';
+          const base = 360 + Math.random() * 140;
+          osc.frequency.setValueAtTime(base, t);
+          osc.frequency.exponentialRampToValueAtTime(base * 2.4, t + 0.48);
+          g.gain.setValueAtTime(0.0005, t);
+          g.gain.linearRampToValueAtTime(0.032, t + 0.08);
+          g.gain.exponentialRampToValueAtTime(0.0004, t + 0.52);
+          osc.connect(g); g.connect(this.getSfxDest());
+          osc.start(t); osc.stop(t + 0.54);
+        } catch (e) {}
+      }
+
+      sfxFireworkBurst(size = 1) {
+        if (!this.ctx || !this.sfxEnabled) return;
+        try {
+          const t = this.ctx.currentTime;
+          const s = Math.max(0.7, Math.min(1.6, size));
+          // 1) 遠距深沉低頻悶雷「轟──」
+          const sub = this.ctx.createOscillator();
+          const sg = this.ctx.createGain();
+          sub.type = 'sine';
+          sub.frequency.setValueAtTime(118 + Math.random() * 26, t);
+          sub.frequency.exponentialRampToValueAtTime(32, t + 0.42 * s);
+          sg.gain.setValueAtTime(0.001, t);
+          sg.gain.linearRampToValueAtTime(0.18 * s, t + 0.015);
+          sg.gain.exponentialRampToValueAtTime(0.0008, t + 0.46 * s);
+          sub.connect(sg); sg.connect(this.getSfxDest());
+          sub.start(t); sub.stop(t + 0.48 * s);
+
+          // 2) 綻放空氣衝擊＋細碎星雨劈啪白噪音
+          const dur = 0.72 * s;
+          const bufLen = Math.floor(this.ctx.sampleRate * dur);
+          const buf = this.ctx.createBuffer(1, bufLen, this.ctx.sampleRate);
+          const data = buf.getChannelData(0);
+          for (let i = 0; i < bufLen; i++) {
+            const p = i / bufLen;
+            const crackle = (p > 0.25 && Math.random() < 0.06) ? 1.8 : 1.0;
+            data[i] = (Math.random() * 2 - 1) * Math.pow(1 - p, 1.8) * crackle;
+          }
+          const src = this.ctx.createBufferSource();
+          src.buffer = buf;
+          const bp = this.ctx.createBiquadFilter();
+          bp.type = 'bandpass';
+          bp.frequency.setValueAtTime(920, t);
+          bp.frequency.exponentialRampToValueAtTime(320, t + dur);
+          bp.Q.value = 0.75;
+          const ng = this.ctx.createGain();
+          ng.gain.setValueAtTime(0.14 * s, t);
+          ng.gain.exponentialRampToValueAtTime(0.0006, t + dur);
+          src.connect(bp); bp.connect(ng); ng.connect(this.getSfxDest());
+          src.start(t); src.stop(t + dur + 0.02);
+
+          // 3) 輕微閃耀鐘琴星芒餘音
+          const chime = this.ctx.createOscillator();
+          const cg = this.ctx.createGain();
+          chime.type = 'sine';
+          const chimeFreqs = [1046.5, 1318.5, 1568.0, 1760.0, 2093.0];
+          chime.frequency.setValueAtTime(chimeFreqs[Math.floor(Math.random() * chimeFreqs.length)], t + 0.05);
+          cg.gain.setValueAtTime(0.0005, t + 0.05);
+          cg.gain.linearRampToValueAtTime(0.03 * s, t + 0.09);
+          cg.gain.exponentialRampToValueAtTime(0.0004, t + 0.65);
+          chime.connect(cg); cg.connect(this.getSfxDest());
+          chime.start(t + 0.05); chime.stop(t + 0.68);
+        } catch (e) {}
+      }
+
+      sfxFinaleFanfare() {
+        if (!this.ctx || !this.sfxEnabled) return;
+        try {
+          const t = this.ctx.currentTime;
+          const lp = this.ctx.createBiquadFilter();
+          lp.type = 'lowpass';
+          lp.frequency.setValueAtTime(1650, t);
+          lp.connect(this.getSfxDest());
+          // 溫暖宏大的 4 段交響和弦進行（Fmaj7 → G6 → Am9 → Cmaj9）
+          const chords = [
+            { at: 0.0, dur: 2.4, notes: [174.61, 220.00, 261.63, 329.63, 523.25] },
+            { at: 2.3, dur: 2.4, notes: [196.00, 246.94, 293.66, 392.00, 587.33] },
+            { at: 4.6, dur: 2.4, notes: [220.00, 261.63, 329.63, 493.88, 659.25] },
+            { at: 6.9, dur: 3.6, notes: [130.81, 261.63, 329.63, 392.00, 523.25, 783.99, 1046.50] }
+          ];
+          chords.forEach((ch) => {
+            ch.notes.forEach((freq, idx) => {
+              const st = t + ch.at + idx * 0.035;
+              const osc = this.ctx.createOscillator();
+              const g = this.ctx.createGain();
+              osc.type = idx < 2 ? 'triangle' : 'sine';
+              osc.frequency.setValueAtTime(freq, st);
+              g.gain.setValueAtTime(0.0004, st);
+              g.gain.linearRampToValueAtTime(idx === 0 ? 0.055 : 0.034, st + 0.35);
+              g.gain.setValueAtTime(idx === 0 ? 0.048 : 0.028, st + ch.dur * 0.65);
+              g.gain.exponentialRampToValueAtTime(0.0004, st + ch.dur);
+              osc.connect(g); g.connect(lp);
+              osc.start(st); osc.stop(st + ch.dur + 0.05);
+            });
+          });
+        } catch (e) {}
+      }
+
       sfxIdaChirp() {
         if (!this.ctx || !this.sfxEnabled) return;
         try {
@@ -18760,6 +18891,281 @@
       return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-40" />;
     };
 
+    // ==================== 專屬燙金榮譽通關證書（含純前端 Canvas 高解析 PNG 下載與滿貫印章） ====================
+    const SanctuaryCertificateModal = ({
+      open,
+      playerName = '星域旅人',
+      rank = { icon: '👑', title: '聖域大宗師' },
+      totalStars = 0,
+      maxStars = 54,
+      gameMode = 'adventure',
+      completedDate = '',
+      onReplayFinale,
+      onClose
+    }) => {
+      const [downloading, setDownloading] = useState(false);
+      if (!open) return null;
+
+      const isPerfect = totalStars >= maxStars;
+      const dateStr = completedDate || new Date().toISOString().slice(0, 10);
+
+      const handleDownloadPng = () => {
+        setDownloading(true);
+        audio.sfxClick();
+        try {
+          const W = 1200, H = 840;
+          const cvs = document.createElement('canvas');
+          cvs.width = W; cvs.height = H;
+          const ctx = cvs.getContext('2d');
+
+          // 深空午夜星海漸層背景
+          const bg = ctx.createRadialGradient(W / 2, H * 0.36, 40, W / 2, H / 2, W * 0.72);
+          bg.addColorStop(0, '#172554');
+          bg.addColorStop(0.52, '#0f172a');
+          bg.addColorStop(1, '#040712');
+          ctx.fillStyle = bg;
+          ctx.fillRect(0, 0, W, H);
+
+          // 繁星點綴
+          for (let i = 0; i < 90; i++) {
+            const sx = ((i * 197 + 53) % (W - 80)) + 40;
+            const sy = ((i * 131 + 29) % (H - 80)) + 40;
+            const sr = (i % 5 === 0) ? 2.1 : 1.1;
+            ctx.fillStyle = i % 3 === 0 ? 'rgba(253,224,71,0.55)' : 'rgba(226,232,240,0.45)';
+            ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
+          }
+
+          // 雙層燙金證書外框
+          ctx.strokeStyle = '#f59e0b';
+          ctx.lineWidth = 5;
+          ctx.strokeRect(34, 34, W - 68, H - 68);
+          ctx.strokeStyle = 'rgba(253,224,71,0.48)';
+          ctx.lineWidth = 1.6;
+          ctx.strokeRect(48, 48, W - 96, H - 96);
+
+          // 頂部 6 色滿格六角星盤徽章
+          const cx = W / 2, cy = 148, r = 56;
+          const colors = ['#34d399', '#fcd34d', '#38bdf8', '#818cf8', '#c084fc', '#fde047'];
+          for (let i = 0; i < 6; i++) {
+            const a1 = -Math.PI / 2 + i * (Math.PI / 3);
+            const a2 = a1 + Math.PI / 3;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(a1) * r, cy + Math.sin(a1) * r);
+            ctx.lineTo(cx + Math.cos(a2) * r, cy + Math.sin(a2) * r);
+            ctx.closePath();
+            ctx.fillStyle = colors[i];
+            ctx.fill();
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+          }
+          ctx.beginPath(); ctx.arc(cx, cy, r + 8, 0, Math.PI * 2);
+          ctx.strokeStyle = '#fde047'; ctx.lineWidth = 2; ctx.stroke();
+          ctx.beginPath(); ctx.arc(cx, cy, 12, 0, Math.PI * 2);
+          ctx.fillStyle = '#fffbeb'; ctx.fill();
+
+          // 標題與英文副標
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#fcd34d';
+          ctx.font = 'bold 18px "Segoe UI", sans-serif';
+          ctx.fillText('SANCTUARY OF TRIGONOMETRY  ·  MASTER CERTIFICATE', W / 2, 244);
+
+          ctx.fillStyle = '#fffdf5';
+          ctx.font = 'bold 46px "Noto Serif TC", Georgia, serif';
+          ctx.fillText('《勇闖三角比聖域》榮譽通關證書', W / 2, 304);
+
+          // 金色分隔線
+          const lg = ctx.createLinearGradient(280, 0, W - 280, 0);
+          lg.addColorStop(0, 'rgba(253,224,71,0)');
+          lg.addColorStop(0.5, 'rgba(253,224,71,0.95)');
+          lg.addColorStop(1, 'rgba(253,224,71,0)');
+          ctx.fillStyle = lg;
+          ctx.fillRect(280, 328, W - 560, 2);
+
+          // 授予冒險者姓名
+          ctx.fillStyle = '#cbd5e1';
+          ctx.font = '600 22px "Noto Sans TC", sans-serif';
+          ctx.fillText('茲 證 明 冒 險 者', W / 2, 384);
+
+          ctx.fillStyle = '#fde047';
+          ctx.font = 'bold 54px "Noto Serif TC", Georgia, serif';
+          ctx.fillText(playerName, W / 2, 456);
+
+          // 詩意銘文
+          ctx.fillStyle = '#e2e8f0';
+          ctx.font = '500 23px "Noto Serif TC", Georgia, serif';
+          ctx.fillText('自微光之角 α 啟程，歷經銳角比例、周天旋轉與星海丈量，', W / 2, 524);
+          ctx.fillText('集齊六片失落星盤，喚醒聖域之橋，抵達雲端聖堡 Ω，特頒此證。', W / 2, 562);
+
+          // 三欄成就數據框
+          const cards = [
+            { label: '榮譽段位', val: `${rank.icon} ${rank.title}` },
+            { label: gameMode === 'free' ? '休閒星數' : '冒險星數', val: `${totalStars} / ${maxStars} ★` },
+            { label: '失落星盤', val: '6 / 6 圓滿' }
+          ];
+          cards.forEach((c, idx) => {
+            const bx = 175 + idx * 295;
+            ctx.fillStyle = 'rgba(255,255,255,0.05)';
+            ctx.strokeStyle = 'rgba(253,224,71,0.35)';
+            ctx.lineWidth = 1.5;
+            ctx.fillRect(bx, 610, 260, 96);
+            ctx.strokeRect(bx, 610, 260, 96);
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = 'bold 16px "Noto Sans TC", sans-serif';
+            ctx.fillText(c.label, bx + 130, 642);
+            ctx.fillStyle = '#fef08a';
+            ctx.font = 'bold 28px "Noto Sans TC", sans-serif';
+            ctx.fillText(c.val, bx + 130, 684);
+          });
+
+          // 滿星大滿貫燙金圓印章
+          if (isPerfect) {
+            ctx.save();
+            ctx.translate(W - 150, 440);
+            ctx.rotate(-0.18);
+            ctx.beginPath(); ctx.arc(0, 0, 64, 0, Math.PI * 2);
+            ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 4; ctx.stroke();
+            ctx.beginPath(); ctx.arc(0, 0, 54, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(253,224,71,0.6)'; ctx.lineWidth = 1.5; ctx.stroke();
+            ctx.fillStyle = '#fde047';
+            ctx.font = 'bold 17px "Noto Sans TC", sans-serif';
+            ctx.fillText('★ 全滿貫 ★', 0, -6);
+            ctx.font = 'bold 20px "Noto Serif TC", serif';
+            ctx.fillText('54★ 圓滿', 0, 22);
+            ctx.restore();
+          }
+
+          // 底部頒發日期與落款
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = '600 18px monospace';
+          ctx.fillText(`ISSUED ON ${dateStr}   ·   雲端聖堡 Ω 見證`, W / 2, 766);
+
+          const link = document.createElement('a');
+          link.download = `勇闖三角比聖域_通關證書_${playerName}.png`;
+          link.href = cvs.toDataURL('image/png');
+          link.click();
+          audio.sfxBonus();
+        } catch (err) {}
+        setTimeout(() => setDownloading(false), 350);
+      };
+
+      return (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 animate-fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-[440px] rounded-3xl bg-gradient-to-b from-[#131e3d] via-[#0c1428] to-[#060a16] border-2 border-amber-400/75 shadow-[0_0_50px_rgba(251,191,36,0.28)] p-4 sm:p-5 text-center overflow-hidden"
+          >
+            {/* 內層細金框 */}
+            <div className="pointer-events-none absolute inset-2.5 rounded-2xl border border-amber-300/30" />
+
+            {/* 滿星大滿貫印章 */}
+            {isPerfect && (
+              <div className="pointer-events-none absolute top-11 right-4 rotate-[-14deg] w-16 h-16 rounded-full border-2 border-amber-300 bg-amber-500/15 flex flex-col items-center justify-center shadow-[0_0_16px_rgba(251,191,36,0.4)]">
+                <span className="text-[9px] font-black text-amber-200 tracking-wider">★ 全滿貫 ★</span>
+                <span className="text-[11px] font-serif font-black text-amber-100">{maxStars}★ 圓滿</span>
+              </div>
+            )}
+
+            {/* 頂部 6 色滿格星盤 SVG 徽章 */}
+            <div className="relative flex justify-center mt-1 mb-2">
+              <svg viewBox="-64 -64 128 128" className="w-16 h-16 drop-shadow-[0_0_16px_rgba(253,224,71,0.55)]">
+                {['#34d399', '#fcd34d', '#38bdf8', '#818cf8', '#c084fc', '#fde047'].map((col, i) => {
+                  const a1 = -Math.PI / 2 + i * (Math.PI / 3);
+                  const a2 = a1 + Math.PI / 3;
+                  const r = 46;
+                  return (
+                    <polygon
+                      key={i}
+                      points={`0,0 ${(Math.cos(a1) * r).toFixed(1)},${(Math.sin(a1) * r).toFixed(1)} ${(Math.cos(a2) * r).toFixed(1)},${(Math.sin(a2) * r).toFixed(1)}`}
+                      fill={col} stroke="#0f172a" strokeWidth="2.5"
+                    />
+                  );
+                })}
+                <circle r="54" fill="none" stroke="#fde047" strokeWidth="2" strokeDasharray="5 3" />
+                <circle r="10" fill="#fffbeb" stroke="#f59e0b" strokeWidth="2" />
+              </svg>
+            </div>
+
+            <div className="relative">
+              <div className="text-[9.5px] font-bold tracking-[0.26em] text-amber-300/90 uppercase">
+                SANCTUARY OF TRIGONOMETRY · MASTER CERTIFICATE
+              </div>
+              <h2 className="font-serif text-lg sm:text-xl font-black text-[#fffdf5] tracking-wider mt-0.5">
+                《勇闖三角比聖域》榮譽通關證書
+              </h2>
+
+              <div className="my-2.5 flex items-center justify-center w-44 mx-auto">
+                <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-amber-300/80 to-amber-100" />
+                <span className="mx-2 w-1.5 h-1.5 rotate-45 bg-amber-200" />
+                <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-amber-300/80 to-amber-100" />
+              </div>
+
+              <div className="text-[11px] font-bold text-slate-300 tracking-widest">茲證明冒險者</div>
+              <div className="font-serif text-2xl sm:text-3xl font-black text-amber-300 tracking-wide my-1 drop-shadow-[0_2px_10px_rgba(251,191,36,0.35)]">
+                {playerName}
+              </div>
+              <p className="font-serif text-xs text-slate-200/90 leading-relaxed max-w-[330px] mx-auto mt-1">
+                自微光之角 α 啟程，歷經銳角比例、周天旋轉與星海丈量，集齊六片失落星盤抵達雲端聖堡 Ω，特頒此證。
+              </p>
+
+              {/* 三欄成就數據 */}
+              <div className="grid grid-cols-3 gap-2 mt-3.5">
+                <div className="rounded-xl bg-white/5 border border-amber-300/25 py-2 px-1">
+                  <div className="text-[9.5px] font-bold text-slate-400">榮譽段位</div>
+                  <div className="text-xs font-black text-amber-200 mt-0.5 truncate">{rank.icon} {rank.title}</div>
+                </div>
+                <div className="rounded-xl bg-white/5 border border-amber-300/25 py-2 px-1">
+                  <div className="text-[9.5px] font-bold text-slate-400">{gameMode === 'free' ? '休閒星數' : '冒險星數'}</div>
+                  <div className="text-xs font-mono font-black text-amber-200 mt-0.5">{totalStars} / {maxStars} ★</div>
+                </div>
+                <div className="rounded-xl bg-white/5 border border-amber-300/25 py-2 px-1">
+                  <div className="text-[9.5px] font-bold text-slate-400">失落星盤</div>
+                  <div className="text-xs font-mono font-black text-emerald-300 mt-0.5">6 / 6 圓滿</div>
+                </div>
+              </div>
+
+              <div className="text-[10px] font-mono text-slate-400 mt-2.5 tracking-wider">
+                ISSUED ON {dateStr} · 雲端聖堡 Ω 見證
+              </div>
+
+              {/* 底部操作按鈕 */}
+              <div className="mt-4 flex flex-col gap-2">
+                <button
+                  type="button"
+                  disabled={downloading}
+                  onClick={handleDownloadPng}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 text-amber-950 font-black text-sm shadow-[0_0_18px_rgba(251,191,36,0.45)] hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span>💾</span>
+                  <span>{downloading ? '正在產生高解析證書…' : '下載證書圖片（PNG）'}</span>
+                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { audio.sfxClick(); onClose(); onReplayFinale && onReplayFinale(); }}
+                    className="py-2 rounded-xl bg-indigo-500/25 hover:bg-indigo-500/35 border border-indigo-300/35 text-indigo-100 font-black text-xs active:scale-95 transition-all cursor-pointer"
+                  >
+                    🎆 重溫煙火結局
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { audio.sfxClick(); onClose(); }}
+                    className="py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-slate-100 font-black text-xs active:scale-95 transition-all cursor-pointer"
+                  >
+                    返回聖域地圖
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
     const ThreeDIslandMap = ({
       levels,
       gameMode,
@@ -18776,6 +19182,7 @@
       curtainPhase = 'hidden',
       onMarkStoryFlag = null,
       onPuzzleCinematicChange = null,
+      onOpenCertificate = null,
       onStartLevel,
       onOpenShrine1,
       onOpenShrine2,
@@ -18845,6 +19252,8 @@
         gameMode,
         adventureTotalStars,
         userProgress,
+        onMarkStoryFlag,
+        onOpenCertificate,
         onPuzzleCinematicChange,
         debugShowLockedColors
       });
@@ -18859,6 +19268,8 @@
         gameMode,
         adventureTotalStars,
         userProgress,
+        onMarkStoryFlag,
+        onOpenCertificate,
         onPuzzleCinematicChange,
         debugShowLockedColors
       };
@@ -20566,14 +20977,13 @@
             });
           }
 
-          if (node.kind !== 'landmark') {
-            group.traverse((child) => {
-              if (child.isMesh) {
-                child.userData.nodeId = node.id;
-                islandMeshes.push(child);
-              }
-            });
-          }
+          // 所有台柱（包含雲端聖堡 id: 19）皆納入可點擊射線檢測
+          group.traverse((child) => {
+            if (child.isMesh) {
+              child.userData.nodeId = node.id;
+              islandMeshes.push(child);
+            }
+          });
 
           scene.add(group);
           nodeObjects[node.id] = {
@@ -21298,6 +21708,191 @@
           scene.add(fmesh);
           flyingTrail.push({ mesh: fmesh, mat: fm });
         }
+
+        // ===== 終章迪士尼星弧 × 3D 星空煙火粒子引擎（輕量 GPU Points ＋ 城堡外牆動態染色反光） =====
+        const fireworkLight = new THREE.PointLight(0xfde047, 0, 52, 1.5);
+        scene.add(fireworkLight);
+        let fwLightIntensity = 0;
+        const activeFireworks = [];
+
+        // 迪士尼金色流星弧線（橫越新天鵝堡最高尖塔上方）
+        const disneyArcTrail = [];
+        const arcStarGeo = new THREE.OctahedronGeometry(0.18, 0);
+        for (let k = 0; k < 14; k++) {
+          const am = new THREE.MeshBasicMaterial({ color: k < 3 ? 0xffffff : 0xfde047, transparent: true, opacity: 0, depthWrite: false });
+          const amesh = new THREE.Mesh(arcStarGeo, am);
+          amesh.visible = false;
+          amesh.renderOrder = 8;
+          scene.add(amesh);
+          disneyArcTrail.push({ mesh: amesh, mat: am });
+        }
+        let disneyArcCurve = null;
+        if (castleEntry) {
+          const cx = castleEntry.node.x, cy = castleEntry.node.y, cz = castleEntry.node.z;
+          disneyArcCurve = new THREE.QuadraticBezierCurve3(
+            new THREE.Vector3(cx - 10.5, cy + 5.0, cz - 1.4),
+            new THREE.Vector3(cx + 0.2, cy + 13.6, cz - 2.4),
+            new THREE.Vector3(cx + 10.2, cy + 6.2, cz - 1.4)
+          );
+        }
+
+        // 建立平滑發光圓點貼圖供煙火粒子使用
+        const fwDotCanvas = document.createElement('canvas');
+        fwDotCanvas.width = 32; fwDotCanvas.height = 32;
+        const fwCtx = fwDotCanvas.getContext('2d');
+        const fwGrad = fwCtx.createRadialGradient(16, 16, 0, 16, 16, 16);
+        fwGrad.addColorStop(0, 'rgba(255,255,255,1)');
+        fwGrad.addColorStop(0.35, 'rgba(255,255,255,0.85)');
+        fwGrad.addColorStop(1, 'rgba(255,255,255,0)');
+        fwCtx.fillStyle = fwGrad;
+        fwCtx.fillRect(0, 0, 32, 32);
+        const fwSpriteTex = new THREE.CanvasTexture(fwDotCanvas);
+
+        const spawnFirework = (originPos, burstPos, primaryHex = 0xfde047, secondaryHex = 0xffffff, scale = 1.0, silentLaunch = false) => {
+          const riseCount = 9;
+          const risePos = new Float32Array(riseCount * 3);
+          for (let i = 0; i < riseCount; i++) {
+            risePos[i * 3] = originPos.x; risePos[i * 3 + 1] = originPos.y; risePos[i * 3 + 2] = originPos.z;
+          }
+          const riseGeo = new THREE.BufferGeometry();
+          riseGeo.setAttribute('position', new THREE.BufferAttribute(risePos, 3));
+          const riseMat = new THREE.PointsMaterial({
+            color: primaryHex, map: fwSpriteTex, size: 0.65 * scale,
+            transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false
+          });
+          const risePts = new THREE.Points(riseGeo, riseMat);
+          risePts.renderOrder = 8;
+          scene.add(risePts);
+
+          if (!silentLaunch) audio.sfxFireworkLaunch();
+          activeFireworks.push({
+            stage: 'rising',
+            age: 0,
+            riseDur: 0.48 + Math.random() * 0.14,
+            burstDur: 2.35 + scale * 0.45,
+            origin: originPos.clone(),
+            burst: burstPos.clone(),
+            primaryHex,
+            secondaryHex,
+            scale,
+            risePts, riseGeo, riseMat,
+            burstPts: null, burstGeo: null, burstMat: null, velocities: null
+          });
+        };
+
+        const updateFireworks = (dtStep) => {
+          if (fwLightIntensity > 0.01) {
+            fwLightIntensity *= Math.pow(0.18, dtStep);
+            fireworkLight.intensity = fwLightIntensity;
+          } else {
+            fireworkLight.intensity = 0;
+          }
+
+          for (let i = activeFireworks.length - 1; i >= 0; i--) {
+            const fw = activeFireworks[i];
+            fw.age += dtStep;
+            if (fw.stage === 'rising') {
+              const u = Math.min(1, fw.age / fw.riseDur);
+              const posAttr = fw.riseGeo.attributes.position;
+              for (let k = 0; k < posAttr.count; k++) {
+                const ku = Math.max(0, u - k * 0.045);
+                const ease = 1 - Math.pow(1 - ku, 2);
+                const px = fw.origin.x + (fw.burst.x - fw.origin.x) * ease;
+                const py = fw.origin.y + (fw.burst.y - fw.origin.y) * ease + Math.sin(ku * Math.PI) * 0.9;
+                const pz = fw.origin.z + (fw.burst.z - fw.origin.z) * ease;
+                posAttr.setXYZ(k, px, py, pz);
+              }
+              posAttr.needsUpdate = true;
+
+              if (u >= 1) {
+                scene.remove(fw.risePts);
+                fw.riseGeo.dispose(); fw.riseMat.dispose();
+                fw.risePts = null;
+
+                // 綻放：78 顆 3D 雙層球面垂柳粒子（外層主色菊花＋內層金色蕊心）
+                const count = Math.round(68 * fw.scale);
+                const positions = new Float32Array(count * 3);
+                const colors = new Float32Array(count * 3);
+                const velocities = [];
+                const c1 = new THREE.Color(fw.primaryHex);
+                const c2 = new THREE.Color(fw.secondaryHex);
+                for (let p = 0; p < count; p++) {
+                  const isInner = p < count * 0.34;
+                  const theta = Math.random() * Math.PI * 2;
+                  const phi = Math.acos(2 * Math.random() - 1);
+                  const speed = (isInner ? (2.1 + Math.random() * 1.4) : (4.2 + Math.random() * 2.1)) * fw.scale;
+                  velocities.push(new THREE.Vector3(
+                    Math.sin(phi) * Math.cos(theta) * speed,
+                    Math.cos(phi) * speed,
+                    Math.sin(phi) * Math.sin(theta) * speed
+                  ));
+                  positions[p * 3] = fw.burst.x;
+                  positions[p * 3 + 1] = fw.burst.y;
+                  positions[p * 3 + 2] = fw.burst.z;
+                  const col = isInner ? c2 : c1;
+                  colors[p * 3] = col.r; colors[p * 3 + 1] = col.g; colors[p * 3 + 2] = col.b;
+                }
+                const burstGeo = new THREE.BufferGeometry();
+                burstGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                burstGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                const burstMat = new THREE.PointsMaterial({
+                  size: 0.72 * fw.scale, map: fwSpriteTex, vertexColors: true,
+                  transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false
+                });
+                const burstPts = new THREE.Points(burstGeo, burstMat);
+                burstPts.renderOrder = 8;
+                scene.add(burstPts);
+
+                fw.stage = 'burst';
+                fw.age = 0;
+                fw.burstPts = burstPts; fw.burstGeo = burstGeo; fw.burstMat = burstMat;
+                fw.velocities = velocities;
+
+                // 動態城堡外牆染色反光 ＋ 遠距悶雷爆裂音效
+                fireworkLight.position.copy(fw.burst);
+                fireworkLight.color.setHex(fw.primaryHex);
+                fwLightIntensity = Math.min(6.2, 3.8 * fw.scale);
+                fireworkLight.intensity = fwLightIntensity;
+                audio.sfxFireworkBurst(fw.scale);
+              }
+            } else {
+              const u = Math.min(1, fw.age / fw.burstDur);
+              const posAttr = fw.burstGeo.attributes.position;
+              const drag = Math.pow(0.32, dtStep);
+              for (let p = 0; p < posAttr.count; p++) {
+                const v = fw.velocities[p];
+                v.multiplyScalar(drag);
+                v.y -= 1.55 * dtStep; // 優雅垂柳重力
+                posAttr.setXYZ(
+                  p,
+                  posAttr.getX(p) + v.x * dtStep,
+                  posAttr.getY(p) + v.y * dtStep,
+                  posAttr.getZ(p) + v.z * dtStep
+                );
+              }
+              posAttr.needsUpdate = true;
+              const strobe = u > 0.55 ? (0.72 + 0.28 * Math.sin(fw.age * 28 + i * 3)) : 1;
+              fw.burstMat.opacity = Math.max(0, (1 - Math.pow(u, 1.55)) * strobe);
+
+              if (u >= 1) {
+                scene.remove(fw.burstPts);
+                fw.burstGeo.dispose(); fw.burstMat.dispose();
+                activeFireworks.splice(i, 1);
+              }
+            }
+          }
+        };
+
+        const clearFireworks = () => {
+          while (activeFireworks.length > 0) {
+            const fw = activeFireworks.pop();
+            if (fw.risePts) { scene.remove(fw.risePts); fw.riseGeo.dispose(); fw.riseMat.dispose(); }
+            if (fw.burstPts) { scene.remove(fw.burstPts); fw.burstGeo.dispose(); fw.burstMat.dispose(); }
+          }
+          disneyArcTrail.forEach(t => { t.mesh.visible = false; });
+          fwLightIntensity = 0;
+          fireworkLight.intensity = 0;
+        };
 
         const applySanctumBridgeProgress = (prog) => {
           const p = Math.max(0, Math.min(1, prog));
@@ -22137,6 +22732,42 @@
           const entry = nodeObjects[nodeId];
           if (!entry) return;
 
+          // 雲端聖堡（id: 19）專屬邏輯：休閒模式僅聚焦欣賞；闖關模式未滿 6 片進星盤鑑賞；滿 6 片首次點擊直接從 Lv.18 踏橋登堡看結局，之後點擊展開三選一金色抽屜
+          if (entry.node.id === 19) {
+            if (cb.gameMode !== 'adventure') {
+              audio.sfxClick();
+              setActiveSea(4);
+              userInteracting = false;
+              const seaView = computeSeaView(4);
+              cameraTargetPos.copy(seaView.pos);
+              controlsTargetPos.copy(seaView.target);
+              cameraMode = 'focusTarget';
+              isTransitioning = true;
+              return;
+            }
+            const collected = cb.userProgress?.collectedPuzzles || [];
+            const watchedFinale = Boolean(cb.userProgress?.seenStoryFlags?.finaleWatched);
+            audio.sfxSelect();
+            if (collected.length < 6) {
+              sceneCtrlRef.current?.focusCastleDisk?.();
+            } else if (!watchedFinale) {
+              if (cb.onMarkStoryFlag) cb.onMarkStoryFlag('finaleWatched');
+              sceneCtrlRef.current?.playFinaleFireworks?.({
+                onOpenCertificate: () => { if (cb.onOpenCertificate) cb.onOpenCertificate(); }
+              });
+            } else {
+              setFocusedNodeId(19);
+              setActiveSea(4);
+              userInteracting = false;
+              const seaView = computeSeaView(4);
+              cameraTargetPos.copy(seaView.pos);
+              controlsTargetPos.copy(seaView.target);
+              cameraMode = 'focusTarget';
+              isTransitioning = true;
+            }
+            return;
+          }
+
           if (entry.node.kind === 'shrine') {
             audio.sfxSelect();
           } else {
@@ -22510,8 +23141,9 @@
               alignPos,
               flyCurve,
               elapsed: 0,
-              duration: triggerBridge ? 13.0 : 7.8,
+              duration: triggerBridge ? 11.8 : 7.8,
               triggerBridge,
+              isFinaleFlow: false,
               preList,
               postList,
               spinY: 0,
@@ -22521,10 +23153,17 @@
               diskBaseZ: starDiskGroup.position.z,
               socketed: false,
               bridgeStarted: false,
+              walkStarted: false,
+              arcStarted: false,
+              fanfareStarted: false,
+              finaleReady: false,
+              firedVolleys: {},
+              ambientFwTimer: 0,
               uiStage: 1,
               prevCamPos,
               prevTargetPos,
-              onDone: opts.onDone || null
+              onDone: opts.onDone || null,
+              onOpenCertificate: opts.onOpenCertificate || null
             };
             cameraMode = 'puzzleCinematic';
             isTransitioning = false;
@@ -22539,30 +23178,127 @@
               ruleVia: meta.ruleVia,
               text: meta.line1,
               stage: 1,
-              countText: null
+              countText: null,
+              isFinaleInteractive: false
             });
           },
-          skipPuzzleCinematic: () => {
+          // 獨立結局演出（點擊雲端聖堡或 Debug 一鍵測試）：強制小人傳送至 Lv.18 橋頭踏橋登堡 → 迪士尼星弧 → 三樂章煙火秀 → 領取證書
+          playFinaleFireworks: (opts = {}) => {
+            if (!castleEntry || !sanctumBridgeCurve) return;
+            const postList = [1, 2, 3, 4, 5, 6];
+            setFocusedNodeId(null);
+            setChapterCaption(null);
+            userInteracting = false;
+            controls.enabled = false;
+            flightAnim = null;
+            renderer.domElement.style.transition = 'none';
+            renderer.domElement.style.filter = 'none';
+            clearFireworks();
+            syncStarDiskVisuals(postList, 1);
+
+            const prevCamPos = camera.position.clone();
+            const prevTargetPos = controls.target.clone();
+            const bridgeStart = sanctumBridgeCurve.getPoint(0);
+            const zFactor = getPortraitZoomFactor();
+            controls.target.set(bridgeStart.x, bridgeStart.y + 0.9, bridgeStart.z);
+            camera.position.set(bridgeStart.x + 5.5 * zFactor, bridgeStart.y + 4.4 * zFactor, bridgeStart.z + 10.5 * zFactor);
+
+            puzzleCinematic = {
+              active: true,
+              pieceId: 6,
+              meta: PUZZLE_PIECES_META[5],
+              wedge: starDiskWedges[6],
+              startPos: bridgeStart.clone(),
+              hoverPos: bridgeStart.clone(),
+              alignPos: starDiskCenterWorld.clone(),
+              flyCurve: sanctumBridgeCurve,
+              elapsed: 11.4, // 直接切入 Shot 6：阿爾法踏橋登堡
+              duration: 9999,
+              triggerBridge: true,
+              isFinaleFlow: true,
+              preList: postList,
+              postList,
+              spinY: 0,
+              alignStartSpinY: null,
+              alignTargetSpinY: 0,
+              recoilTimer: 0,
+              diskBaseZ: starDiskGroup.position.z,
+              socketed: true,
+              bridgeStarted: true,
+              walkStarted: false,
+              arcStarted: false,
+              fanfareStarted: false,
+              finaleReady: false,
+              firedVolleys: {},
+              ambientFwTimer: 0,
+              uiStage: 4,
+              prevCamPos,
+              prevTargetPos,
+              onDone: opts.onDone || null,
+              onOpenCertificate: opts.onOpenCertificate || null
+            };
+            cameraMode = 'puzzleCinematic';
+            isTransitioning = false;
+            audio.setModalDucking(true);
+            if (callbacksRef.current.onPuzzleCinematicChange) callbacksRef.current.onPuzzleCinematicChange(true);
+          },
+          // 煙火沉浸留白期：玩家輕點夜空自由加碼放一發煙火
+          launchInteractiveFirework: (normX = 0.5, normY = 0.35) => {
+            if (!puzzleCinematic || !puzzleCinematic.active || !puzzleCinematic.finaleReady || !castleEntry) return;
+            const cx = castleEntry.node.x, cy = castleEntry.node.y, cz = castleEntry.node.z;
+            const spreadX = (normX - 0.5) * 18;
+            const burstY = cy + 6.8 + (1 - Math.min(0.75, Math.max(0.08, normY))) * 7.8;
+            const palette = [
+              [0x34d399, 0xfef08a],
+              [0x38bdf8, 0xffffff],
+              [0xc084fc, 0xfde047],
+              [0xfb7185, 0xfef3c7],
+              [0xfde047, 0xffffff]
+            ];
+            const pick = palette[Math.floor(Math.random() * palette.length)];
+            spawnFirework(
+              new THREE.Vector3(cx + spreadX * 0.55, cy + 2.0, cz - 2.6),
+              new THREE.Vector3(cx + spreadX, burstY, cz - 2.2 - Math.random() * 2.2),
+              pick[0], pick[1], 1.05 + Math.random() * 0.25, false
+            );
+          },
+          skipPuzzleCinematic: (openCert = false) => {
             if (!puzzleCinematic || !puzzleCinematic.active) return;
             const pc = puzzleCinematic;
             pc.active = false;
             puzzleCinematic = null;
             flyingPieceGroup.visible = false;
             flyingTrail.forEach(tr => { tr.mesh.visible = false; });
+            clearFireworks();
             if (diskBeamMesh) { diskBeamMesh.visible = false; diskBeamMat.opacity = 0; }
             syncStarDiskVisuals(pc.postList, pc.triggerBridge ? 1 : (pc.postList.length >= 6 ? 1 : 0));
+            if (pc.isFinaleFlow) {
+              const stand = getPlatformStandPos(19);
+              idaGroup.position.copy(stand);
+              idaGroup.rotation.y = Math.PI;
+              if (leftLeg) leftLeg.rotation.x = 0;
+              if (rightLeg) rightLeg.rotation.x = 0;
+            }
             controls.enabled = true;
             fogDensityTarget = 0.0115;
             renderer.domElement.style.transition = 'none';
             renderer.domElement.style.filter = 'none';
-            cameraTargetPos.copy(pc.prevCamPos);
-            controlsTargetPos.copy(pc.prevTargetPos);
+            if (pc.triggerBridge && !pc.isFinaleFlow) {
+              // 第 6 片開橋結束後，保留視角在雲端聖堡與聖域之橋前，引導玩家親手點擊聖堡登頂！
+              const seaView = computeSeaView(4);
+              cameraTargetPos.copy(seaView.pos);
+              controlsTargetPos.copy(seaView.target);
+            } else {
+              cameraTargetPos.copy(pc.prevCamPos);
+              controlsTargetPos.copy(pc.prevTargetPos);
+            }
             cameraMode = 'focusTarget';
             isTransitioning = true;
             audio.setModalDucking(false);
             setPuzzleCutsceneUI(null);
             if (callbacksRef.current.onPuzzleCinematicChange) callbacksRef.current.onPuzzleCinematicChange(false);
             if (pc.onDone) pc.onDone();
+            if ((openCert || pc.isFinaleFlow) && pc.onOpenCertificate) pc.onOpenCertificate();
           },
           focusCastleEpilogue: () => {
             const castleEntry = nodeObjects[19];
@@ -23511,8 +24247,8 @@
                 );
                 camera.position.lerp(cameraTargetPos, 0.065);
                 controls.target.lerp(controlsTargetPos, 0.08);
-              } else {
-                // Shot 5（第 6 片專屬）：大遠景搖臂俯瞰，聖域之橋 13 階一階階浮升點亮
+              } else if (!pc.isFinaleFlow || e < 11.4) {
+                // Shot 5（第 6 片專屬）：大遠景搖臂俯瞰，聖域之橋 13 階一階階浮升點亮，邀請玩家點擊雲端聖堡登頂
                 if (!pc.bridgeStarted) {
                   pc.bridgeStarted = true;
                   audio.sfxBridgeRise();
@@ -23522,9 +24258,10 @@
                     era: 'Ω · 360° 星盤歸一',
                     accentCls: 'text-amber-200',
                     ruleVia: 'via-amber-300/95',
-                    text: '跨越千年的光與弦，此刻在雲海之上為你鋪展。',
+                    text: '聖域之橋已為你鋪展——點擊雲端聖堡 Ω，踏上終章旅程！',
                     stage: 3,
-                    countText: '❖ 失落星盤 · 6 / 6 圓滿'
+                    countText: '❖ 失落星盤 · 6 / 6 圓滿',
+                    isFinaleInteractive: false
                   });
                 }
                 const bu = smoothstep((e - 7.9) / 3.4);
@@ -23542,6 +24279,170 @@
                 );
                 camera.position.lerp(cameraTargetPos, 0.055);
                 controls.target.lerp(controlsTargetPos, 0.075);
+              } else if (e < 15.6) {
+                // Shot 6（終章）：阿爾法自 Lv.18 橋頭踏過 13 階發光聖域之橋，最後平滑站至王者階梯前正中央（零穿模）
+                if (!pc.walkStarted) {
+                  pc.walkStarted = true;
+                  applySanctumBridgeProgress(1);
+                  if (diskBeamMesh) diskBeamMesh.visible = false;
+                  setPuzzleCutsceneUI({
+                    pieceId: pc.pieceId,
+                    name: '踏橋登堡',
+                    era: 'α ➔ Ω · 終章朝聖',
+                    accentCls: 'text-amber-200',
+                    ruleVia: 'via-amber-300/95',
+                    text: '從微光之角 α 啟程，你已以邊、角與弦，抵達雲端聖堡 Ω。',
+                    stage: 4,
+                    countText: '❖ 雲端聖堡 · 終章',
+                    isFinaleInteractive: false
+                  });
+                }
+                const wu = smoothstep((e - 11.4) / 4.2);
+                if (sanctumBridgeCurve) {
+                  const standPos = getPlatformStandPos(19);
+                  let pos, lookYaw;
+                  if (wu < 0.88) {
+                    const bu = wu / 0.88;
+                    pos = sanctumBridgeCurve.getPoint(bu);
+                    const tan = sanctumBridgeCurve.getTangent(bu).normalize();
+                    lookYaw = Math.atan2(tan.x, tan.z);
+                  } else {
+                    const su = (wu - 0.88) / 0.12;
+                    const pEnd = sanctumBridgeCurve.getPoint(1);
+                    pos = new THREE.Vector3().lerpVectors(pEnd, standPos, su);
+                    lookYaw = Math.atan2(standPos.x - pEnd.x, standPos.z - pEnd.z) * (1 - su) + Math.PI * su;
+                  }
+                  const hop = Math.abs(Math.sin(wu * 14 * Math.PI)) * 0.22;
+                  idaGroup.position.set(pos.x, pos.y + 0.08 + hop, pos.z);
+                  idaGroup.rotation.y = lookYaw;
+                  const stride = Math.sin(wu * 14 * Math.PI * 2);
+                  if (leftLeg) leftLeg.rotation.x = stride * 0.48;
+                  if (rightLeg) rightLeg.rotation.x = -stride * 0.48;
+
+                  const activeStepIdx = Math.floor(Math.min(0.99, wu / 0.88) * sanctumBridgeSteps.length);
+                  sanctumBridgeSteps.forEach((st, idx) => {
+                    st.mat.emissiveIntensity = idx === activeStepIdx ? 1.75 : (idx < activeStepIdx ? 0.78 : 0.48);
+                  });
+
+                  controlsTargetPos.set(pos.x, pos.y + 1.15, pos.z);
+                  cameraTargetPos.set(
+                    pos.x + (6.4 - wu * 2.2) * zFactor,
+                    pos.y + (3.6 + wu * 1.4) * zFactor,
+                    pos.z + (9.4 + wu * 1.8) * zFactor
+                  );
+                  camera.position.lerp(cameraTargetPos, 0.075);
+                  controls.target.lerp(controlsTargetPos, 0.095);
+                }
+              } else {
+                // Shot 7 & 8（迪士尼星弧 → 三樂章 3D 光影煙火秀 → 沉浸留白餘韻＋點擊夜空自由放煙火）
+                const fe = e - 15.6;
+                updateFireworks(stepDt);
+                fogDensityTarget = 0.0065;
+
+                // 小人穩立於聖堡正中央前庭、面朝城堡抬頭歡呼看煙火
+                const standPos = getPlatformStandPos(19);
+                const cheerHop = fe < 1.2 ? Math.abs(Math.sin(fe * 5.2)) * 0.16 : 0;
+                idaGroup.position.set(standPos.x, standPos.y + 0.06 + cheerHop, standPos.z);
+                idaGroup.rotation.y = Math.PI;
+                if (leftLeg) leftLeg.rotation.x = 0;
+                if (rightLeg) rightLeg.rotation.x = 0;
+
+                // 迪士尼片頭仰角構圖：從小人背後大遠景緩慢仰望整座雲端新天鵝堡
+                if (castleEntry) {
+                  const cx = castleEntry.node.x, cy = castleEntry.node.y, cz = castleEntry.node.z;
+                  const drift = Math.sin(fe * 0.25) * 1.1;
+                  controlsTargetPos.set(cx, cy + 5.2, cz);
+                  cameraTargetPos.set(
+                    cx + drift * zFactor,
+                    cy + 5.8 * zFactor,
+                    cz + 22.8 * zFactor
+                  );
+                  camera.position.lerp(cameraTargetPos, 0.042);
+                  controls.target.lerp(controlsTargetPos, 0.06);
+
+                  // 0.3s ~ 1.65s：迪士尼招牌金色流星弧線橫越最高尖塔
+                  if (fe >= 0.3 && fe <= 1.75 && disneyArcCurve) {
+                    if (!pc.arcStarted) {
+                      pc.arcStarted = true;
+                      audio.sfxDisneyArc();
+                    }
+                    const au = Math.min(1, (fe - 0.3) / 1.35);
+                    disneyArcTrail.forEach((tr, idx) => {
+                      const tu = Math.max(0, au - idx * 0.028);
+                      const pt = disneyArcCurve.getPoint(tu);
+                      tr.mesh.visible = au > 0.02 && au < 0.99;
+                      tr.mesh.position.copy(pt);
+                      tr.mesh.scale.setScalar(Math.max(0.22, 1.15 - idx * 0.075));
+                      tr.mat.opacity = Math.max(0, (1 - idx / disneyArcTrail.length) * (1 - Math.max(0, au - 0.8) / 0.2));
+                    });
+                    if (au >= 0.5 && !pc.firedVolleys.arcTip) {
+                      pc.firedVolleys.arcTip = true;
+                      const tip = disneyArcCurve.getPoint(0.5);
+                      spawnFirework(tip.clone().add(new THREE.Vector3(0, -1.2, 0)), tip, 0xfde047, 0xffffff, 0.85, true);
+                    }
+                  } else {
+                    disneyArcTrail.forEach(tr => { tr.mesh.visible = false; });
+                  }
+
+                  // 1.4s：奏響 10 秒溫暖宏大終章凱旋交響和弦
+                  if (fe >= 1.4 && !pc.fanfareStarted) {
+                    pc.fanfareStarted = true;
+                    audio.sfxFinaleFanfare();
+                  }
+
+                  // 三樂章 3D 光影煙火編排（呼應三大聖域色 → 對稱雙發 → 帝王金壓軸大齊放）
+                  const schedule = [
+                    { key: 'm1a', at: 1.6,  ox: -5.5, bx: -6.8, by: 10.6, bz: -2.2, c1: 0x34d399, c2: 0xfef08a, sc: 1.05 }, // 第一聖域 翡翠青
+                    { key: 'm1b', at: 2.8,  ox: 5.5,  bx: 6.8,  by: 11.4, bz: -2.2, c1: 0x38bdf8, c2: 0xffffff, sc: 1.10 }, // 第二聖域 星夜藍
+                    { key: 'm1c', at: 4.0,  ox: 0.0,  bx: 0.2,  by: 13.0, bz: -3.2, c1: 0xc084fc, c2: 0xfde047, sc: 1.18 }, // 第三聖域 幻夜紫
+                    { key: 'm2a', at: 5.5,  ox: -6.5, bx: -8.2, by: 11.8, bz: -2.5, c1: 0xfb7185, c2: 0xfef3c7, sc: 1.12 }, // 第二樂章 左玫瑰金
+                    { key: 'm2b', at: 5.65, ox: 6.5,  bx: 8.2,  by: 11.8, bz: -2.5, c1: 0x7dd3fc, c2: 0xfef08a, sc: 1.12 }, // 第二樂章 右冰藍
+                    { key: 'm3a', at: 7.3,  ox: -4.2, bx: -5.4, by: 12.6, bz: -3.0, c1: 0xfde047, c2: 0xffffff, sc: 1.32 }, // 壓軸 黃金垂柳左
+                    { key: 'm3b', at: 7.55, ox: 4.2,  bx: 5.4,  by: 12.6, bz: -3.0, c1: 0xfde047, c2: 0xffffff, sc: 1.32 }, // 壓軸 黃金垂柳右
+                    { key: 'm3c', at: 7.9,  ox: 0.0,  bx: 0.0,  by: 14.2, bz: -3.8, c1: 0xfbbf24, c2: 0xfffbeb, sc: 1.48 }  // 壓軸 中央最大帝王金
+                  ];
+                  schedule.forEach(s => {
+                    if (fe >= s.at && !pc.firedVolleys[s.key]) {
+                      pc.firedVolleys[s.key] = true;
+                      spawnFirework(
+                        new THREE.Vector3(cx + s.ox, cy + 2.2, cz + s.bz),
+                        new THREE.Vector3(cx + s.bx, cy + s.by, cz + s.bz),
+                        s.c1, s.c2, s.sc, false
+                      );
+                    }
+                  });
+
+                  // 9.4s 後進入留白沉浸餘韻：顯示「領取聖域通關證書」按鈕，背景持續柔和放遠景煙火，且點夜空可自由放煙火！
+                  if (fe >= 9.4 && !pc.finaleReady) {
+                    pc.finaleReady = true;
+                    setPuzzleCutsceneUI({
+                      pieceId: pc.pieceId,
+                      name: '雲端聖堡圓滿達成',
+                      era: 'Ω · SANCTUARY COMPLETE',
+                      accentCls: 'text-amber-200',
+                      ruleVia: 'via-amber-300/95',
+                      text: '星辰與幾何為你綻放——輕點夜空可自由施放煙火，隨時領取榮譽證書。',
+                      stage: 5,
+                      countText: '❖ 失落星盤 · 6 / 6 圓滿',
+                      isFinaleInteractive: true
+                    });
+                  }
+                  if (pc.finaleReady) {
+                    pc.ambientFwTimer += stepDt;
+                    if (pc.ambientFwTimer >= 2.35) {
+                      pc.ambientFwTimer = 0;
+                      const rx = (Math.random() - 0.5) * 15;
+                      const ry = 9.5 + Math.random() * 4.5;
+                      const pal = [[0xfde047, 0xffffff], [0x34d399, 0xfef08a], [0x38bdf8, 0xffffff], [0xc084fc, 0xfef3c7], [0xfb7185, 0xfef08a]];
+                      const pick = pal[Math.floor(Math.random() * pal.length)];
+                      spawnFirework(
+                        new THREE.Vector3(cx + rx * 0.6, cy + 2.0, cz - 3.0),
+                        new THREE.Vector3(cx + rx, cy + ry, cz - 3.0),
+                        pick[0], pick[1], 0.95 + Math.random() * 0.25, true
+                      );
+                    }
+                  }
+                }
               }
             }
 
@@ -23556,8 +24457,15 @@
               starDiskGroup.userData.lastKey = pc.postList.join(',');
               controls.enabled = true;
               fogDensityTarget = 0.0115;
-              cameraTargetPos.copy(pc.prevCamPos);
-              controlsTargetPos.copy(pc.prevTargetPos);
+              if (pc.triggerBridge && !pc.isFinaleFlow) {
+                const seaView = computeSeaView(4);
+                cameraTargetPos.copy(seaView.pos);
+                controlsTargetPos.copy(seaView.target);
+                setActiveSea(4);
+              } else {
+                cameraTargetPos.copy(pc.prevCamPos);
+                controlsTargetPos.copy(pc.prevTargetPos);
+              }
               cameraMode = 'focusTarget';
               isTransitioning = true;
               audio.setModalDucking(false);
@@ -24309,9 +25217,20 @@
             </div>
           )}
 
-          {/* 電影寬銀幕拼圖過場覆蓋層（上下黑邊＋微劇情字幕＋低調略過鈕） */}
+          {/* 電影寬銀幕拼圖過場覆蓋層（pointer-events-auto 徹底封鎖過場誤觸；煙火留白期點夜空可自由放煙火） */}
           {puzzleCutsceneUI && (
-            <div className="pointer-events-none select-none absolute inset-0 z-40 flex flex-col justify-between overflow-hidden">
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                if (puzzleCutsceneUI.isFinaleInteractive) {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const nx = (e.clientX - rect.left) / Math.max(1, rect.width);
+                  const ny = (e.clientY - rect.top) / Math.max(1, rect.height);
+                  sceneCtrlRef.current?.launchInteractiveFirework?.(nx, ny);
+                }
+              }}
+              className={`pointer-events-auto select-none absolute inset-0 z-40 flex flex-col justify-between overflow-hidden ${puzzleCutsceneUI.isFinaleInteractive ? 'cursor-crosshair' : ''}`}
+            >
               {/* 上黑邊 */}
               <div className="w-full h-[8%] min-h-[44px] bg-gradient-to-b from-black/95 via-black/85 to-black/0 flex items-center justify-center px-4">
                 {puzzleCutsceneUI.countText && (
@@ -24321,9 +25240,12 @@
                 )}
               </div>
 
-              {/* 下黑邊＋電影微劇情字幕 */}
-              <div className="w-full min-h-[118px] sm:min-h-[128px] bg-gradient-to-t from-black/95 via-black/80 to-black/0 pt-6 pb-4 pb-safe px-5 flex flex-col items-center justify-end text-center relative">
-                <div key={`pc-sub-${puzzleCutsceneUI.stage}-${puzzleCutsceneUI.pieceId}`} className="max-w-[340px] flex flex-col items-center animate-fade-in">
+              {/* 下黑邊＋電影微劇情字幕（終章煙火留白期附「領取聖域通關證書」發光鈕） */}
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="w-full min-h-[124px] sm:min-h-[136px] bg-gradient-to-t from-black/95 via-black/82 to-black/0 pt-6 pb-4 pb-safe px-5 flex flex-col items-center justify-end text-center relative"
+              >
+                <div key={`pc-sub-${puzzleCutsceneUI.stage}-${puzzleCutsceneUI.pieceId}`} className="max-w-[350px] flex flex-col items-center animate-fade-in">
                   <div className={`text-[10px] font-bold tracking-[0.26em] uppercase ${puzzleCutsceneUI.accentCls}`}>
                     {puzzleCutsceneUI.era} · {puzzleCutsceneUI.name}
                   </div>
@@ -24333,18 +25255,35 @@
                     <div className={`h-[1px] flex-1 bg-gradient-to-l from-transparent ${puzzleCutsceneUI.ruleVia} to-amber-100/80`} />
                   </div>
                   <div
-                    className="font-serif text-[13.5px] sm:text-[14.5px] font-bold tracking-[0.08em] text-[#fffdf5] leading-relaxed"
+                    className="font-serif text-[13px] sm:text-[14px] font-bold tracking-[0.06em] text-[#fffdf5] leading-relaxed"
                     style={{ textShadow: '0 2px 10px rgba(0,0,0,0.95)' }}
                   >
                     {puzzleCutsceneUI.text}
                   </div>
+                  {puzzleCutsceneUI.isFinaleInteractive && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        audio.sfxBonus();
+                        sceneCtrlRef.current?.skipPuzzleCinematic?.(true);
+                      }}
+                      className="mt-3 px-5 py-2 rounded-full bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 text-amber-950 font-black text-xs sm:text-sm tracking-wider shadow-[0_0_24px_rgba(251,191,36,0.7)] border border-amber-100 hover:brightness-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span>📜</span>
+                      <span>領取聖域通關證書</span>
+                    </button>
+                  )}
                 </div>
-                <button
-                  onClick={() => { audio.sfxClick(); sceneCtrlRef.current?.skipPuzzleCinematic?.(); }}
-                  className="pointer-events-auto absolute bottom-2.5 right-3 px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-[10px] font-bold tracking-wider text-slate-200/80 hover:text-white active:scale-95 transition-all"
-                >
-                  略過 ▶▶
-                </button>
+                {!puzzleCutsceneUI.isFinaleInteractive && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); audio.sfxClick(); sceneCtrlRef.current?.skipPuzzleCinematic?.(false); }}
+                    className="pointer-events-auto absolute bottom-2.5 right-3 px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-[10px] font-bold tracking-wider text-slate-200/80 hover:text-white active:scale-95 transition-all cursor-pointer"
+                  >
+                    略過 ▶▶
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -24372,7 +25311,7 @@
                 {/* 下方無框深空漸層字幕區（不擋上方 3D 星盤） */}
                 <div className="w-full bg-gradient-to-t from-slate-950/92 via-slate-950/72 to-transparent pt-10 pb-5 pb-safe px-5 flex flex-col items-center text-center">
                   {!pickedMeta ? (
-                    <div className="animate-fade-in space-y-1">
+                    <div className="animate-fade-in space-y-1.5 flex flex-col items-center">
                       <div className="text-[10.5px] font-bold tracking-[0.24em] text-amber-200/85 uppercase">
                         STAR DISK CODEX
                       </div>
@@ -24382,6 +25321,34 @@
                       >
                         點擊星盤上的任一拼圖塊，重溫尋弦紀事
                       </div>
+                      {collected.length >= 6 && (
+                        <div className="pt-2 flex items-center justify-center gap-2.5 pointer-events-auto">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              audio.sfxBonus();
+                              if (onOpenCertificate) onOpenCertificate();
+                            }}
+                            className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-300 to-yellow-400 text-amber-950 text-xs font-black tracking-wide shadow-[0_0_16px_rgba(251,191,36,0.5)] active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>📜</span><span>查看通關證書</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              audio.sfxClick();
+                              setDiskInspectMode(false);
+                              setInspectedPieceId(null);
+                              sceneCtrlRef.current?.playFinaleFireworks?.({
+                                onOpenCertificate: () => { if (onOpenCertificate) onOpenCertificate(); }
+                              });
+                            }}
+                            className="px-3.5 py-1.5 rounded-full bg-indigo-500/35 hover:bg-indigo-500/50 border border-indigo-300/50 text-indigo-100 text-xs font-black tracking-wide backdrop-blur-sm active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>🎆</span><span>重溫結局煙火</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ) : isPickedUnlocked ? (
                     <div key={`inspect-${pickedMeta.id}`} className="w-full max-w-[356px] flex flex-col items-center animate-fade-in">
@@ -24455,7 +25422,7 @@
             );
           })()}
 
-          {puzzleCutsceneUI || diskInspectMode ? null : !focusedLevelObj && !focusedShrineObj ? (
+          {puzzleCutsceneUI || diskInspectMode ? null : !focusedLevelObj && !focusedShrineObj && focusedNodeId !== 19 ? (
             <div className="absolute bottom-2 pb-safe left-2.5 right-2.5 z-20 flex justify-center pointer-events-none">
               <div className="flex items-center gap-2 w-full max-w-[404px] pointer-events-auto">
                 {/* 左側鏡頭工具膠囊（放大好按 44×40px：回主角 α │ 全覽 🗺️） */}
@@ -24526,7 +25493,75 @@
                     }`}
                   >
                     <span className={`w-1.5 h-1.5 rotate-45 rounded-[1.5px] shrink-0 ${activeSea === 4 ? 'bg-amber-950' : 'bg-gradient-to-br from-amber-200 to-amber-500 shadow-[0_0_5px_rgba(251,191,36,0.85)]'}`} />
-                    <span>聖堡</span>
+                    <span className="text-base font-serif font-bold leading-none">Ω</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : focusedNodeId === 19 ? (
+            <div className="absolute bottom-0 pb-safe left-0 right-0 sm:bottom-3 sm:left-3 sm:right-3 z-30 rounded-t-3xl sm:rounded-2xl overflow-hidden animate-jelly text-amber-50 bg-gradient-to-b from-[#172040] via-[#0f172e] to-[#080d1d] border-t-2 sm:border-2 border-amber-400/75 shadow-[0_-12px_36px_rgba(15,23,42,0.75)]">
+              <div className="h-1.5 w-full bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400" />
+              <div className="relative p-3.5">
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-2xl border-2 border-amber-300/70 bg-amber-400/15 shadow-sm shrink-0">
+                      🏰
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-black tracking-[0.2em] text-amber-300 uppercase">
+                        Ω · SANCTUARY CITADEL
+                      </div>
+                      <div className="text-sm font-black text-white mt-0.5 truncate">雲端聖堡 Ω</div>
+                      <div className="text-[11px] font-bold text-amber-200/80 truncate">
+                        六片失落星盤歸一 · 聖域之橋已永恆開啟
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { audio.sfxClick(); setFocusedNodeId(null); }}
+                    className="w-8 h-8 rounded-full font-black text-xs flex items-center justify-center shrink-0 active:scale-90 transition-colors bg-white/10 hover:bg-white/20 text-amber-100 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      audio.sfxBonus();
+                      setFocusedNodeId(null);
+                      sceneCtrlRef.current?.playFinaleFireworks?.({
+                        onOpenCertificate: () => { if (onOpenCertificate) onOpenCertificate(); }
+                      });
+                    }}
+                    className="py-2.5 px-1.5 rounded-xl bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-black text-xs flex flex-col items-center justify-center gap-0.5 shadow-lg active:scale-95 transition-all cursor-pointer"
+                  >
+                    <span className="text-base leading-none">🎆</span>
+                    <span>煙火結局</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      audio.sfxClick();
+                      setFocusedNodeId(null);
+                      if (onOpenCertificate) onOpenCertificate();
+                    }}
+                    className="py-2.5 px-1.5 rounded-xl bg-indigo-500/35 hover:bg-indigo-500/50 border border-indigo-300/50 text-indigo-50 font-black text-xs flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <span className="text-base leading-none">📜</span>
+                    <span>通關證書</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      audio.sfxClick();
+                      setFocusedNodeId(null);
+                      sceneCtrlRef.current?.focusCastleDisk?.();
+                    }}
+                    className="py-2.5 px-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-amber-300/35 text-amber-100 font-black text-xs flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <span className="text-base leading-none">❖</span>
+                    <span>鑑賞星盤</span>
                   </button>
                 </div>
               </div>
@@ -25860,16 +26895,23 @@
         );
       }, [newCardModalSlot, showSettingsModal, showUnifiedShrine, showAngleDialModal, showTriangleShrine, showStatusModal]);
 
-      // 每 3 關皆拿 ≥ 1★ → 回到地圖時自動觸發失落星盤電影過場並鑲嵌至雲端聖堡底柱
+      // 檢查是否有待解鎖之失落星盤拼圖（僅闖關模式啟用，休閒模式關閉所有拼圖動畫與結局；且優先於 pendingNextWalk 播放！）
+      const [showCertificateModal, setShowCertificateModal] = useState(false);
+      const pendingPuzzlePiece = useMemo(() => {
+        if (gameMode !== 'adventure') return null;
+        const starsObj = userProgress.stars || {};
+        const collected = Array.isArray(userProgress.collectedPuzzles) ? userProgress.collectedPuzzles : [];
+        return PUZZLE_PIECES_META.find(
+          p => !collected.includes(p.id) && p.levels.every(lv => (starsObj[lv] || 0) >= 1)
+        ) || null;
+      }, [gameMode, userProgress.stars, userProgress.collectedPuzzles]);
+
+      // 完整排隊順序：① 3★ 灑花慶祝 → ② 優先播失落星盤電影過場（播完或略過立即存檔） → ③ 小人自動邁步走向下一關
       useEffect(() => {
         if (currentStage !== 'map' || curtainState.phase !== 'hidden') return;
-        if (isPuzzleCinematicPlaying || pendingCelebration || pendingNextWalk) return;
-        const starsObj = gameMode === 'free' ? (userProgress.freeStars || {}) : (userProgress.stars || {});
+        if (isPuzzleCinematicPlaying || pendingCelebration || !pendingPuzzlePiece) return;
         const collected = Array.isArray(userProgress.collectedPuzzles) ? userProgress.collectedPuzzles : [];
-        const nextPiece = PUZZLE_PIECES_META.find(
-          p => !collected.includes(p.id) && p.levels.every(lv => (starsObj[lv] || 0) >= 1)
-        );
-        if (!nextPiece) return;
+        const nextPiece = pendingPuzzlePiece;
         const tid = setTimeout(() => {
           if (!mapCtrlRef.current?.playPuzzleCinematic) return;
           mapCtrlRef.current.playPuzzleCinematic(nextPiece.id, {
@@ -25877,14 +26919,24 @@
             onDone: () => {
               setUserProgress(prev => {
                 const prevList = Array.isArray(prev.collectedPuzzles) ? prev.collectedPuzzles : [];
-                if (prevList.includes(nextPiece.id)) return prev;
-                return { ...prev, collectedPuzzles: [...prevList, nextPiece.id].sort((a, b) => a - b) };
+                const nextList = prevList.includes(nextPiece.id)
+                  ? prevList
+                  : [...prevList, nextPiece.id].sort((a, b) => a - b);
+                const today = new Date().toISOString().slice(0, 10);
+                return {
+                  ...prev,
+                  collectedPuzzles: nextList,
+                  completedDate: nextList.length >= 6 ? (prev.completedDate || today) : prev.completedDate
+                };
               });
+            },
+            onOpenCertificate: () => {
+              setShowCertificateModal(true);
             }
           });
-        }, 550);
+        }, 420);
         return () => clearTimeout(tid);
-      }, [currentStage, curtainState.phase, gameMode, userProgress.stars, userProgress.freeStars, userProgress.collectedPuzzles, isPuzzleCinematicPlaying, pendingCelebration, pendingNextWalk]);
+      }, [currentStage, curtainState.phase, pendingPuzzlePiece, userProgress.collectedPuzzles, isPuzzleCinematicPlaying, pendingCelebration]);
 
       const enterLevelFromMap = useCallback((lvlId) => {
         if (mapCtrlRef.current) {
@@ -26639,11 +27691,12 @@
                 mapCtrlRef={mapCtrlRef}
                 celebration={pendingCelebration}
                 onCelebrationDone={() => setPendingCelebration(null)}
-                pendingNextWalk={pendingNextWalk}
+                pendingNextWalk={(isPuzzleCinematicPlaying || pendingCelebration || pendingPuzzlePiece) ? null : pendingNextWalk}
                 onNextWalkDone={() => setPendingNextWalk(null)}
                 debugShowLockedColors={isDebugMode && debugShowLockedColors}
                 curtainPhase={curtainState.phase}
                 onPuzzleCinematicChange={setIsPuzzleCinematicPlaying}
+                onOpenCertificate={() => setShowCertificateModal(true)}
                 onMarkStoryFlag={(flagKey) => setUserProgress(prev => ({
                   ...prev,
                   seenStoryFlags: { ...(prev.seenStoryFlags || {}), [flagKey]: true }
@@ -27984,7 +29037,8 @@
                               const previewBase = pm.id === 6 ? [1, 2, 3, 4, 5] : cur.filter(x => x !== pm.id);
                               mapCtrlRef.current?.playPuzzleCinematic?.(pm.id, {
                                 baseCollected: previewBase,
-                                forceBridge: pm.id === 6
+                                forceBridge: pm.id === 6,
+                                onOpenCertificate: pm.id === 6 ? () => setShowCertificateModal(true) : null
                               });
                             };
                             if (currentStage !== 'map') {
@@ -28000,9 +29054,45 @@
                               : 'bg-slate-800 hover:bg-slate-700 border-white/10 text-amber-100'
                           }`}
                         >
-                          {pm.id === 6 ? '🌉 #6+開橋' : `🎬 #${pm.id} ${pm.name.slice(0, 2)}`}
+                          {pm.id === 6 ? '🌉 #6+大結局' : `🎬 #${pm.id} ${pm.name.slice(0, 2)}`}
                         </button>
                       ))}
+                    </div>
+                    <div className="grid grid-cols-2 gap-1">
+                      <button
+                        onClick={() => {
+                          audio.init();
+                          audio.sfxClick();
+                          setShowDebugPanel(false);
+                          setShowSettingsModal(false);
+                          const runFinale = () => {
+                            mapCtrlRef.current?.playFinaleFireworks?.({
+                              onOpenCertificate: () => setShowCertificateModal(true)
+                            });
+                          };
+                          if (currentStage !== 'map') {
+                            setCurrentStage('map');
+                            setTimeout(runFinale, 450);
+                          } else {
+                            setTimeout(runFinale, 120);
+                          }
+                        }}
+                        className="py-1.5 px-2 rounded-lg bg-gradient-to-r from-amber-500/90 to-rose-500/85 hover:brightness-110 border border-amber-200/70 font-black text-[10px] text-white"
+                      >
+                        🎆 測試跨橋煙火結局
+                      </button>
+                      <button
+                        onClick={() => {
+                          audio.init();
+                          audio.sfxClick();
+                          setShowDebugPanel(false);
+                          setShowSettingsModal(false);
+                          setShowCertificateModal(true);
+                        }}
+                        className="py-1.5 px-2 rounded-lg bg-indigo-600/85 hover:bg-indigo-500 border border-indigo-300/60 font-black text-[10px] text-white"
+                      >
+                        📜 預覽通關證書
+                      </button>
                     </div>
                     <div className="grid grid-cols-3 gap-1">
                       <button
@@ -28196,6 +29286,30 @@
               </div>
             );
           })()}
+
+          <SanctuaryCertificateModal
+            open={showCertificateModal}
+            playerName={userProgress.name || '星域旅人'}
+            rank={currentRank}
+            totalStars={totalStars}
+            maxStars={totalPossibleStars}
+            gameMode={gameMode}
+            completedDate={userProgress.completedDate || ''}
+            onReplayFinale={() => {
+              const trigger = () => {
+                mapCtrlRef.current?.playFinaleFireworks?.({
+                  onOpenCertificate: () => setShowCertificateModal(true)
+                });
+              };
+              if (currentStage !== 'map') {
+                setCurrentStage('map');
+                setTimeout(trigger, 450);
+              } else {
+                setTimeout(trigger, 120);
+              }
+            }}
+            onClose={() => setShowCertificateModal(false)}
+          />
 
         </div>
         </GameModeContext.Provider>
