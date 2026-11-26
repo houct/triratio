@@ -546,6 +546,7 @@
   <script type="text/babel">
     const { useState, useEffect, useRef, useMemo, useCallback } = React;
     const APP_VERSION = '測試版 v2026.11.26a';
+    const ENABLE_CREDITS = false; // 測試版暫時隱藏片尾致謝浮字與關於彈窗；正式版改為 true 即可一鍵回歸
 
     // ==================== 共用 SVG 圖示元件 ====================
     const StarBadge = ({ filled, className = "w-6 h-6" }) => (
@@ -2181,28 +2182,78 @@
         }
       }
 
+      setBgmSea(seaId = 1) {
+        const clamped = seaId === 2 ? 2 : seaId >= 3 ? 3 : 1;
+        if (this.bgmSea === clamped) return;
+        this.bgmSea = clamped;
+      }
+
       setModalDucking(ducked) {
         if (this.isDucked === ducked) return;
         this.isDucked = ducked;
         this.syncGains(0.28);
       }
 
+      // 合成 1.35 秒立體聲神殿空間殘響（零外部音檔，賦予空靈大廳質感）
+      createReverbImpulse(durSec = 1.35, decay = 2.6) {
+        const rate = this.ctx.sampleRate;
+        const len = Math.floor(rate * durSec);
+        const buf = this.ctx.createBuffer(2, len, rate);
+        for (let ch = 0; ch < 2; ch++) {
+          const data = buf.getChannelData(ch);
+          let lp = 0;
+          for (let i = 0; i < len; i++) {
+            const env = Math.pow(1 - i / len, decay);
+            const white = (Math.random() * 2 - 1);
+            lp = lp * 0.72 + white * 0.28; // 溫暖低通高頻吸收
+            data[i] = lp * env;
+          }
+        }
+        return buf;
+      }
+
       init() {
         try {
           if (!this.ctx) {
             this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-            this.sfxGain = this.ctx.createGain();
-            this.sfxGain.connect(this.ctx.destination);
+            if (!this.bgmSea) this.bgmSea = 1;
 
+            // 1) 主母線動態防破音壓縮器（避免煙火＋連擊＋BGM 疊加爆音）
+            this.masterComp = this.ctx.createDynamicsCompressor();
+            this.masterComp.threshold.setValueAtTime(-12, this.ctx.currentTime);
+            this.masterComp.knee.setValueAtTime(18, this.ctx.currentTime);
+            this.masterComp.ratio.setValueAtTime(4, this.ctx.currentTime);
+            this.masterComp.attack.setValueAtTime(0.005, this.ctx.currentTime);
+            this.masterComp.release.setValueAtTime(0.16, this.ctx.currentTime);
+            this.masterComp.connect(this.ctx.destination);
+
+            // 2) 立體神殿空間殘響總線
+            this.reverbNode = this.ctx.createConvolver();
+            this.reverbNode.buffer = this.createReverbImpulse(1.35, 2.7);
+            this.reverbNode.connect(this.masterComp);
+
+            // 3) SFX 總線（乾聲 ＋ 7% 極細微空間尾韻，保持俐落不扭曲滑音）
+            this.sfxGain = this.ctx.createGain();
+            this.sfxGain.connect(this.masterComp);
+            this.reverbSfxSend = this.ctx.createGain();
+            this.reverbSfxSend.gain.setValueAtTime(0.07, this.ctx.currentTime);
+            this.sfxGain.connect(this.reverbSfxSend);
+            this.reverbSfxSend.connect(this.reverbNode);
+
+            // 4) BGM 總線（溫暖濾波 ＋ 28% 神殿殘響濕聲）
             this.bgmFilter = this.ctx.createBiquadFilter();
             this.bgmFilter.type = 'lowpass';
-            this.bgmFilter.frequency.setValueAtTime(1120, this.ctx.currentTime);
+            this.bgmFilter.frequency.setValueAtTime(1180, this.ctx.currentTime);
             this.bgmFilter.Q.setValueAtTime(0.7, this.ctx.currentTime);
 
             this.bgmGain = this.ctx.createGain();
             this.bgmGain.gain.setValueAtTime(0, this.ctx.currentTime);
             this.bgmFilter.connect(this.bgmGain);
-            this.bgmGain.connect(this.ctx.destination);
+            this.bgmGain.connect(this.masterComp);
+            this.reverbBgmSend = this.ctx.createGain();
+            this.reverbBgmSend.gain.setValueAtTime(0.28, this.ctx.currentTime);
+            this.bgmGain.connect(this.reverbBgmSend);
+            this.reverbBgmSend.connect(this.reverbNode);
           }
           if (this.ctx.state === 'suspended') {
             this.ctx.resume().then(() => {
@@ -2242,44 +2293,137 @@
         } catch (e) {}
       }
 
+      // 極輕柔軟木魚／高帽節拍點綴（關卡挑戰專注律動）
+      scheduleBgmPerc(t, accent = false) {
+        if (!this.ctx || !this.bgmFilter || !this.stepNoiseBuf) return;
+        try {
+          const src = this.ctx.createBufferSource();
+          src.buffer = this.stepNoiseBuf;
+          const bp = this.ctx.createBiquadFilter();
+          bp.type = 'bandpass';
+          bp.frequency.setValueAtTime(accent ? 2600 : 1850, t);
+          bp.Q.value = 2.4;
+          const g = this.ctx.createGain();
+          g.gain.setValueAtTime(0.0001, t);
+          g.gain.linearRampToValueAtTime(accent ? 0.032 : 0.018, t + 0.003);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + 0.032);
+          src.connect(bp); bp.connect(g); g.connect(this.bgmFilter);
+          src.start(t); src.stop(t + 0.036);
+        } catch (e) {}
+      }
+
       scheduleBgmStep(step, t) {
+        const sea = this.bgmSea || 1;
+        const s64 = step % 64;
+        const chordIdx = Math.floor(s64 / 8); // 8 小節（A 段 0..3 + B 段 4..7）
+
         if (this.bgmScene === 'map') {
-          // 聖域探索（約 72 BPM，每步 0.42s）：溫暖長音 Pad + 五聲音階鐘琴點綴
-          const padRoots = [130.81, 110.0, 87.31, 98.0]; // C3 -> A2 -> F2 -> G2
-          const padFifths = [196.0, 164.81, 130.81, 146.83];
-          const chordIdx = Math.floor((step % 32) / 8);
-          if (step % 8 === 0) {
-            this.scheduleBgmTone(padRoots[chordIdx], t, 3.25, 'sine', 0.28, 0.45);
-            this.scheduleBgmTone(padFifths[chordIdx], t, 3.1, 'triangle', 0.13, 0.55);
+          // 聖域探索（64 步 A/B 雙樂句，約 27 秒循環，依三座聖域切換調性與星空音色）
+          const mapThemes = {
+            // 第一聖域・月光花園（溫暖 C 大調五聲）
+            1: {
+              roots:  [130.81, 110.0, 87.31, 98.0,   87.31, 98.0, 164.81, 110.0],
+              fifths: [196.0,  164.81, 130.81, 146.83, 130.81, 146.83, 246.94, 164.81],
+              melody: [
+                523.25, 0, 659.25, 587.33, 0, 440.0, 523.25, 0,
+                392.0, 0, 523.25, 0, 587.33, 659.25, 0, 440.0,
+                349.23, 0, 440.0, 523.25, 0, 659.25, 587.33, 0,
+                392.0, 440.0, 0, 587.33, 523.25, 0, 392.0, 0,
+                // B 段高音星鈴延伸
+                659.25, 0, 783.99, 659.25, 0, 587.33, 523.25, 0,
+                587.33, 0, 659.25, 783.99, 0, 880.0, 783.99, 0,
+                659.25, 0, 523.25, 587.33, 0, 440.0, 392.0, 0,
+                440.0, 0, 523.25, 0, 587.33, 0, 523.25, 0
+              ]
+            },
+            // 第二聖域・星象迴廊（空靈 D Dorian 星空感）
+            2: {
+              roots:  [146.83, 130.81, 98.0, 110.0,  98.0, 110.0, 130.81, 146.83],
+              fifths: [220.0,  196.0,  146.83, 164.81, 146.83, 164.81, 196.0, 220.0],
+              melody: [
+                587.33, 0, 659.25, 783.99, 0, 659.25, 523.25, 0,
+                440.0, 0, 587.33, 0, 659.25, 783.99, 0, 587.33,
+                392.0, 0, 493.88, 587.33, 0, 659.25, 587.33, 0,
+                440.0, 523.25, 0, 587.33, 440.0, 0, 392.0, 0,
+                // B 段星空泛音
+                783.99, 0, 880.0, 783.99, 0, 659.25, 587.33, 0,
+                659.25, 0, 783.99, 880.0, 0, 987.77, 880.0, 0,
+                783.99, 0, 659.25, 587.33, 0, 523.25, 440.0, 0,
+                523.25, 0, 587.33, 0, 659.25, 0, 587.33, 0
+              ]
+            },
+            // 第三聖域・幻夜秘境（深邃神祕 A 小調水晶夜色）
+            3: {
+              roots:  [110.0, 87.31, 73.42, 82.41,   87.31, 98.0, 82.41, 110.0],
+              fifths: [164.81, 130.81, 110.0, 123.47, 130.81, 146.83, 123.47, 164.81],
+              melody: [
+                440.0, 0, 523.25, 659.25, 0, 587.33, 523.25, 0,
+                349.23, 0, 440.0, 0, 523.25, 659.25, 0, 440.0,
+                329.63, 0, 392.0, 493.88, 0, 587.33, 523.25, 0,
+                329.63, 440.0, 0, 493.88, 440.0, 0, 329.63, 0,
+                // B 段幻夜高星光
+                659.25, 0, 783.99, 659.25, 0, 523.25, 493.88, 0,
+                523.25, 0, 659.25, 783.99, 0, 880.0, 783.99, 0,
+                659.25, 0, 587.33, 523.25, 0, 493.88, 440.0, 0,
+                392.0, 0, 440.0, 0, 523.25, 0, 440.0, 0
+              ]
+            }
+          };
+          const th = mapThemes[sea] || mapThemes[1];
+          if (s64 % 8 === 0) {
+            this.scheduleBgmTone(th.roots[chordIdx], t, 3.3, 'sine', 0.26, 0.45);
+            this.scheduleBgmTone(th.fifths[chordIdx], t, 3.1, 'triangle', 0.12, 0.55);
           }
-          const mapMelody = [
-            523.25, 0, 659.25, 587.33, 0, 440.0, 523.25, 0,
-            392.0, 0, 523.25, 0, 587.33, 659.25, 0, 440.0,
-            349.23, 0, 440.0, 523.25, 0, 659.25, 587.33, 0,
-            392.0, 440.0, 0, 587.33, 523.25, 0, 392.0, 0
-          ];
-          const note = mapMelody[step % mapMelody.length];
+          const note = th.melody[s64];
           if (note > 0) {
-            this.scheduleBgmTone(note, t, 0.95, 'sine', 0.14, 0.03);
+            this.scheduleBgmTone(note, t, 1.05, 'sine', 0.135, 0.025);
+            if (sea >= 2 && s64 % 8 === 0) {
+              this.scheduleBgmTone(note * 2, t + 0.04, 0.65, 'sine', 0.032, 0.02);
+            }
           }
         } else {
-          // 關卡挑戰（約 108 BPM，每步 0.275s）：輕快專注的琶音律動
-          const bassProg = [110.0, 87.31, 130.81, 98.0]; // A2 -> F2 -> C3 -> G2
-          const arpChords = [
-            [220.0, 261.63, 329.63, 392.0],
-            [174.61, 220.0, 261.63, 349.23],
-            [261.63, 329.63, 392.0, 523.25],
-            [196.0, 246.94, 293.66, 392.0]
-          ];
-          const chordIdx = Math.floor((step % 32) / 8);
-          if (step % 4 === 0) {
-            this.scheduleBgmTone(bassProg[chordIdx], t, 0.52, 'triangle', 0.22, 0.02);
+          // 關卡挑戰（64 步 A/B 雙段，三聖域不同和聲色彩＋微弱軟木魚節拍）
+          const playThemes = {
+            1: {
+              bass: [110.0, 87.31, 130.81, 98.0,  87.31, 98.0, 110.0, 98.0],
+              chords: [
+                [220.0, 261.63, 329.63, 392.0], [174.61, 220.0, 261.63, 349.23],
+                [261.63, 329.63, 392.0, 523.25], [196.0, 246.94, 293.66, 392.0],
+                [174.61, 220.0, 261.63, 329.63], [196.0, 246.94, 293.66, 349.23],
+                [220.0, 261.63, 329.63, 440.0], [196.0, 246.94, 293.66, 392.0]
+              ]
+            },
+            2: {
+              bass: [146.83, 123.47, 98.0, 110.0, 98.0, 110.0, 130.81, 110.0],
+              chords: [
+                [293.66, 349.23, 440.0, 523.25], [246.94, 293.66, 392.0, 493.88],
+                [196.0, 246.94, 293.66, 392.0], [220.0, 261.63, 329.63, 440.0],
+                [196.0, 246.94, 293.66, 349.23], [220.0, 293.66, 329.63, 440.0],
+                [261.63, 329.63, 392.0, 523.25], [220.0, 261.63, 329.63, 392.0]
+              ]
+            },
+            3: {
+              bass: [110.0, 98.0, 87.31, 82.41,   87.31, 98.0, 82.41, 110.0],
+              chords: [
+                [220.0, 261.63, 329.63, 440.0], [196.0, 246.94, 293.66, 392.0],
+                [174.61, 220.0, 261.63, 329.63], [164.81, 207.65, 246.94, 329.63],
+                [174.61, 220.0, 261.63, 349.23], [196.0, 246.94, 293.66, 392.0],
+                [164.81, 196.0, 246.94, 329.63], [220.0, 261.63, 329.63, 392.0]
+              ]
+            }
+          };
+          const pt = playThemes[sea] || playThemes[1];
+          if (s64 % 4 === 0) {
+            this.scheduleBgmTone(pt.bass[chordIdx], t, 0.52, 'triangle', 0.20, 0.02);
           }
-          const arpPattern = [0, 1, 2, 3, 2, 1, 2, 3];
-          const arpNote = arpChords[chordIdx][arpPattern[step % 8]];
-          this.scheduleBgmTone(arpNote, t, 0.24, 'sine', 0.12, 0.015);
-          if (step % 8 === 0 || step % 8 === 3 || step % 8 === 6) {
-            this.scheduleBgmTone(arpNote * 2, t, 0.32, 'sine', 0.06, 0.015);
+          if (s64 % 2 === 0) {
+            this.scheduleBgmPerc(t, s64 % 8 === 0);
+          }
+          const arpPattern = s64 < 32 ? [0, 1, 2, 3, 2, 1, 2, 3] : [0, 2, 1, 3, 2, 3, 1, 2];
+          const arpNote = pt.chords[chordIdx][arpPattern[s64 % 8]];
+          this.scheduleBgmTone(arpNote, t, 0.25, sea === 3 ? 'triangle' : 'sine', 0.115, 0.015);
+          if (s64 % 8 === 0 || s64 % 8 === 3 || s64 % 8 === 6) {
+            this.scheduleBgmTone(arpNote * 2, t, 0.34, 'sine', 0.055, 0.015);
           }
         }
       }
@@ -2315,29 +2459,148 @@
           osc.start(t); osc.stop(t + dur);
         } catch (e) {}
       }
-      sfxClick() { this.play(800, 'sine', 0.05, 0.05); }
-      sfxSelect() { this.play(1200, 'sine', 0.1, 0.05); }
-      sfxMatch() { this.play(800, 'triangle', 0.1, 0.1); setTimeout(() => this.play(1200, 'sine', 0.2, 0.1), 100); }
-      sfxHint() { this.play(600, 'sine', 0.3, 0.1); }
-      sfxError() { this.play(200, 'sawtooth', 0.2, 0.1); }
+      // ===== 溫潤觸覺基礎 UI 音效（去刺耳鋸齒與方波，採濾波木質／星鈴音色） =====
+      sfxClick() {
+        if (!this.ctx || !this.sfxEnabled) return;
+        try {
+          const t = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(920, t);
+          osc.frequency.exponentialRampToValueAtTime(580, t + 0.042);
+          g.gain.setValueAtTime(0.001, t);
+          g.gain.linearRampToValueAtTime(0.065, t + 0.006);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.048);
+          osc.connect(g); g.connect(this.getSfxDest());
+          osc.start(t); osc.stop(t + 0.052);
+        } catch (e) {}
+      }
+      sfxSelect() {
+        if (!this.ctx || !this.sfxEnabled) return;
+        try {
+          const t = this.ctx.currentTime;
+          [1046.5, 1567.98].forEach((f, idx) => {
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            const st = t + idx * 0.025;
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(f, st);
+            g.gain.setValueAtTime(0.001, st);
+            g.gain.linearRampToValueAtTime(idx === 0 ? 0.055 : 0.032, st + 0.01);
+            g.gain.exponentialRampToValueAtTime(0.001, st + 0.14);
+            osc.connect(g); g.connect(this.getSfxDest());
+            osc.start(st); osc.stop(st + 0.15);
+          });
+        } catch (e) {}
+      }
+      sfxMatch() {
+        if (!this.ctx || !this.sfxEnabled) return;
+        try {
+          const t = this.ctx.currentTime;
+          [783.99, 1046.5].forEach((f, idx) => {
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            const st = t + idx * 0.075;
+            osc.type = idx === 0 ? 'triangle' : 'sine';
+            osc.frequency.setValueAtTime(f, st);
+            g.gain.setValueAtTime(0.001, st);
+            g.gain.linearRampToValueAtTime(0.09, st + 0.012);
+            g.gain.exponentialRampToValueAtTime(0.001, st + 0.22);
+            osc.connect(g); g.connect(this.getSfxDest());
+            osc.start(st); osc.stop(st + 0.24);
+          });
+        } catch (e) {}
+      }
+      sfxHint() { this.play(587.33, 'sine', 0.26, 0.075); }
+      sfxError() {
+        if (!this.ctx || !this.sfxEnabled) return;
+        try {
+          const t = this.ctx.currentTime;
+          const lp = this.ctx.createBiquadFilter();
+          lp.type = 'lowpass'; lp.frequency.setValueAtTime(620, t);
+          lp.connect(this.getSfxDest());
+          [245, 175].forEach((f, idx) => {
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            const st = t + idx * 0.085;
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(f, st);
+            osc.frequency.exponentialRampToValueAtTime(f * 0.86, st + 0.13);
+            g.gain.setValueAtTime(0.001, st);
+            g.gain.linearRampToValueAtTime(0.11, st + 0.012);
+            g.gain.exponentialRampToValueAtTime(0.001, st + 0.15);
+            osc.connect(g); g.connect(lp);
+            osc.start(st); osc.stop(st + 0.16);
+          });
+        } catch (e) {}
+      }
       sfxLoseLife() {
-        this.play(330, 'sawtooth', 0.11, 0.13);
-        setTimeout(() => this.play(220, 'sawtooth', 0.13, 0.12), 85);
-        setTimeout(() => this.play(135, 'triangle', 0.22, 0.14), 175);
+        if (!this.ctx || !this.sfxEnabled) return;
+        try {
+          const t = this.ctx.currentTime;
+          const lp = this.ctx.createBiquadFilter();
+          lp.type = 'lowpass'; lp.frequency.setValueAtTime(720, t);
+          lp.connect(this.getSfxDest());
+          [329.63, 246.94, 164.81].forEach((f, idx) => {
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            const st = t + idx * 0.085;
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(f, st);
+            g.gain.setValueAtTime(0.001, st);
+            g.gain.linearRampToValueAtTime(0.12, st + 0.012);
+            g.gain.exponentialRampToValueAtTime(0.001, st + (idx === 2 ? 0.26 : 0.13));
+            osc.connect(g); g.connect(lp);
+            osc.start(st); osc.stop(st + (idx === 2 ? 0.28 : 0.14));
+          });
+        } catch (e) {}
       }
       sfxHealCharge(step = 0) {
         const notes = [523.25, 587.33, 659.25, 783.99, 880];
         const freq = notes[Math.min(notes.length - 1, Math.max(0, step))];
-        this.play(freq, 'sine', 0.14, 0.08);
+        this.play(freq, 'sine', 0.16, 0.08);
       }
       sfxHealLife() {
         [523.25, 659.25, 783.99, 1046.5].forEach((f, idx) => {
-          setTimeout(() => this.play(f, 'triangle', 0.18, 0.11), idx * 70);
+          setTimeout(() => this.play(f, 'triangle', 0.2, 0.1), idx * 65);
         });
       }
-      sfxBonus() { this.play(1046, 'sine', 0.1, 0.1); setTimeout(() => this.play(1318, 'sine', 0.3, 0.1), 100); }
-      sfxTimeUp() { this.play(150, 'sawtooth', 0.5, 0.2); }
-      sfxTick() { this.play(1600, 'square', 0.015, 0.04); }
+      sfxBonus() {
+        if (!this.ctx || !this.sfxEnabled) return;
+        try {
+          const t = this.ctx.currentTime;
+          [1046.5, 1318.51, 1567.98].forEach((f, idx) => {
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            const st = t + idx * 0.055;
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(f, st);
+            g.gain.setValueAtTime(0.001, st);
+            g.gain.linearRampToValueAtTime(idx === 2 ? 0.105 : 0.085, st + 0.012);
+            g.gain.exponentialRampToValueAtTime(0.001, st + (idx === 2 ? 0.34 : 0.2));
+            osc.connect(g); g.connect(this.getSfxDest());
+            osc.start(st); osc.stop(st + (idx === 2 ? 0.36 : 0.22));
+          });
+        } catch (e) {}
+      }
+      sfxTimeUp() { this.play(164.81, 'triangle', 0.45, 0.16); }
+      sfxTick() {
+        if (!this.ctx || !this.sfxEnabled) return;
+        try {
+          const t = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(1280, t);
+          osc.frequency.exponentialRampToValueAtTime(740, t + 0.02);
+          g.gain.setValueAtTime(0.001, t);
+          g.gain.linearRampToValueAtTime(0.055, t + 0.003);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.024);
+          osc.connect(g); g.connect(this.getSfxDest());
+          osc.start(t); osc.stop(t + 0.028);
+        } catch (e) {}
+      }
       sfxStep(stepIdx = 0, isAscending = true) {
         if (!this.ctx || !this.sfxEnabled) return;
         try {
@@ -3007,7 +3270,7 @@
       // ===== Lv.14 極坐標對接站專屬科幻音效套件 =====
       // 1) 油門／滾輪依檔位變頻的清脆機械棘輪聲
       sfxThrottleStep(level = 0) {
-        if (this.muted) return;
+        if (!this.sfxEnabled) return;
         this.init();
         try {
           const t = this.ctx.currentTime;
@@ -3027,7 +3290,7 @@
 
       // 2) 火箭／飛彈點火推進（濾波氣流噴射白噪音 ＋ 電漿升頻嗡鳴）
       sfxRocketThrust(durSec = 0.85) {
-        if (this.muted) return;
+        if (!this.sfxEnabled) return;
         this.init();
         try {
           const t = this.ctx.currentTime;
@@ -3068,7 +3331,7 @@
 
       // 3) 四軸無人機旋翼輕快推進聲
       sfxDroneWhir(durSec = 0.65) {
-        if (this.muted) return;
+        if (!this.sfxEnabled) return;
         this.init();
         try {
           const t = this.ctx.currentTime;
@@ -3096,7 +3359,7 @@
 
       // 4) 正交雷射掃描鎖定雙音「嗶─嗶！」
       sfxRadarScan() {
-        if (this.muted) return;
+        if (!this.sfxEnabled) return;
         this.init();
         try {
           const t = this.ctx.currentTime;
@@ -3117,7 +3380,7 @@
 
       // 5) 無人機對接咬合「喀噠」＋明亮勝利和弦
       sfxDockSuccess() {
-        if (this.muted) return;
+        if (!this.sfxEnabled) return;
         this.init();
         try {
           const t = this.ctx.currentTime;
@@ -3138,7 +3401,7 @@
 
       // 6) 極光飛彈命中敵方要塞重低音爆破 ＋ 結晶勝利餘韻
       sfxLaserHit() {
-        if (this.muted) return;
+        if (!this.sfxEnabled) return;
         this.init();
         try {
           const t = this.ctx.currentTime;
@@ -3188,7 +3451,7 @@
 
       // 7) 飛彈飛過頭／撲空啞火空爆警示
       sfxMissBoom() {
-        if (this.muted) return;
+        if (!this.sfxEnabled) return;
         this.init();
         try {
           const t = this.ctx.currentTime;
@@ -3206,7 +3469,7 @@
 
       // 8) 帝國主力戰艦畫面外迫近入侵（低沉威壓次低音引擎降頻轟鳴）
       sfxBattleshipWarp() {
-        if (this.muted) return;
+        if (!this.sfxEnabled) return;
         this.init();
         try {
           const t = this.ctx.currentTime;
@@ -3235,7 +3498,7 @@
 
       // 9) 重裝軌道離子主砲開火（清脆爆發電磁離子出膛脈衝）
       sfxRailgunFire() {
-        if (this.muted) return;
+        if (!this.sfxEnabled) return;
         this.init();
         try {
           const t = this.ctx.currentTime;
@@ -19166,6 +19429,98 @@
       );
     };
 
+    // ==================== 關於與致謝彈窗（標題頁、設定選單、通關證書皆可常駐查閱） ====================
+    const CreditsModal = ({ open, onClose }) => {
+      if (!open) return null;
+      return (
+        <div
+          className="fixed inset-0 z-[75] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3.5 animate-fade-in"
+          onClick={onClose}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-[390px] rounded-3xl overflow-hidden bg-gradient-to-b from-[#111936] via-[#0b1228] to-[#060a18] border-2 border-amber-300/70 shadow-[0_24px_64px_rgba(0,0,0,0.85),0_0_32px_rgba(251,191,36,0.2)] text-amber-50 animate-jelly"
+          >
+            <div className="h-1.5 w-full bg-gradient-to-r from-amber-400 via-yellow-200 to-amber-400" />
+            <div className="p-5 sm:p-6">
+              <div className="flex items-start justify-between gap-2 mb-4">
+                <div>
+                  <div className="text-[10px] font-black tracking-[0.28em] text-amber-300/90 uppercase">
+                    CREDITS &amp; TRIBUTE
+                  </div>
+                  <h3 className="font-serif text-lg font-black tracking-[0.14em] text-white mt-0.5">
+                    尋弦紀 · 關於與致謝
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { audio.sfxClick(); onClose(); }}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-amber-100 text-xs font-black flex items-center justify-center active:scale-90 transition-all cursor-pointer"
+                  aria-label="關閉關於與致謝"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-3 text-left">
+                <div className="rounded-2xl bg-white/[0.04] border border-amber-300/20 px-3.5 py-2.5">
+                  <div className="text-[10px] font-black tracking-[0.18em] text-amber-300/90 uppercase">製作與教學設計</div>
+                  <div className="text-sm font-bold text-white mt-0.5">侯杰材 ／ 國立陽明交大附中</div>
+                </div>
+                <div className="rounded-2xl bg-white/[0.04] border border-amber-300/20 px-3.5 py-2.5">
+                  <div className="text-[10px] font-black tracking-[0.18em] text-sky-300/90 uppercase">數學史與靈感致敬</div>
+                  <div className="text-xs sm:text-[13px] font-bold text-slate-100 mt-0.5 leading-relaxed">
+                    喜帕恰斯、畢達哥拉斯、托勒密、阿耶波多、歐拉等跨時空探索者
+                  </div>
+                </div>
+                <div className="rounded-2xl bg-white/[0.04] border border-amber-300/20 px-3.5 py-2.5">
+                  <div className="text-[10px] font-black tracking-[0.18em] text-purple-300/90 uppercase">幾何美學啟發</div>
+                  <div className="text-xs sm:text-[13px] font-bold text-slate-100 mt-0.5">
+                    紀念碑谷 ／ 薩爾達傳說
+                  </div>
+                </div>
+                <div className="rounded-2xl bg-white/[0.04] border border-amber-300/20 px-3.5 py-2.5">
+                  <div className="text-[10px] font-black tracking-[0.18em] text-cyan-300/90 uppercase">製作工具</div>
+                  <div className="text-xs sm:text-[13px] font-bold text-slate-100 mt-0.5">
+                    VS Code ／ Antigravity ／ Gemini
+                  </div>
+                </div>
+                <div className="rounded-2xl bg-white/[0.04] border border-amber-300/20 px-3.5 py-2.5">
+                  <div className="text-[10px] font-black tracking-[0.18em] text-emerald-300/90 uppercase">特別感謝</div>
+                  <div className="text-xs sm:text-[13px] font-bold text-slate-100 mt-0.5">
+                    完成這趟幾何旅程的你
+                  </div>
+                </div>
+              </div>
+
+              {/* 結尾彩蛋引句 */}
+              <div className="mt-4 pt-3.5 border-t border-amber-300/20 text-center">
+                <div className="font-serif italic text-sm sm:text-[15px] font-bold text-amber-200 tracking-wide">
+                  &ldquo;Thanks for playing my game.&rdquo;
+                </div>
+                <div className="text-[10.5px] font-bold text-slate-300/80 mt-1 tracking-wider">
+                  ——《Ready Player One, 2018》James Halliday
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between gap-2">
+                <span className="text-[10px] font-mono font-bold tracking-wider text-slate-400">
+                  {APP_VERSION}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => { audio.sfxClick(); onClose(); }}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-300 to-amber-400 text-amber-950 font-black text-xs shadow-md active:scale-95 transition-all cursor-pointer"
+                >
+                  關閉
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
     const ThreeDIslandMap = ({
       levels,
       gameMode,
@@ -19237,6 +19592,27 @@
       const [lastMainLevelId, setLastMainLevelId] = useState(restoredMainLevelId);
       const lastMainLevelRef = useRef(restoredMainLevelId);
       lastMainLevelRef.current = lastMainLevelId;
+
+      // 煙火結局沉浸留白期：片尾電影感金色致謝浮字輪播（受 ENABLE_CREDITS 控制）
+      const [finaleCreditIdx, setFinaleCreditIdx] = useState(0);
+      useEffect(() => {
+        if (!ENABLE_CREDITS || !puzzleCutsceneUI || !puzzleCutsceneUI.isFinaleInteractive) {
+          setFinaleCreditIdx(0);
+          return;
+        }
+        const durations = [3800, 3800, 3800, 6200];
+        let idx = 0;
+        let timerId = null;
+        const scheduleNext = () => {
+          timerId = setTimeout(() => {
+            idx = (idx + 1) % durations.length;
+            setFinaleCreditIdx(idx);
+            scheduleNext();
+          }, durations[idx]);
+        };
+        scheduleNext();
+        return () => { if (timerId) clearTimeout(timerId); };
+      }, [Boolean(puzzleCutsceneUI && puzzleCutsceneUI.isFinaleInteractive)]);
 
       const currentTargetNodeId = focusedNodeId || lastMainLevelId;
       const shipDockedNodeId = typeof focusedNodeId === 'number' ? focusedNodeId : lastMainLevelId;
@@ -21615,7 +21991,8 @@
         const sanctumBridgeRails = [];
         let sanctumBridgeCurve = null;
         if (lv18Entry && castleEntry) {
-          const pStart = new THREE.Vector3(lv18Entry.node.x - 0.6, lv18Entry.node.y + lv18Entry.surfaceY + 0.05, lv18Entry.node.z - 0.9);
+          // 起點外移至 Lv.18 八角台柱左後安全外緣，徹底避開燈塔與礁岩建物零穿模
+          const pStart = new THREE.Vector3(lv18Entry.node.x - 1.18, lv18Entry.node.y + lv18Entry.surfaceY + 0.05, lv18Entry.node.z - 1.38);
           const pEnd = new THREE.Vector3(castleEntry.node.x + 1.1, castleEntry.node.y + castleEntry.surfaceY - 0.08, castleEntry.node.z + 2.35);
           const pMid = new THREE.Vector3(
             (pStart.x + pEnd.x) / 2 - 1.4,
@@ -22756,6 +23133,23 @@
                 onOpenCertificate: () => { if (cb.onOpenCertificate) cb.onOpenCertificate(); }
               });
             } else {
+              // 結局後再次點擊聖堡：同步將小人安靜移至聖堡前庭，展開三選一金色抽屜（可直接戳小人或重溫結局）
+              const stand = getPlatformStandPos(19);
+              idaGroup.position.copy(stand);
+              idaGroup.rotation.set(0, 0, 0);
+              idaGroup.scale.set(1, 1, 1);
+              idaGroup.visible = true;
+              if (leftLeg) leftLeg.rotation.x = 0;
+              if (rightLeg) rightLeg.rotation.x = 0;
+              walkState.mode = 'idle';
+              walkState.segQueue = [];
+              walkState.openDrawerOnArriveId = null;
+              walkState.settledNodeId = 19;
+              walkState.lastTargetId = 19;
+              teleportBeam.visible = false;
+              hidePhotonVisuals();
+              lastMainLevelRef.current = 19;
+              setLastMainLevelId(19);
               setFocusedNodeId(19);
               setActiveSea(4);
               userInteracting = false;
@@ -23042,6 +23436,13 @@
             flightAnim = null;
             renderer.domElement.style.transition = 'none';
             renderer.domElement.style.filter = 'none';
+            walkState.mode = 'idle';
+            walkState.segQueue = [];
+            walkState.openDrawerOnArriveId = null;
+            teleportBeam.visible = false;
+            hidePhotonVisuals();
+            idaGroup.visible = true;
+            idaGroup.scale.set(1, 1, 1);
             fogDensityTarget = 0.0085;
             const zFactor = getPortraitZoomFactor();
             // 略微將目標點下移，讓星盤穩穩呈現在螢幕中上方，為下方紀事卡留出完整視野
@@ -23107,6 +23508,13 @@
             flightAnim = null;
             renderer.domElement.style.transition = 'none';
             renderer.domElement.style.filter = 'none';
+            walkState.mode = 'idle';
+            walkState.segQueue = [];
+            walkState.openDrawerOnArriveId = null;
+            teleportBeam.visible = false;
+            hidePhotonVisuals();
+            idaGroup.visible = true;
+            idaGroup.scale.set(1, 1, 1);
             fogDensityTarget = 0.0085;
 
             const pbr = puzzlePBRCache[pieceId];
@@ -23193,6 +23601,13 @@
             flightAnim = null;
             renderer.domElement.style.transition = 'none';
             renderer.domElement.style.filter = 'none';
+            walkState.mode = 'idle';
+            walkState.segQueue = [];
+            walkState.openDrawerOnArriveId = null;
+            teleportBeam.visible = false;
+            hidePhotonVisuals();
+            idaGroup.visible = true;
+            idaGroup.scale.set(1, 1, 1);
             clearFireworks();
             syncStarDiskVisuals(postList, 1);
 
@@ -23275,19 +23690,24 @@
             if (pc.isFinaleFlow) {
               const stand = getPlatformStandPos(19);
               idaGroup.position.copy(stand);
-              idaGroup.rotation.y = Math.PI;
+              idaGroup.rotation.y = 0;
               if (leftLeg) leftLeg.rotation.x = 0;
               if (rightLeg) rightLeg.rotation.x = 0;
+              walkState.mode = 'idle';
+              walkState.segQueue = [];
+              walkState.settledNodeId = 19;
+              walkState.lastTargetId = 19;
             }
             controls.enabled = true;
             fogDensityTarget = 0.0115;
             renderer.domElement.style.transition = 'none';
             renderer.domElement.style.filter = 'none';
-            if (pc.triggerBridge && !pc.isFinaleFlow) {
-              // 第 6 片開橋結束後，保留視角在雲端聖堡與聖域之橋前，引導玩家親手點擊聖堡登頂！
+            if (pc.triggerBridge) {
+              // 第 6 片開橋或煙火結局結束後，皆將鏡頭留在雲端聖堡前庭視角
               const seaView = computeSeaView(4);
               cameraTargetPos.copy(seaView.pos);
               controlsTargetPos.copy(seaView.target);
+              setActiveSea(4);
             } else {
               cameraTargetPos.copy(pc.prevCamPos);
               controlsTargetPos.copy(pc.prevTargetPos);
@@ -23602,8 +24022,9 @@
           }
 
           const cb = callbacksRef.current;
+          const isPuzzleCinematicActive = Boolean(puzzleCinematic && puzzleCinematic.active);
           const isGateCinematicActive = cameraMode === 'gateCinematic' || Boolean(walkState.photonSeg?.isCinematic);
-          if (!pendingWalkRef.current && !isGateCinematicActive && cb.currentTargetNodeId !== walkState.lastTargetId) {
+          if (!isPuzzleCinematicActive && !pendingWalkRef.current && !isGateCinematicActive && cb.currentTargetNodeId !== walkState.lastTargetId) {
             const fromNode = walkState.settledNodeId || walkState.lastTargetId;
             const toNode = cb.currentTargetNodeId;
             userInteracting = false;
@@ -23625,7 +24046,9 @@
             isTransitioning = true;
           }
 
-          if (walkState.mode === 'teleportOut') {
+          if (isPuzzleCinematicActive) {
+            // 拼圖 / 煙火結局過場期間由 puzzleCinematic 接管小人位置與姿態，避免 walkState 觸發傳送光束或拉扯位置
+          } else if (walkState.mode === 'teleportOut') {
             walkState.teleportTimer += dt;
             const p = Math.min(1, walkState.teleportTimer / 0.34);
             idaGroup.scale.set(1 - p * 0.78, 1 + p * 0.85, 1 - p * 0.78);
@@ -24339,7 +24762,11 @@
                 updateFireworks(stepDt);
                 fogDensityTarget = 0.0065;
 
-                // 小人穩立於聖堡正中央前庭、面朝城堡抬頭歡呼看煙火
+                // 小人穩立於聖堡正中央前庭、面朝城堡抬頭歡呼看煙火（同步鎖定 settledNodeId = 19 防收尾溜滑梯）
+                walkState.mode = 'idle';
+                walkState.segQueue = [];
+                walkState.settledNodeId = 19;
+                walkState.lastTargetId = 19;
                 const standPos = getPlatformStandPos(19);
                 const cheerHop = fe < 1.2 ? Math.abs(Math.sin(fe * 5.2)) * 0.16 : 0;
                 idaGroup.position.set(standPos.x, standPos.y + 0.06 + cheerHop, standPos.z);
@@ -24458,16 +24885,18 @@
               controls.enabled = true;
               fogDensityTarget = 0.0115;
               if (pc.triggerBridge && !pc.isFinaleFlow) {
-                const seaView = computeSeaView(4);
-                cameraTargetPos.copy(seaView.pos);
-                controlsTargetPos.copy(seaView.target);
+                // 無縫保留 Shot 5 俯瞰聖域之橋與雲端聖堡的黃金大遠景，零跳動交回控制權
+                cameraTargetPos.copy(camera.position);
+                controlsTargetPos.copy(controls.target);
                 setActiveSea(4);
+                cameraMode = 'free';
+                isTransitioning = false;
               } else {
                 cameraTargetPos.copy(pc.prevCamPos);
                 controlsTargetPos.copy(pc.prevTargetPos);
+                cameraMode = 'focusTarget';
+                isTransitioning = true;
               }
-              cameraMode = 'focusTarget';
-              isTransitioning = true;
               audio.setModalDucking(false);
               setPuzzleCutsceneUI(null);
               if (callbacksRef.current.onPuzzleCinematicChange) callbacksRef.current.onPuzzleCinematicChange(false);
@@ -25075,6 +25504,12 @@
       }, [onMarkStoryFlag]);
 
       useEffect(() => {
+        if (activeSea === 1 || activeSea === 2 || activeSea === 3) {
+          audio.setBgmSea(activeSea);
+        }
+      }, [activeSea]);
+
+      useEffect(() => {
         if (focusedShrineObj?.id === 'shrine_1' && !userProgress.seenStoryFlags?.shrine1Guide) {
           dismissShrine1Guide();
         }
@@ -25239,6 +25674,40 @@
                   </div>
                 )}
               </div>
+
+              {/* 煙火結局留白期：夜空上方極簡電影感片尾致謝浮字（不阻擋點夜空放煙火與聖堡視野；測試版由 ENABLE_CREDITS 隱藏） */}
+              {ENABLE_CREDITS && puzzleCutsceneUI.isFinaleInteractive && (() => {
+                const slides = [
+                  { label: 'PRODUCED & DESIGNED BY', main: '製作與企劃 · 侯杰材', sub: '國立陽明交大附中' },
+                  { label: 'VISUAL & MUSICAL TRIBUTE', main: '視覺與音樂致敬', sub: '紀念碑谷 ／ 薩爾達傳說' },
+                  { label: 'SPECIAL THANKS', main: '特別感謝', sub: '完成這趟幾何旅程的你' },
+                  { label: '', main: '“Thanks for playing my game.”', sub: '—《Ready Player One, 2018》James Halliday', isQuote: true }
+                ];
+                const cur = slides[finaleCreditIdx % slides.length];
+                return (
+                  <div className="pointer-events-none flex-1 flex flex-col items-center justify-start pt-3 sm:pt-5 px-5 text-center">
+                    <div
+                      key={`finale-credit-${finaleCreditIdx}`}
+                      className="max-w-[360px] animate-fade-in"
+                      style={{ textShadow: '0 2px 14px rgba(2,6,23,0.95), 0 0 24px rgba(2,6,23,0.85)' }}
+                    >
+                      {cur.label && (
+                        <div className="text-[9.5px] font-bold tracking-[0.3em] text-amber-200/80 uppercase mb-1">
+                          {cur.label}
+                        </div>
+                      )}
+                      <div className={`font-serif font-bold tracking-[0.12em] text-amber-50/95 ${cur.isQuote ? 'italic text-sm sm:text-base text-amber-200' : 'text-sm sm:text-[15px]'}`}>
+                        {cur.main}
+                      </div>
+                      {cur.sub && (
+                        <div className="text-[11px] sm:text-xs font-bold tracking-[0.12em] text-amber-100/80 mt-1">
+                          {cur.sub}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* 下黑邊＋電影微劇情字幕（終章煙火留白期附「領取聖域通關證書」發光鈕） */}
               <div
@@ -25622,20 +26091,6 @@
             </div>
           ) : (
             <div className={`absolute bottom-0 pb-safe left-0 right-0 sm:bottom-3 sm:left-3 sm:right-3 z-30 rounded-t-3xl sm:rounded-2xl overflow-visible animate-jelly text-slate-800 ${drawerTheme.shell}`}>
-              {showDrawerStartGuide && (
-                <div className="pointer-events-none absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-40">
-                  <div className="pointer-events-auto bg-slate-950/95 backdrop-blur-md text-white border border-amber-400/90 rounded-full px-3.5 py-1.5 shadow-xl flex items-center gap-2 whitespace-nowrap animate-jelly">
-                    <span className="text-[11px] font-black text-amber-100">點擊「進入試煉」，開始第 1 關！</span>
-                    <button
-                      onClick={dismissMapGuide}
-                      className="w-4 h-4 rounded-full bg-white/15 hover:bg-rose-500/60 text-[9px] font-black text-slate-200 flex items-center justify-center"
-                      aria-label="關閉引導"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              )}
               <div className={`h-2 w-full rounded-t-3xl sm:rounded-t-2xl bg-gradient-to-r ${drawerTheme.topBar}`} />
               <div className={`relative overflow-hidden ${drawerTheme.headerWrap}`}>
                 <div className="pointer-events-none select-none absolute -right-1 top-1 text-6xl opacity-10">{drawerTheme.watermark}</div>
@@ -25711,6 +26166,24 @@
                       }}
                       className={`relative flex-1 py-3 rounded-xl font-black text-sm tracking-wide shadow-md transition-all active:translate-y-0.5 flex items-center justify-center gap-1.5 ${drawerTheme.ctaBtn}`}
                     >
+                      {showDrawerStartGuide && (
+                        <div className="pointer-events-none absolute bottom-full mb-2.5 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center">
+                          <div className="pointer-events-auto bg-slate-950/95 backdrop-blur-md text-white border border-amber-400/90 rounded-full px-3 py-1.5 shadow-xl flex items-center gap-1.5 whitespace-nowrap animate-jelly">
+                            <span className="text-[11px] font-black text-amber-100">點擊「進入挑戰」，開始第 1 關！</span>
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              onClick={(e) => { e.stopPropagation(); dismissMapGuide(); }}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); dismissMapGuide(); } }}
+                              className="w-4 h-4 rounded-full bg-white/15 hover:bg-rose-500/60 text-[9px] font-black text-slate-200 flex items-center justify-center cursor-pointer"
+                              aria-label="關閉引導"
+                            >
+                              ✕
+                            </span>
+                          </div>
+                          <div className="w-2.5 h-2.5 -mt-1.5 rotate-45 bg-slate-950/95 border-r border-b border-amber-400/90" />
+                        </div>
+                      )}
                       {focusedLevelObj.isBoss ? (
                         <span>👑</span>
                       ) : (
@@ -25719,6 +26192,13 @@
                         </svg>
                       )}
                       <span>進入挑戰</span>
+                      {focusedLevelObj.isBoss ? (
+                        <span>👑</span>
+                      ) : (
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 shrink-0">
+                          <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" />
+                        </svg>
+                      )}
                       {showDrawerStartGuide && (
                         <span className="pointer-events-none absolute -bottom-3 right-3 flex items-center justify-center">
                           <span className="absolute -top-1 left-[5px] w-6 h-6 rounded-full border-2 border-amber-400 animate-ping opacity-80" />
@@ -26839,10 +27319,14 @@
 
       useEffect(() => {
         audio.setBgmScene(currentStage === 'playing' ? 'playing' : 'map');
+        if (currentStage === 'playing' && selectedLevel) {
+          const curLvl = LEVELS.find(l => l.id === selectedLevel);
+          if (curLvl?.sea) audio.setBgmSea(curLvl.sea);
+        }
         if (currentStage !== 'map') {
           setStoryWhisper(null);
         }
-      }, [currentStage]);
+      }, [currentStage, selectedLevel]);
 
       useEffect(() => {
         if (currentStage !== 'map') return;
@@ -26891,12 +27375,13 @@
 
       useEffect(() => {
         audio.setModalDucking(
-          newCardModalSlot !== null || showSettingsModal || showUnifiedShrine || showAngleDialModal || showTriangleShrine || showStatusModal
+          newCardModalSlot !== null || showSettingsModal || showUnifiedShrine || showAngleDialModal || showTriangleShrine || showStatusModal || showCreditsModal
         );
-      }, [newCardModalSlot, showSettingsModal, showUnifiedShrine, showAngleDialModal, showTriangleShrine, showStatusModal]);
+      }, [newCardModalSlot, showSettingsModal, showUnifiedShrine, showAngleDialModal, showTriangleShrine, showStatusModal, showCreditsModal]);
 
       // 檢查是否有待解鎖之失落星盤拼圖（僅闖關模式啟用，休閒模式關閉所有拼圖動畫與結局；且優先於 pendingNextWalk 播放！）
       const [showCertificateModal, setShowCertificateModal] = useState(false);
+      const [showCreditsModal, setShowCreditsModal] = useState(false);
       const pendingPuzzlePiece = useMemo(() => {
         if (gameMode !== 'adventure') return null;
         const starsObj = userProgress.stars || {};
@@ -28663,6 +29148,17 @@
 
                 <FullscreenToggleCard />
 
+                {ENABLE_CREDITS && (
+                  <button
+                    type="button"
+                    onClick={() => { audio.sfxClick(); setShowSettingsModal(false); setShowCreditsModal(true); }}
+                    className="w-full py-2.5 px-3 rounded-2xl bg-indigo-50/85 hover:bg-indigo-100/80 border-2 border-indigo-200 text-indigo-900 font-black text-xs flex items-center justify-between transition-all active:scale-[0.98] cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1.5"><span>✨</span><span>關於與致謝</span></span>
+                    <span className="text-[11px] text-indigo-400">ⓘ</span>
+                  </button>
+                )}
+
                 <div className="flex items-center gap-2">
                   {currentStage !== 'title' && (
                     <button
@@ -29310,6 +29806,13 @@
             }}
             onClose={() => setShowCertificateModal(false)}
           />
+
+          {ENABLE_CREDITS && (
+            <CreditsModal
+              open={showCreditsModal}
+              onClose={() => setShowCreditsModal(false)}
+            />
+          )}
 
         </div>
         </GameModeContext.Provider>
