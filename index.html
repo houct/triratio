@@ -11060,6 +11060,7 @@
       const [feedbackAnim, setFeedbackAnim] = useState('');
       const [wrongTargetKey, setWrongTargetKey] = useState(null);
       const [flashQuad, setFlashQuad] = useState(null);
+      const [flashDef, setFlashDef] = useState(null);
       const [conceptTip, setConceptTip] = useState(null);
 
       // P2 雙條件選取狀態
@@ -11210,6 +11211,7 @@
         setIsTransitioning(false);
         setWrongTargetKey(null);
         setFlashQuad(null);
+        setFlashDef(null);
         setConceptTip(null);
         setP2Selected([]);
         setP2Cond1Locked([]);
@@ -11264,7 +11266,7 @@
         setIsTransitioning(true);
         setConceptTip(null);
         const errs = questionErrorsRef.current;
-        audio.sfxSwipeSort(false, 0);
+        audio.sfxBonus();
         setFlyOutTarget(getFlyVector(choice));
         setFeedbackAnim('animate-correct');
         setSolvedStamp(
@@ -11275,7 +11277,7 @@
             : { kind: 'sign', ans: choice }
         );
         justSolvedAtRef.current = Date.now();
-        const { completed, nextProgress } = recordCorrect({ wasMissed: errs > 0, delayEndMs: 780 });
+        const { completed, nextProgress } = recordCorrect({ wasMissed: errs > 0, delayEndMs: 1080 });
         const goNext = () => {
           pendingNextRef.current = null;
           setFeedbackAnim('');
@@ -11283,7 +11285,7 @@
         };
         if (!completed) {
           pendingNextRef.current = goNext;
-          confirmTimerRef.current = setTimeout(goNext, 760);
+          confirmTimerRef.current = setTimeout(goNext, 1050);
         }
       };
 
@@ -11298,7 +11300,7 @@
             setIsTransitioning(true);
             setConceptTip(null);
             setFlashQuad(choice);
-            audio.sfxClick();
+            audio.sfxBubblePop(0);
             setFlyOutTarget(getFlyVector(choice));
             timerRef.current = setTimeout(() => {
               setFlyOutTarget(null);
@@ -11318,14 +11320,16 @@
           if (choice === question.def) {
             setIsTransitioning(true);
             setConceptTip(null);
-            audio.sfxClick();
+            setFlashDef(choice);
+            audio.sfxBubblePop(1);
             setFlyOutTarget(getFlyVector(choice));
             timerRef.current = setTimeout(() => {
               setFlyOutTarget(null);
               setDragOffset({ x: 0, y: 0 });
+              setFlashDef(null);
               setSubStep(2);
               setIsTransitioning(false);
-            }, 260);
+            }, 300);
           } else {
             triggerWrong(choice, `回想廣義角定義：sin θ = y/r、cos θ = x/r、tan θ = y/x（本題為 ${question.fn} θ）`);
           }
@@ -11349,14 +11353,16 @@
         if (choice === question.def) {
           setIsTransitioning(true);
           setConceptTip(null);
-          audio.sfxClick();
+          setFlashDef(choice);
+          audio.sfxBubblePop(0);
           setFlyOutTarget(getFlyVector(choice));
           timerRef.current = setTimeout(() => {
             setFlyOutTarget(null);
             setDragOffset({ x: 0, y: 0 });
+            setFlashDef(null);
             setSubStep(1);
             setIsTransitioning(false);
-          }, 260);
+          }, 300);
         } else {
           triggerWrong(choice, `回想廣義角定義：sin θ = y/r、cos θ = x/r、tan θ = y/x（本題為 ${question.fn} θ）`);
         }
@@ -11402,7 +11408,7 @@
             setP2Cond1Locked(activeCond.quads);
             completeCurrentQuestion(qKey);
           } else {
-            audio.sfxSwipeSort(false, 0);
+            audio.sfxBubblePop(subStep);
             setDragOffset({ x: 0, y: 0 });
             if (subStep === 0) {
               setP2Cond1Locked(activeCond.quads);
@@ -11534,7 +11540,9 @@
               <div
                 onClick={solvedStamp ? handleConfirmSkip : undefined}
                 className={`flex-1 min-h-0 rounded-3xl border-3 shadow-xl flex flex-col overflow-hidden transition-all duration-200 relative ${
-                isFever
+                solvedStamp
+                  ? 'bg-gradient-to-b from-emerald-950 via-indigo-950 to-slate-950 border-emerald-300 ring-4 ring-emerald-400/80 shadow-[0_0_28px_rgba(52,211,153,0.4)]'
+                  : isFever
                   ? 'bg-gradient-to-b from-amber-950 via-purple-950 to-slate-950 border-amber-400 ring-4 ring-amber-400/75'
                   : isWarm
                   ? 'bg-gradient-to-b from-indigo-950 via-purple-950 to-slate-950 border-sky-400 ring-2 ring-sky-400/50'
@@ -11623,6 +11631,39 @@
                 {/* 主操作舞台（Z 軸三層上疊：底層四象限盤 → 中層定義 → 上層正負，移除底部橫條讓盤面最大化） */}
                 <div className="relative flex-1 min-h-0 p-2.5 flex flex-col justify-between overflow-hidden select-none">
                   <HintBanner tip={conceptTip} />
+
+                  {/* 破題答對中央星芒與結論印證徽章（取代題卡飛出後的空白，輕點可提前跳下一題） */}
+                  {solvedStamp && (
+                    <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-emerald-400/10">
+                      <span className="absolute w-28 h-28 rounded-full border-2 border-emerald-300/90 shadow-[0_0_24px_rgba(52,211,153,0.9)] animate-star-ring" />
+                      {[0, 60, 120, 180, 240, 300].map(deg => {
+                        const rad = deg * Math.PI / 180;
+                        return (
+                          <span
+                            key={deg}
+                            style={{ '--tx': `${Math.cos(rad) * 58}px`, '--ty': `${Math.sin(rad) * 58}px` }}
+                            className="absolute w-2.5 h-2.5 rounded-full bg-amber-300 shadow-[0_0_10px_rgba(253,224,71,0.95)] animate-star-spark"
+                          />
+                        );
+                      })}
+                      <div className={`animate-jelly px-5 py-3 rounded-3xl border-2 backdrop-blur-md shadow-[0_14px_36px_rgba(2,6,23,0.75)] flex flex-col items-center gap-0.5 ${
+                        solvedStamp.kind === 'sign' && solvedStamp.ans === 'neg'
+                          ? 'bg-slate-950/92 border-rose-300/90 text-white shadow-[0_0_28px_rgba(244,63,94,0.45)]'
+                          : solvedStamp.kind === 'quad'
+                          ? 'bg-slate-950/92 border-amber-300/90 text-white shadow-[0_0_28px_rgba(251,191,36,0.5)]'
+                          : 'bg-slate-950/92 border-emerald-300/90 text-white shadow-[0_0_28px_rgba(52,211,153,0.5)]'
+                      }`}>
+                        <div className="text-[11px] font-black tracking-[0.2em] text-emerald-300">✓ 正確！</div>
+                        <div className="text-lg sm:text-xl font-serif font-black whitespace-nowrap">
+                          {solvedStamp.kind === 'sign'
+                            ? `${question.expr} ${solvedStamp.ans === 'pos' ? '> 0' : '< 0'}`
+                            : solvedStamp.kind === 'p1quads'
+                            ? `第 ${solvedStamp.quads.map(k => LV11_QUAD_INFO[k].roman).join('、')} 象限`
+                            : LV11_QUAD_INFO[solvedStamp.ans].label}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* ==================== P0：Z 軸三層上疊（正向推導） ==================== */}
                   {question.phase === 0 && (
@@ -11743,6 +11784,7 @@
                           <div data-coach="lv11-defslot" className="relative z-20 grid grid-cols-3 gap-2 pt-1">
                             {LV11_DEF_SLOTS.map(slot => {
                               const isWrong = wrongTargetKey === slot.key;
+                              const isFlashed = flashDef === slot.key;
                               const isHover = hoverTarget === slot.key;
                               return (
                                 <button
@@ -11751,6 +11793,8 @@
                                   className={`min-h-[78px] sm:min-h-[88px] rounded-2xl border-2 backdrop-blur-md flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
                                     isWrong
                                       ? 'bg-red-500/85 border-red-200 text-white btn-wrong-flash'
+                                      : isFlashed
+                                      ? 'bg-emerald-400 border-white text-emerald-950 scale-105 shadow-[0_0_24px_rgba(52,211,153,0.9)]'
                                       : isHover
                                       ? 'bg-sky-400 border-white text-slate-950 scale-105 shadow-[0_0_24px_rgba(56,189,248,0.85)]'
                                       : 'bg-slate-900/75 border-sky-400/75 text-sky-100 hover:bg-sky-500/35 shadow-lg'
@@ -11920,6 +11964,7 @@
                           <div data-coach="lv11-p1defslot" className="relative z-20 grid grid-cols-3 gap-2 pt-1">
                             {LV11_DEF_SLOTS.map(slot => {
                               const isWrong = wrongTargetKey === slot.key;
+                              const isFlashed = flashDef === slot.key;
                               const isHover = hoverTarget === slot.key;
                               return (
                                 <button
@@ -11928,6 +11973,8 @@
                                   className={`min-h-[78px] sm:min-h-[88px] rounded-2xl border-2 backdrop-blur-md flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
                                     isWrong
                                       ? 'bg-red-500/85 border-red-200 text-white btn-wrong-flash'
+                                      : isFlashed
+                                      ? 'bg-emerald-400 border-white text-emerald-950 scale-105 shadow-[0_0_24px_rgba(52,211,153,0.9)]'
                                       : isHover
                                       ? 'bg-sky-400 border-white text-slate-950 scale-105 shadow-[0_0_24px_rgba(56,189,248,0.85)]'
                                       : 'bg-slate-900/75 border-sky-400/75 text-sky-100 hover:bg-sky-500/35 shadow-lg'
