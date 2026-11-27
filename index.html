@@ -11740,7 +11740,7 @@
                       {/* Layer 2（中層・Step 2 浮上來）：上方三向定義槽，底層亮象限透出可見 */}
                       {subStep === 1 && (
                         <div className="absolute inset-0 z-30 p-2 bg-slate-950/20">
-                          <div data-coach="lv11-defslot" className="relative z-30 grid grid-cols-3 gap-2 pt-1">
+                          <div data-coach="lv11-defslot" className="relative z-20 grid grid-cols-3 gap-2 pt-1">
                             {LV11_DEF_SLOTS.map(slot => {
                               const isWrong = wrongTargetKey === slot.key;
                               const isHover = hoverTarget === slot.key;
@@ -11763,7 +11763,7 @@
                             })}
                           </div>
 
-                          <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-20">
+                          <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-40">
                             <div
                               data-coach="lv11-card"
                               onPointerDown={handleCardPointerDown}
@@ -11917,7 +11917,7 @@
                       {/* P1 Step 1（subStep === 0）：上方三向坐標定義槽＋正中央函數卡（與十字軸原點對齊） */}
                       {subStep === 0 && (
                         <div className="absolute inset-0 z-30 p-2 bg-slate-950/20">
-                          <div data-coach="lv11-p1defslot" className="relative z-30 grid grid-cols-3 gap-2 pt-1">
+                          <div data-coach="lv11-p1defslot" className="relative z-20 grid grid-cols-3 gap-2 pt-1">
                             {LV11_DEF_SLOTS.map(slot => {
                               const isWrong = wrongTargetKey === slot.key;
                               const isHover = hoverTarget === slot.key;
@@ -11940,7 +11940,7 @@
                             })}
                           </div>
 
-                          <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-20">
+                          <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-40">
                             <div
                               data-coach="lv11-p1defcard"
                               onPointerDown={handleCardPointerDown}
@@ -11966,7 +11966,7 @@
 
                       {/* P1 Step 2（subStep === 1）：頂部鎖定定義標記（僅顯示 ✓ fn θ = def） */}
                       {subStep === 1 && (
-                        <div className="pointer-events-none absolute top-2 left-1/2 -translate-x-1/2 z-30">
+                        <div className="pointer-events-none absolute top-2 left-1/2 -translate-x-1/2 z-20">
                           <div data-coach="lv11-p1defbadge" className="inline-flex items-center gap-2 px-4 py-1.5 rounded-2xl bg-sky-950/85 backdrop-blur-md border-2 border-sky-400/85 text-sky-100 shadow-[0_6px_22px_rgba(56,189,248,0.45)]">
                             <span className="text-xs font-black text-sky-300">✓</span>
                             <span className="text-sm sm:text-base font-serif font-black">{question.fn} θ =</span>
@@ -11977,7 +11977,7 @@
 
                       {/* P1 Step 2（subStep === 1）：中央單條件拖曳滑卡（逐格滑入 2 象限，或直接點擊 2 象限） */}
                       {subStep === 1 && (
-                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-20">
+                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-40">
                           <div
                             data-coach="lv11-p1card"
                             onPointerDown={handleCardPointerDown}
