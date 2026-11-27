@@ -2025,7 +2025,7 @@
       { id: 8, title: "同界角星爆", subtitle: "同界角星座一筆連", island: "星雲高台", sea: 2, icon: "🫧", color: "from-fuchsia-500 to-indigo-700", borderColor: "border-indigo-900" },
       { id: 9, title: "坐標網格建築師", subtitle: "(x, y, r) 拖曳建構廣義角", island: "星象群礁", sea: 2, icon: "🎯", color: "from-cyan-400 to-blue-600", borderColor: "border-blue-800" },
       { id: 10, title: "星象羅盤師", subtitle: "廣義特殊角與象限角旋轉推導", island: "星軌聖壇", sea: 2, icon: "🔭", color: "from-violet-500 to-indigo-700", borderColor: "border-indigo-900" },
-      { id: 11, title: "正負傳送帶", subtitle: "三角比正負與無意義分流", island: "四象限祭壇", sea: 2, icon: "⚡", color: "from-rose-500 to-indigo-700", borderColor: "border-indigo-900" },
+      { id: 11, title: "正負傳送帶", subtitle: "象限定位與三角比正負", island: "四象限祭壇", sea: 2, icon: "⚡", color: "from-rose-500 to-indigo-700", borderColor: "border-indigo-900" },
       { id: 12, title: "廣轉銳密碼輪", subtitle: "廣義角化為銳角變換（四大公式）", island: "星海彼端", sea: 2, icon: "🔑", color: "from-amber-400 to-indigo-600", borderColor: "border-indigo-900" },
       { id: 13, title: "知一解碼終端", subtitle: "三區密鑰驗證 × IC 晶片解碼（廣義角知一求一）", island: "烈日火山", sea: 3, icon: "💻", color: "from-violet-600 to-purple-800", borderColor: "border-purple-950" },
       { id: 14, title: "極坐標對接站", subtitle: "星際飛船 [r,θ] × 無人機 (x,y) 雙坐標對接", island: "極光觀測站", sea: 3, icon: "🚀", color: "from-cyan-500 to-indigo-700", borderColor: "border-indigo-950" },
@@ -10908,54 +10908,134 @@
 
 
     // ==================== 第 10 關組件：正負傳送帶（分類滑卡） ====================
-    const LV10_PHASE0_POOL = [
-      { id: 'p0_sin40', expr: 'sin 40°', ans: 'pos', tip: '40° 在第 I 象限，所有函數皆正 (> 0)' },
-      { id: 'p0_cos55', expr: 'cos 55°', ans: 'pos', tip: '55° 在第 I 象限，cos > 0' },
-      { id: 'p0_tan70', expr: 'tan 70°', ans: 'pos', tip: '70° 在第 I 象限，tan > 0' },
-      { id: 'p0_sin140', expr: 'sin 140°', ans: 'pos', tip: '140° 在第 II 象限，sin 看 y 坐標為正 (> 0)' },
-      { id: 'p0_cos125', expr: 'cos 125°', ans: 'neg', tip: '125° 在第 II 象限，cos 看 x 坐標為負 (< 0)' },
-      { id: 'p0_tan150', expr: 'tan 150°', ans: 'neg', tip: '150° 在第 II 象限，x, y 異號故 tan < 0' },
-      { id: 'p0_sin220', expr: 'sin 220°', ans: 'neg', tip: '220° 在第 III 象限，sin < 0' },
-      { id: 'p0_cos210', expr: 'cos 210°', ans: 'neg', tip: '210° 在第 III 象限，cos < 0' },
-      { id: 'p0_tan235', expr: 'tan 235°', ans: 'pos', tip: '235° 在第 III 象限，x, y 皆負故 tan > 0' },
-      { id: 'p0_sin310', expr: 'sin 310°', ans: 'neg', tip: '310° 在第 IV 象限，sin < 0' },
-      { id: 'p0_cos320', expr: 'cos 320°', ans: 'pos', tip: '320° 在第 IV 象限，cos > 0' },
-      { id: 'p0_tan315', expr: 'tan 315°', ans: 'neg', tip: '315° 在第 IV 象限，x, y 異號故 tan < 0' }
+    const LV11_QUAD_INFO = {
+      '1': { key: '1', roman: 'I', label: '第 I 象限', coord: '(+, +)', xyText: 'x > 0, y > 0', xPos: true, yPos: true, arrow: '↗ 右上' },
+      '2': { key: '2', roman: 'II', label: '第 II 象限', coord: '(−, +)', xyText: 'x < 0, y > 0', xPos: false, yPos: true, arrow: '↖ 左上' },
+      '3': { key: '3', roman: 'III', label: '第 III 象限', coord: '(−, −)', xyText: 'x < 0, y < 0', xPos: false, yPos: false, arrow: '↙ 左下' },
+      '4': { key: '4', roman: 'IV', label: '第 IV 象限', coord: '(+, −)', xyText: 'x > 0, y < 0', xPos: true, yPos: false, arrow: '↘ 右下' }
+    };
+
+    const LV11_DEF_SLOTS = [
+      { key: 'y/r', fn: 'sin', label: 'y/r', arrow: '↖ 左上' },
+      { key: 'x/r', fn: 'cos', label: 'x/r', arrow: '⬆ 正上' },
+      { key: 'y/x', fn: 'tan', label: 'y/x', arrow: '↗ 右上' }
     ];
 
-    const LV10_PHASE1_POOL = [
-      { id: 'p1_sin_n45', expr: 'sin(-45°)', ans: 'neg', tip: '-45° 在第 IV 象限，sin < 0' },
-      { id: 'p1_cos_n40', expr: 'cos(-40°)', ans: 'pos', tip: '-40° 在第 IV 象限，cos > 0' },
-      { id: 'p1_tan_n50', expr: 'tan(-50°)', ans: 'neg', tip: '-50° 在第 IV 象限，tan < 0' },
-      { id: 'p1_sin_n120', expr: 'sin(-120°)', ans: 'neg', tip: '-120° 同界 240°（第 III 象限），sin < 0' },
-      { id: 'p1_cos_n210', expr: 'cos(-210°)', ans: 'neg', tip: '-210° 同界 150°（第 II 象限），cos < 0' },
-      { id: 'p1_tan_n135', expr: 'tan(-135°)', ans: 'pos', tip: '-135° 同界 225°（第 III 象限），tan > 0' },
-      { id: 'p1_sin_n300', expr: 'sin(-300°)', ans: 'pos', tip: '-300° 同界 60°（第 I 象限），sin > 0' },
-      { id: 'p1_cos_n310', expr: 'cos(-310°)', ans: 'pos', tip: '-310° 同界 50°（第 I 象限），cos > 0' },
-      { id: 'p1_sin400', expr: 'sin 400°', ans: 'pos', tip: '400° = 360° + 40°（第 I 象限），sin > 0' },
-      { id: 'p1_cos500', expr: 'cos 500°', ans: 'neg', tip: '500° = 360° + 140°（第 II 象限），cos < 0' },
-      { id: 'p1_tan495', expr: 'tan 495°', ans: 'neg', tip: '495° = 360° + 135°（第 II 象限），tan < 0' },
-      { id: 'p1_tan580', expr: 'tan 580°', ans: 'pos', tip: '580° = 360° + 220°（第 III 象限），tan > 0' }
+    const LV11_QUAD_GRID = ['2', '1', '3', '4'];
+
+    // 第 11 關 P0 & P1 共用題庫：正一圈 (0°~360°) + 負半圈 (-180°~0°)，非軸角
+    const LV11_SIGN_POOL = [
+      // 第 I 象限（低權重校準題，抽題時嚴格控管出現頻率）
+      { id: 'q1_sin40', fn: 'sin', angle: 40, angleText: '40°', expr: 'sin 40°', quad: '1', def: 'y/r', ans: 'pos', isNegAngle: false },
+      { id: 'q1_cos55', fn: 'cos', angle: 55, angleText: '55°', expr: 'cos 55°', quad: '1', def: 'x/r', ans: 'pos', isNegAngle: false },
+      { id: 'q1_tan70', fn: 'tan', angle: 70, angleText: '70°', expr: 'tan 70°', quad: '1', def: 'y/x', ans: 'pos', isNegAngle: false },
+      // 第 II 象限（正角）
+      { id: 'q2_sin140', fn: 'sin', angle: 140, angleText: '140°', expr: 'sin 140°', quad: '2', def: 'y/r', ans: 'pos', isNegAngle: false },
+      { id: 'q2_cos125', fn: 'cos', angle: 125, angleText: '125°', expr: 'cos 125°', quad: '2', def: 'x/r', ans: 'neg', isNegAngle: false },
+      { id: 'q2_tan150', fn: 'tan', angle: 150, angleText: '150°', expr: 'tan 150°', quad: '2', def: 'y/x', ans: 'neg', isNegAngle: false },
+      // 第 III 象限（正角 + 負半圈）
+      { id: 'q3_sin220', fn: 'sin', angle: 220, angleText: '220°', expr: 'sin 220°', quad: '3', def: 'y/r', ans: 'neg', isNegAngle: false },
+      { id: 'q3_cos210', fn: 'cos', angle: 210, angleText: '210°', expr: 'cos 210°', quad: '3', def: 'x/r', ans: 'neg', isNegAngle: false },
+      { id: 'q3_tan235', fn: 'tan', angle: 235, angleText: '235°', expr: 'tan 235°', quad: '3', def: 'y/x', ans: 'pos', isNegAngle: false },
+      { id: 'q3_sin_n120', fn: 'sin', angle: -120, angleText: '-120°', expr: 'sin(-120°)', quad: '3', def: 'y/r', ans: 'neg', isNegAngle: true },
+      { id: 'q3_cos_n145', fn: 'cos', angle: -145, angleText: '-145°', expr: 'cos(-145°)', quad: '3', def: 'x/r', ans: 'neg', isNegAngle: true },
+      { id: 'q3_tan_n135', fn: 'tan', angle: -135, angleText: '-135°', expr: 'tan(-135°)', quad: '3', def: 'y/x', ans: 'pos', isNegAngle: true },
+      // 第 IV 象限（正角 + 負半圈）
+      { id: 'q4_sin310', fn: 'sin', angle: 310, angleText: '310°', expr: 'sin 310°', quad: '4', def: 'y/r', ans: 'neg', isNegAngle: false },
+      { id: 'q4_cos320', fn: 'cos', angle: 320, angleText: '320°', expr: 'cos 320°', quad: '4', def: 'x/r', ans: 'pos', isNegAngle: false },
+      { id: 'q4_tan315', fn: 'tan', angle: 315, angleText: '315°', expr: 'tan 315°', quad: '4', def: 'y/x', ans: 'neg', isNegAngle: false },
+      { id: 'q4_sin_n45', fn: 'sin', angle: -45, angleText: '-45°', expr: 'sin(-45°)', quad: '4', def: 'y/r', ans: 'neg', isNegAngle: true },
+      { id: 'q4_cos_n40', fn: 'cos', angle: -40, angleText: '-40°', expr: 'cos(-40°)', quad: '4', def: 'x/r', ans: 'pos', isNegAngle: true },
+      { id: 'q4_tan_n50', fn: 'tan', angle: -50, angleText: '-50°', expr: 'tan(-50°)', quad: '4', def: 'y/x', ans: 'neg', isNegAngle: true }
     ];
 
-    const LV10_PHASE2_POOL = [
-      { id: 'p2_q1_sc', lines: ['sin θ > 0', 'cos θ > 0'], ans: '1', tip: 'y > 0 且 x > 0 → 第 I 象限' },
-      { id: 'p2_q1_ct', lines: ['cos θ > 0', 'tan θ > 0'], ans: '1', tip: 'cos>0 (I,IV) 與 tan>0 (I,III) → 第 I 象限' },
-      { id: 'p2_q1_st', lines: ['sin θ > 0', 'tan θ > 0'], ans: '1', tip: 'sin>0 (I,II) 與 tan>0 (I,III) → 第 I 象限' },
-      { id: 'p2_q2_sc', lines: ['sin θ > 0', 'cos θ < 0'], ans: '2', tip: 'y > 0 且 x < 0 → 第 II 象限' },
-      { id: 'p2_q2_st', lines: ['sin θ > 0', 'tan θ < 0'], ans: '2', tip: 'sin>0 (I,II) 與 tan<0 (II,IV) → 第 II 象限' },
-      { id: 'p2_q2_ct', lines: ['cos θ < 0', 'tan θ < 0'], ans: '2', tip: 'cos<0 (II,III) 與 tan<0 (II,IV) → 第 II 象限' },
-      { id: 'p2_q3_sc', lines: ['sin θ < 0', 'cos θ < 0'], ans: '3', tip: 'y < 0 且 x < 0 → 第 III 象限' },
-      { id: 'p2_q3_st', lines: ['sin θ < 0', 'tan θ > 0'], ans: '3', tip: 'sin<0 (III,IV) 與 tan>0 (I,III) → 第 III 象限' },
-      { id: 'p2_q3_ct', lines: ['cos θ < 0', 'tan θ > 0'], ans: '3', tip: 'cos<0 (II,III) 與 tan>0 (I,III) → 第 III 象限' },
-      { id: 'p2_q4_cs', lines: ['cos θ > 0', 'sin θ < 0'], ans: '4', tip: 'x > 0 且 y < 0 → 第 IV 象限' },
-      { id: 'p2_q4_ct', lines: ['cos θ > 0', 'tan θ < 0'], ans: '4', tip: 'cos>0 (I,IV) 與 tan<0 (II,IV) → 第 IV 象限' },
-      { id: 'p2_q4_st', lines: ['sin θ < 0', 'tan θ < 0'], ans: '4', tip: 'sin<0 (III,IV) 與 tan<0 (II,IV) → 第 IV 象限' }
+    const LV11_P2_CONDS = {
+      sin_pos: { text: 'sin θ > 0', short: 'sin > 0', quads: ['1', '2'], tag: 'y > 0', hint: 'sin θ = y/r > 0，看 y > 0 的上半平面（第 I、II 象限）' },
+      sin_neg: { text: 'sin θ < 0', short: 'sin < 0', quads: ['3', '4'], tag: 'y < 0', hint: 'sin θ = y/r < 0，看 y < 0 的下半平面（第 III、IV 象限）' },
+      cos_pos: { text: 'cos θ > 0', short: 'cos > 0', quads: ['1', '4'], tag: 'x > 0', hint: 'cos θ = x/r > 0，看 x > 0 的右半平面（第 I、IV 象限）' },
+      cos_neg: { text: 'cos θ < 0', short: 'cos < 0', quads: ['2', '3'], tag: 'x < 0', hint: 'cos θ = x/r < 0，看 x < 0 的左半平面（第 II、III 象限）' },
+      tan_pos: { text: 'tan θ > 0', short: 'tan > 0', quads: ['1', '3'], tag: 'x,y 同號', hint: 'tan θ = y/x > 0，x 與 y 同號（第 I、III 象限）' },
+      tan_neg: { text: 'tan θ < 0', short: 'tan < 0', quads: ['2', '4'], tag: 'x,y 異號', hint: 'tan θ = y/x < 0，x 與 y 異號（第 II、IV 象限）' },
+      sc_pos:  { text: 'sin θ · cos θ > 0', short: 'sin·cos > 0', quads: ['1', '3'], tag: '同號', hint: '乘積 > 0 代表 sin 與 cos 同號（x, y 同號），落在第 I、III 象限' },
+      sc_neg:  { text: 'sin θ · cos θ < 0', short: 'sin·cos < 0', quads: ['2', '4'], tag: '異號', hint: '乘積 < 0 代表 sin 與 cos 異號（x, y 異號），落在第 II、IV 象限' },
+      st_pos:  { text: 'sin θ · tan θ > 0', short: 'sin·tan > 0', quads: ['1', '4'], tag: '同號', hint: '乘積 > 0 代表 sin 與 tan 同號（等同 cos θ > 0），落在第 I、IV 象限' },
+      st_neg:  { text: 'sin θ · tan θ < 0', short: 'sin·tan < 0', quads: ['2', '3'], tag: '異號', hint: '乘積 < 0 代表 sin 與 tan 異號（等同 cos θ < 0），落在第 II、III 象限' },
+      ct_pos:  { text: 'cos θ · tan θ > 0', short: 'cos·tan > 0', quads: ['1', '2'], tag: '同號', hint: '乘積 > 0 代表 cos 與 tan 同號（化簡為 sin θ > 0），落在第 I、II 象限' },
+      ct_neg:  { text: 'cos θ · tan θ < 0', short: 'cos·tan < 0', quads: ['3', '4'], tag: '異號', hint: '乘積 < 0 代表 cos 與 tan 異號（化簡為 sin θ < 0），落在第 III、IV 象限' }
+    };
+
+    const makeLv11P2Item = (id, tier, tierLabel, c1Key, c2Key, ans) => ({
+      id,
+      phase: 2,
+      tier,
+      tierLabel,
+      cond1: LV11_P2_CONDS[c1Key],
+      cond2: LV11_P2_CONDS[c2Key],
+      ans
+    });
+
+    // P2 方案 1 漸進題庫：Tier 0 雙單項 → Tier 1 單項＋乘積 → Tier 2 雙乘積壓軸（主打 II/III/IV 象限）
+    const LV11_P2_SINGLE_POOL = [
+      makeLv11P2Item('p2s_q2_sc', 0, '雙單項', 'sin_pos', 'cos_neg', '2'),
+      makeLv11P2Item('p2s_q2_st', 0, '雙單項', 'sin_pos', 'tan_neg', '2'),
+      makeLv11P2Item('p2s_q2_ct', 0, '雙單項', 'cos_neg', 'tan_neg', '2'),
+      makeLv11P2Item('p2s_q3_sc', 0, '雙單項', 'sin_neg', 'cos_neg', '3'),
+      makeLv11P2Item('p2s_q3_st', 0, '雙單項', 'sin_neg', 'tan_pos', '3'),
+      makeLv11P2Item('p2s_q3_ct', 0, '雙單項', 'cos_neg', 'tan_pos', '3'),
+      makeLv11P2Item('p2s_q4_cs', 0, '雙單項', 'cos_pos', 'sin_neg', '4'),
+      makeLv11P2Item('p2s_q4_ct', 0, '雙單項', 'cos_pos', 'tan_neg', '4'),
+      makeLv11P2Item('p2s_q4_st', 0, '雙單項', 'sin_neg', 'tan_neg', '4'),
+      makeLv11P2Item('p2s_q1_ct', 0, '雙單項', 'cos_pos', 'tan_pos', '1')
     ];
+
+    const LV11_P2_MIXED_POOL = [
+      makeLv11P2Item('p2m_q2_sc_s', 1, '單項×乘積', 'sc_neg', 'sin_pos', '2'),
+      makeLv11P2Item('p2m_q2_st_s', 1, '單項×乘積', 'st_neg', 'sin_pos', '2'),
+      makeLv11P2Item('p2m_q2_sc_c', 1, '單項×乘積', 'sc_neg', 'cos_neg', '2'),
+      makeLv11P2Item('p2m_q3_sc_s', 1, '單項×乘積', 'sc_pos', 'sin_neg', '3'),
+      makeLv11P2Item('p2m_q3_st_t', 1, '單項×乘積', 'st_neg', 'tan_pos', '3'),
+      makeLv11P2Item('p2m_q3_ct_c', 1, '單項×乘積', 'ct_neg', 'cos_neg', '3'),
+      makeLv11P2Item('p2m_q4_sc_c', 1, '單項×乘積', 'sc_neg', 'cos_pos', '4'),
+      makeLv11P2Item('p2m_q4_ct_c', 1, '單項×乘積', 'ct_neg', 'cos_pos', '4'),
+      makeLv11P2Item('p2m_q4_st_t', 1, '單項×乘積', 'st_pos', 'tan_neg', '4')
+    ];
+
+    const LV11_P2_DOUBLE_PROD_POOL = [
+      makeLv11P2Item('p2d_q2_sc_st', 2, '雙乘積壓軸', 'sc_neg', 'st_neg', '2'),
+      makeLv11P2Item('p2d_q2_sc_ct', 2, '雙乘積壓軸', 'sc_neg', 'ct_pos', '2'),
+      makeLv11P2Item('p2d_q2_st_ct', 2, '雙乘積壓軸', 'st_neg', 'ct_pos', '2'),
+      makeLv11P2Item('p2d_q3_sc_st', 2, '雙乘積壓軸', 'sc_pos', 'st_neg', '3'),
+      makeLv11P2Item('p2d_q3_sc_ct', 2, '雙乘積壓軸', 'sc_pos', 'ct_neg', '3'),
+      makeLv11P2Item('p2d_q3_st_ct', 2, '雙乘積壓軸', 'st_neg', 'ct_neg', '3'),
+      makeLv11P2Item('p2d_q4_sc_ct', 2, '雙乘積壓軸', 'sc_neg', 'ct_neg', '4'),
+      makeLv11P2Item('p2d_q4_sc_st', 2, '雙乘積壓軸', 'sc_neg', 'st_pos', '4'),
+      makeLv11P2Item('p2d_q4_st_ct', 2, '雙乘積壓軸', 'st_pos', 'ct_neg', '4')
+    ];
+
+    const buildLv11AngleTip = (q) => {
+      const qInfo = LV11_QUAD_INFO[q.quad];
+      if (q.isNegAngle) {
+        const cot = q.angle + 360;
+        return `${q.angleText} 為順時針旋轉（同界 ${cot}°），落在${qInfo.label}！`;
+      }
+      const rangeMap = { '1': '0° 與 90°', '2': '90° 與 180°', '3': '180° 與 270°', '4': '270° 與 360°' };
+      return `${q.angleText} 介於 ${rangeMap[q.quad]} 之間，落在${qInfo.label}！`;
+    };
+
+    const buildLv11SignTip = (q) => {
+      const qInfo = LV11_QUAD_INFO[q.quad];
+      const signWord = q.ans === 'pos' ? '正值 (> 0)' : '負值 (< 0)';
+      if (q.fn === 'tan') {
+        const same = qInfo.xPos === qInfo.yPos ? '同號相除為正' : '異號相除為負';
+        return `${qInfo.label} ${qInfo.xyText}，tan θ = y/x ${same}，故為${signWord}`;
+      }
+      const axis = q.fn === 'sin' ? 'y' : 'x';
+      return `${qInfo.label} ${qInfo.xyText}，r 恆正，代入 ${q.fn} θ = ${q.def}（看 ${axis}）得${signWord}`;
+    };
 
     const Level8QuadrantSignMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
-      const starsThreshold = [2, 4, 6];
+      const starsThreshold = [3, 6, 9];
       const maxLives = 3;
       const healTarget = 3;
       const {
@@ -10965,83 +11045,177 @@
       } = useLivesLevelSession({ starThresholds: starsThreshold, maxLives, healTarget, currentStars, onUpdateStars });
 
       const [question, setQuestion] = useState(null);
-      const [nextPreview, setNextPreview] = useState(null);
+      const [subStep, setSubStep] = useState(0); // P0/P1: 0=象限, 1=定義, 2=正負 | P2: 0=條件1, 1=條件2, 2=交集
       const [isTransitioning, setIsTransitioning] = useState(false);
       const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
       const [isDragging, setIsDragging] = useState(false);
       const [flyOutTarget, setFlyOutTarget] = useState(null);
       const [feedbackAnim, setFeedbackAnim] = useState('');
       const [wrongTargetKey, setWrongTargetKey] = useState(null);
+      const [flashQuad, setFlashQuad] = useState(null);
       const [conceptTip, setConceptTip] = useState(null);
-      const { showGuide, guideMode, openGuide, dismissGuide } = useLevelGuide(currentStars, hasSeenGuide, onMarkGuideSeen);
+
+      // P2 雙條件選取狀態
+      const [p2Selected, setP2Selected] = useState([]);
+      const [p2Cond1Locked, setP2Cond1Locked] = useState([]);
+      const [p2Cond2Locked, setP2Cond2Locked] = useState([]);
+      const [solvedStamp, setSolvedStamp] = useState(null); // 答對短定格印證
+
+      const activeGuideStageKey = (gameState === 'playing' && question && !isTransitioning && !solvedStamp)
+        ? (question.phase === 0
+            ? `p0_s${subStep}`
+            : question.phase === 1
+            ? 'p1_s0'
+            : question.phase === 2 && (subStep === 0 || subStep === 2)
+            ? `p2_s${subStep}`
+            : null)
+        : null;
+
+      const { showGuide, guideMode, openGuide, dismissGuide } = useStagedLevelGuide({
+        currentStars,
+        hasSeenGuide,
+        onMarkGuideSeen,
+        activeStageKey: activeGuideStageKey,
+        phase: question?.phase ?? 0,
+        enabled: gameState === 'playing' && !!question && !isTransitioning && !solvedStamp,
+        finalStageKey: 'p2_s2'
+      });
 
       const containerRef = useRef(null);
-      const bag0Ref = useRef([]);
-      const bag1Ref = useRef([]);
-      const bag2Ref = useRef([]);
-      const lastIdRef = useRef(null);
       const dragStartRef = useRef(null);
-      const nextPreviewRef = useRef(null);
       const questionErrorsRef = useRef(0);
+      const runQueueRef = useRef([]);
+      const timerRef = useRef(null);
       const confirmTimerRef = useRef(null);
       const pendingNextRef = useRef(null);
       const justSolvedAtRef = useRef(0);
+
       const handleConfirmSkip = () => {
         if (!pendingNextRef.current) return;
-        if (Date.now() - justSolvedAtRef.current < 260) return;
+        if (Date.now() - justSolvedAtRef.current < 240) return;
         clearTimeout(confirmTimerRef.current);
         const fn = pendingNextRef.current;
         pendingNextRef.current = null;
         audio.sfxClick();
         fn();
       };
-      useEffect(() => () => clearTimeout(confirmTimerRef.current), []);
 
-      const drawFromBag = (bagRef, sourcePool) => {
-        if (bagRef.current.length === 0) {
-          let fresh = shuffle(sourcePool);
-          if (fresh.length > 1 && fresh[0].id === lastIdRef.current) {
-            [fresh[0], fresh[fresh.length - 1]] = [fresh[fresh.length - 1], fresh[0]];
+      useEffect(() => () => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+      }, []);
+
+      // 為單一 3 題階段（P0 或 P1）抽出 sin/cos/tan 各 1 題、至少 1 負角、低 Q1 權重、不重複 ID
+      const buildSignPhase3 = (phase, usedIds, allowQ1) => {
+        const fns = shuffle(['sin', 'cos', 'tan']);
+        const pickOne = (fn, preferNeg, forbidQ1) => {
+          let cands = LV11_SIGN_POOL.filter(it => it.fn === fn && !usedIds.has(it.id));
+          if (forbidQ1) cands = cands.filter(it => it.quad !== '1');
+          if (preferNeg === true) {
+            const negs = cands.filter(it => it.isNegAngle);
+            if (negs.length > 0) cands = negs;
+          } else if (preferNeg === false) {
+            const pos = cands.filter(it => !it.isNegAngle);
+            if (pos.length > 0) cands = pos;
           }
-          bagRef.current = fresh;
-        }
-        const item = bagRef.current.shift();
-        lastIdRef.current = item.id;
-        return item;
+          if (cands.length === 0) cands = LV11_SIGN_POOL.filter(it => it.fn === fn);
+          return shuffle(cands)[0];
+        };
+
+        // 決定哪一題用負角（至少 1 題負角，至多 2 題負角），以及是否出現 1 題 Q1（約 25% 機率）
+        const negIndex = Math.floor(Math.random() * 3);
+        const includeQ1 = allowQ1 && Math.random() < 0.25;
+        const q1Index = includeQ1 ? ((negIndex + 1 + Math.floor(Math.random() * 2)) % 3) : -1;
+
+        const picked = [];
+        const usedQuads = new Set();
+        fns.forEach((fn, idx) => {
+          let item;
+          if (idx === q1Index) {
+            const q1Cands = LV11_SIGN_POOL.filter(it => it.fn === fn && it.quad === '1' && !usedIds.has(it.id));
+            item = q1Cands[0] || pickOne(fn, false, true);
+          } else if (idx === negIndex) {
+            const negCands = LV11_SIGN_POOL.filter(it => it.fn === fn && it.isNegAngle && !usedIds.has(it.id) && !usedQuads.has(it.quad));
+            item = negCands.length > 0 ? shuffle(negCands)[0] : pickOne(fn, true, true);
+          } else {
+            const nonQ1 = LV11_SIGN_POOL.filter(it => it.fn === fn && it.quad !== '1' && !usedIds.has(it.id) && !usedQuads.has(it.quad));
+            item = nonQ1.length > 0 ? shuffle(nonQ1)[0] : pickOne(fn, null, true);
+          }
+          usedIds.add(item.id);
+          usedQuads.add(item.quad);
+          picked.push({ phase, ...item });
+        });
+        return picked;
       };
 
-      const pickQuestionForScore = (curProg) => {
-        const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
-        const pool = phase === 0 ? LV10_PHASE0_POOL : phase === 1 ? LV10_PHASE1_POOL : LV10_PHASE2_POOL;
-        const bag = phase === 0 ? bag0Ref : phase === 1 ? bag1Ref : bag2Ref;
-        return { phase, ...drawFromBag(bag, pool) };
+      // P2 方案 1：第 1 題雙單項 → 第 2 題單項×乘積 → 第 3 題雙乘積壓軸，且三題象限不重複
+      const buildP2Phase3 = () => {
+        const usedAns = new Set();
+        // Tier 0 優先選非 Q1（Q1 僅保留 10% 機率）
+        const t0Pool = Math.random() < 0.1
+          ? LV11_P2_SINGLE_POOL
+          : LV11_P2_SINGLE_POOL.filter(it => it.ans !== '1');
+        const q1 = shuffle(t0Pool)[0];
+        usedAns.add(q1.ans);
+
+        const t1Cands = LV11_P2_MIXED_POOL.filter(it => !usedAns.has(it.ans));
+        const q2 = shuffle(t1Cands.length > 0 ? t1Cands : LV11_P2_MIXED_POOL)[0];
+        usedAns.add(q2.ans);
+
+        const t2Cands = LV11_P2_DOUBLE_PROD_POOL.filter(it => !usedAns.has(it.ans));
+        const q3 = shuffle(t2Cands.length > 0 ? t2Cands : LV11_P2_DOUBLE_PROD_POOL)[0];
+
+        return [q1, q2, q3];
       };
 
-      const advanceCard = (curProg) => {
-        const curPhase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
-        const currentCard = nextPreviewRef.current && nextPreviewRef.current.phase === curPhase
-          ? nextPreviewRef.current
-          : pickQuestionForScore(curProg);
-        const upcoming = pickQuestionForScore(curProg);
-        nextPreviewRef.current = upcoming;
+      // P1：單條件逆推 3 題（sin / cos / tan 各 1 題，保證正負皆出現）
+      const buildP1Phase3 = () => {
+        const fns = shuffle(['sin', 'cos', 'tan']);
+        const signs = shuffle(['pos', 'neg', Math.random() < 0.5 ? 'pos' : 'neg']);
+        return fns.map((fn, idx) => {
+          const key = `${fn}_${signs[idx]}`;
+          return {
+            id: `p1_${key}`,
+            phase: 1,
+            cond: LV11_P2_CONDS[key]
+          };
+        });
+      };
+
+      const buildFullRunQueue = () => {
+        const usedIds = new Set();
+        const p0 = buildSignPhase3(0, usedIds, true);
+        const p1 = buildP1Phase3();
+        const p2 = buildP2Phase3();
+        return [...p0, ...p1, ...p2];
+      };
+
+      const loadQuestionAt = (idx) => {
+        const q = runQueueRef.current[idx] || runQueueRef.current[runQueueRef.current.length - 1];
         questionErrorsRef.current = 0;
-        setQuestion(currentCard);
-        setNextPreview(upcoming);
+        setQuestion(q);
+        setSubStep(0);
         setDragOffset({ x: 0, y: 0 });
         setFlyOutTarget(null);
         setIsTransitioning(false);
+        setWrongTargetKey(null);
+        setFlashQuad(null);
         setConceptTip(null);
+        setP2Selected([]);
+        setP2Cond1Locked([]);
+        setP2Cond2Locked([]);
+        setSolvedStamp(null);
+        pendingNextRef.current = null;
       };
 
       const startGame = () => {
-        bag0Ref.current = []; bag1Ref.current = []; bag2Ref.current = []; lastIdRef.current = null;
-        nextPreviewRef.current = null;
+        if (timerRef.current) clearTimeout(timerRef.current);
+        if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+        pendingNextRef.current = null;
+        runQueueRef.current = buildFullRunQueue();
         setFeedbackAnim('');
-        setWrongTargetKey(null); setConceptTip(null);
-        setDragOffset({ x: 0, y: 0 }); setFlyOutTarget(null);
-        setIsTransitioning(false);
         const initProg = startSession();
-        advanceCard(initProg);
+        loadQuestionAt(initProg);
         audio.init();
       };
 
@@ -11050,57 +11224,201 @@
       const getFlyVector = (choice) => {
         if (choice === 'neg') return { x: -240, y: -10 };
         if (choice === 'pos') return { x: 240, y: -10 };
-        if (choice === '1') return { x: 180, y: -150 };
-        if (choice === '2') return { x: -180, y: -150 };
-        if (choice === '3') return { x: -180, y: 150 };
-        if (choice === '4') return { x: 180, y: 150 };
-        return { x: 0, y: 200 };
+        if (choice === '1') return { x: 170, y: -140 };
+        if (choice === '2') return { x: -170, y: -140 };
+        if (choice === '3') return { x: -170, y: 140 };
+        if (choice === '4') return { x: 170, y: 140 };
+        if (choice === 'y/r') return { x: -145, y: -175 };
+        if (choice === 'x/r') return { x: 0, y: -195 };
+        if (choice === 'y/x') return { x: 145, y: -175 };
+        return { x: 0, y: 180 };
       };
 
-      const submitSort = (choice) => {
-        if (gameState !== 'playing' || !question || isTransitioning || (!isRelaxMode && lives <= 0)) return;
-        if (choice === question.ans) {
-          if (showGuide) dismissGuide();
-          setIsTransitioning(true);
-          setConceptTip(null);
-          const errs = questionErrorsRef.current;
-          audio.sfxSwipeSort(false, 0);
-          setFlyOutTarget(getFlyVector(choice));
-          setFeedbackAnim('animate-correct');
-          const { completed, nextProgress } = recordCorrect({ wasMissed: errs > 0, delayEndMs: 260 });
-          setTimeout(() => {
+      const triggerWrong = (wrongKey, tipText) => {
+        audio.sfxError();
+        questionErrorsRef.current += 1;
+        const { gameOver } = recordWrong({ delayEndMs: 360 });
+        setWrongTargetKey(wrongKey);
+        setDragOffset({ x: 0, y: 0 });
+        if (tipText) setConceptTip({ text: tipText, id: Date.now() });
+        setFeedbackAnim('animate-shake');
+        if (!gameOver) {
+          timerRef.current = setTimeout(() => {
             setFeedbackAnim('');
-            if (!completed) advanceCard(nextProgress);
-          }, 240);
-        } else {
-          audio.sfxError();
-          questionErrorsRef.current += 1;
-          const { gameOver } = recordWrong({ delayEndMs: 360 });
-          setWrongTargetKey(choice);
-          setDragOffset({ x: 0, y: 0 });
-          if (question?.tip) setConceptTip({ text: question.tip, id: Date.now() });
-          setFeedbackAnim('animate-shake');
-          if (!gameOver) {
-            setTimeout(() => {
-              setFeedbackAnim('');
-              setWrongTargetKey(null);
-            }, 350);
+            setWrongTargetKey(null);
+          }, 360);
+        }
+      };
+
+      const completeCurrentQuestion = (choice) => {
+        setIsTransitioning(true);
+        setConceptTip(null);
+        const errs = questionErrorsRef.current;
+        audio.sfxSwipeSort(false, 0);
+        setFlyOutTarget(getFlyVector(choice));
+        setFeedbackAnim('animate-correct');
+        setSolvedStamp(
+          question.phase === 2
+            ? { kind: 'quad', ans: choice }
+            : question.phase === 1
+            ? { kind: 'p1quads', quads: question.cond.quads }
+            : { kind: 'sign', ans: choice }
+        );
+        justSolvedAtRef.current = Date.now();
+        const { completed, nextProgress } = recordCorrect({ wasMissed: errs > 0, delayEndMs: 780 });
+        const goNext = () => {
+          pendingNextRef.current = null;
+          setFeedbackAnim('');
+          if (!completed) loadQuestionAt(nextProgress);
+        };
+        if (!completed) {
+          pendingNextRef.current = goNext;
+          confirmTimerRef.current = setTimeout(goNext, 760);
+        }
+      };
+
+      // P0 / P1 三步驟提交
+      const submitSignStep = (choice) => {
+        if (gameState !== 'playing' || !question || question.phase === 2 || isTransitioning || (!isRelaxMode && lives <= 0)) return;
+        if (showGuide) dismissGuide();
+
+        if (subStep === 0) {
+          // Step 1: 象限
+          if (choice === question.quad) {
+            setIsTransitioning(true);
+            setConceptTip(null);
+            setFlashQuad(choice);
+            audio.sfxClick();
+            setFlyOutTarget(getFlyVector(choice));
+            timerRef.current = setTimeout(() => {
+              setFlyOutTarget(null);
+              setDragOffset({ x: 0, y: 0 });
+              setFlashQuad(null);
+              setSubStep(1);
+              setIsTransitioning(false);
+            }, 340);
+          } else {
+            triggerWrong(choice, buildLv11AngleTip(question));
           }
+          return;
+        }
+
+        if (subStep === 1) {
+          // Step 2: 三角比定義
+          if (choice === question.def) {
+            setIsTransitioning(true);
+            setConceptTip(null);
+            audio.sfxClick();
+            setFlyOutTarget(getFlyVector(choice));
+            timerRef.current = setTimeout(() => {
+              setFlyOutTarget(null);
+              setDragOffset({ x: 0, y: 0 });
+              setSubStep(2);
+              setIsTransitioning(false);
+            }, 260);
+          } else {
+            triggerWrong(choice, `回想廣義角定義：sin θ = y/r、cos θ = x/r、tan θ = y/x（本題為 ${question.fn} θ）`);
+          }
+          return;
+        }
+
+        if (subStep === 2) {
+          // Step 3: 正負
+          if (choice === question.ans) {
+            completeCurrentQuestion(choice);
+          } else {
+            triggerWrong(choice, buildLv11SignTip(question));
+          }
+        }
+      };
+
+      // P1（單條件逆推 2 象限）& P2（雙條件逐格滑入 2 象限＋交集）共用處理
+      const handleQuadPhaseSelect = (qKey) => {
+        if (gameState !== 'playing' || !question || question.phase === 0 || isTransitioning || (!isRelaxMode && lives <= 0)) return;
+        if (showGuide) dismissGuide();
+
+        // P2 Step 3：滑入或點選金色交集象限
+        if (question.phase === 2 && subStep === 2) {
+          if (qKey === question.ans) {
+            completeCurrentQuestion(qKey);
+          } else {
+            triggerWrong(qKey, `請點選或滑入同時被青色 ① 與洋紅 ② 重疊的金色交集象限（第 ${LV11_QUAD_INFO[question.ans].roman} 象限）！`);
+          }
+          return;
+        }
+
+        // P1 或 P2 Step 1/2：逐格滑入或點選，滿 2 格立刻自動判定
+        const nextSel = p2Selected.includes(qKey)
+          ? p2Selected.filter(k => k !== qKey)
+          : [...p2Selected, qKey];
+
+        if (nextSel.length < 2) {
+          audio.sfxClick();
+          setDragOffset({ x: 0, y: 0 });
+          setP2Selected(nextSel);
+          return;
+        }
+
+        const activeCond = question.phase === 1
+          ? question.cond
+          : (subStep === 0 ? question.cond1 : question.cond2);
+        const expected = [...activeCond.quads].sort().join(',');
+        const picked = [...nextSel].sort().join(',');
+
+        if (picked === expected) {
+          setConceptTip(null);
+          setP2Selected([]);
+          if (question.phase === 1) {
+            setP2Cond1Locked(activeCond.quads);
+            completeCurrentQuestion(qKey);
+          } else {
+            audio.sfxSwipeSort(false, 0);
+            setDragOffset({ x: 0, y: 0 });
+            if (subStep === 0) {
+              setP2Cond1Locked(activeCond.quads);
+              setSubStep(1);
+            } else {
+              setP2Cond2Locked(activeCond.quads);
+              setSubStep(2);
+            }
+          }
+        } else {
+          setP2Selected(nextSel);
+          setIsTransitioning(true);
+          triggerWrong(qKey, activeCond.hint);
+          timerRef.current = setTimeout(() => {
+            setP2Selected([]);
+            setIsTransitioning(false);
+          }, 360);
         }
       };
 
       const getHoverTarget = (dx, dy) => {
         if (!question) return null;
-        if (question.phase < 2) {
+        // 2×2 象限四向滑動：P0 Step 1、P1 全程、P2 全程
+        if ((question.phase === 0 && subStep === 0) || question.phase >= 1) {
+          if (Math.hypot(dx, dy) < 42) return null;
+          if (dx >= 0 && dy < 0) return '1';
+          if (dx < 0 && dy < 0) return '2';
+          if (dx < 0 && dy >= 0) return '3';
+          return '4';
+        }
+        // P0 Step 2：上方三向定義槽
+        if (question.phase === 0 && subStep === 1) {
+          if (dy > -24 && Math.hypot(dx, dy) < 52) return null;
+          if (dy > 20) return null;
+          if (dx < -38) return 'y/r';
+          if (dx > 38) return 'y/x';
+          if (dy < -36) return 'x/r';
+          return null;
+        }
+        // P0 Step 3：左右正負
+        if (question.phase === 0 && subStep === 2) {
           if (dx < -45) return 'neg';
           if (dx > 45) return 'pos';
           return null;
         }
-        if (Math.hypot(dx, dy) < 48) return null;
-        if (dx >= 0 && dy < 0) return '1';
-        if (dx < 0 && dy < 0) return '2';
-        if (dx < 0 && dy >= 0) return '3';
-        return '4';
+        return null;
       };
 
       const handleCardPointerDown = (e) => {
@@ -11113,9 +11431,8 @@
       const handleCardPointerMove = (e) => {
         if (!isDragging || !dragStartRef.current) return;
         const dx = e.clientX - dragStartRef.current.x;
-        const dy = question?.phase < 2
-          ? (e.clientY - dragStartRef.current.y) * 0.22
-          : (e.clientY - dragStartRef.current.y);
+        const rawDy = e.clientY - dragStartRef.current.y;
+        const dy = (question?.phase === 0 && subStep === 2) ? rawDy * 0.22 : rawDy;
         setDragOffset({ x: dx, y: dy });
       };
 
@@ -11125,7 +11442,11 @@
         dragStartRef.current = null;
         const target = getHoverTarget(dragOffset.x, dragOffset.y);
         if (target) {
-          submitSort(target);
+          if (question?.phase >= 1) {
+            handleQuadPhaseSelect(target);
+          } else {
+            submitSignStep(target);
+          }
         } else {
           setDragOffset({ x: 0, y: 0 });
         }
@@ -11135,8 +11456,14 @@
       const isWarm = healStreak >= 2 && healStreak < 4;
       const hoverTarget = isDragging ? getHoverTarget(dragOffset.x, dragOffset.y) : null;
       const cardTransform = flyOutTarget
-        ? `translate(${flyOutTarget.x}px, ${flyOutTarget.y}px) rotate(${flyOutTarget.x * 0.08}deg) scale(0.82)`
-        : `translate(${dragOffset.x}px, ${dragOffset.y}px) rotate(${dragOffset.x * 0.055}deg)`;
+        ? `translate(${flyOutTarget.x}px, ${flyOutTarget.y}px) rotate(${flyOutTarget.x * 0.07}deg) scale(0.8)`
+        : `translate(${dragOffset.x}px, ${dragOffset.y}px) rotate(${dragOffset.x * 0.05}deg)`;
+
+      const showCoordScaffold = question?.phase === 0;
+
+      const stepLabels = question?.phase === 2
+        ? ['① 條件一', '② 條件二', '③ 交集']
+        : ['① 象限', '② 定義', '③ 正負'];
 
       return (
         <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
@@ -11146,7 +11473,7 @@
                 <div className="w-20 h-20 mx-auto rounded-3xl bg-rose-100 border-4 border-rose-500 flex items-center justify-center text-4xl shadow-inner animate-bounce">⚡</div>
                 <h2 className="text-2xl font-black text-indigo-950 tracking-wide">正負傳送帶</h2>
                 <p className="text-xs text-slate-500 font-bold leading-relaxed max-w-xs mx-auto">
-                  滑動或點擊分類中央題卡！前段分流 <span className="text-rose-600 font-black">左 &lt; 0</span> / <span className="text-emerald-600 font-black">右 &gt; 0</span>，高階切換為<span className="text-indigo-600 font-black">四角象限盤</span>！連對 4 題啟動 FEVER！
+                  三階段螺旋進階：<span className="text-emerald-600 font-black">P0 層疊推正負</span> → <span className="text-sky-600 font-black">P1 單條件找象限</span> → <span className="text-amber-600 font-black">P2 雙條件疊交集</span>！全程滑卡或點擊皆可！
                 </p>
               </div>
               <CompactStarPills starsThreshold={starsThreshold} livesMode maxLives={maxLives} />
@@ -11158,7 +11485,7 @@
           )}
 
           {gameState === 'playing' && question && (
-            <div className={`flex-1 min-h-0 flex flex-col justify-between gap-2 overflow-hidden pb-0.5 ${feedbackAnim}`}>
+            <div className={`flex-1 min-h-0 flex flex-col justify-between gap-1.5 overflow-hidden pb-0.5 ${feedbackAnim}`}>
               <GameHUD
                 progress={progress}
                 starsThreshold={starsThreshold}
@@ -11170,20 +11497,23 @@
                 onOpenGuide={openGuide}
               />
 
-              <div className={`flex-1 min-h-0 rounded-3xl border-3 shadow-xl flex flex-col overflow-hidden transition-all duration-200 relative ${
+              <div
+                onClick={solvedStamp ? handleConfirmSkip : undefined}
+                className={`flex-1 min-h-0 rounded-3xl border-3 shadow-xl flex flex-col overflow-hidden transition-all duration-200 relative ${
                 isFever
                   ? 'bg-gradient-to-b from-amber-950 via-purple-950 to-slate-950 border-amber-400 ring-4 ring-amber-400/75'
                   : isWarm
                   ? 'bg-gradient-to-b from-indigo-950 via-purple-950 to-slate-950 border-sky-400 ring-2 ring-sky-400/50'
                   : 'bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-950 border-indigo-950'
               }`}>
-                <div className={`h-6 px-3.5 flex justify-between items-center text-white border-b shrink-0 ${
+                {/* 24px 階段細條 */}
+                <div className={`h-6 px-3 flex justify-between items-center gap-1.5 text-white border-b shrink-0 ${
                   isFever ? 'bg-amber-500/20 border-amber-400/50' : 'bg-slate-900/90 border-white/10'
                 }`}>
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${question.phase === 0 ? 'bg-emerald-400' : question.phase === 1 ? 'bg-sky-400' : 'bg-amber-400'}`} />
                     <span className="text-[11px] font-bold text-slate-200 truncate">
-                      {question.phase === 0 ? '單一三角比 • 左右正負聖壇分流' : question.phase === 1 ? '進階角度與複合正負判別' : '四象限條件交集判別'}
+                      {question.phase === 0 ? 'P0 正向推導 • 象限 → 定義 → 正負' : question.phase === 1 ? 'P1 單條件逆推 • 逐格滑入 2 個象限' : `P2 雙條件交集 • ${question.tierLabel}`}
                     </span>
                   </div>
                   {isFever ? (
@@ -11193,35 +11523,375 @@
                   ) : null}
                 </div>
 
+                {/* 頂部獨立題目與步驟進度列（高約 48~54px） */}
+                <div className="shrink-0 min-h-[48px] px-3 py-1.5 bg-indigo-950/75 border-b border-white/10 flex items-center justify-between gap-2">
+                  {question.phase === 0 ? (
+                    <div className="flex items-center gap-1 font-serif font-black text-lg sm:text-xl text-white min-w-0">
+                      <span className={`px-1.5 py-0.5 rounded-lg transition-all ${
+                        subStep === 1
+                          ? 'bg-sky-400/25 text-sky-200 border border-sky-300/70 shadow-[0_0_12px_rgba(56,189,248,0.4)]'
+                          : subStep === 2
+                          ? 'text-emerald-200'
+                          : 'text-slate-300'
+                      }`}>{question.fn}</span>
+                      <span className={`px-1.5 py-0.5 rounded-lg transition-all ${
+                        subStep === 0
+                          ? 'bg-amber-400/25 text-amber-200 border border-amber-300/70 shadow-[0_0_12px_rgba(251,191,36,0.4)]'
+                          : subStep === 2
+                          ? 'text-emerald-200'
+                          : 'text-slate-300'
+                      }`}>{question.isNegAngle ? `(${question.angleText})` : question.angleText}</span>
+                      {solvedStamp?.kind === 'sign' && (
+                        <span className={`ml-1 px-2 py-0.5 rounded-lg text-sm font-mono font-black ${
+                          solvedStamp.ans === 'pos' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
+                        }`}>{solvedStamp.ans === 'pos' ? '> 0 ✓' : '< 0 ✓'}</span>
+                      )}
+                    </div>
+                  ) : question.phase === 1 ? (
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-serif font-black text-lg sm:text-xl text-cyan-200 whitespace-nowrap">{question.cond.text}</span>
+                      {solvedStamp?.kind === 'p1quads' && (
+                        <span className="px-2 py-0.5 rounded-lg text-xs font-black bg-cyan-400 text-slate-950 shrink-0">
+                          第 {solvedStamp.quads.map(k => LV11_QUAD_INFO[k].roman).join('、')} 象限 ✓
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-xs sm:text-sm font-black text-amber-200 truncate">找出 θ 所在象限</span>
+                      {solvedStamp?.kind === 'quad' && (
+                        <span className="px-2 py-0.5 rounded-lg text-xs font-black bg-amber-400 text-amber-950 shrink-0">
+                          {LV11_QUAD_INFO[solvedStamp.ans].label} ✓
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 右側步驟／進度膠囊 */}
+                  {question.phase === 1 ? (
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 transition-all ${
+                      solvedStamp
+                        ? 'bg-emerald-500/30 text-emerald-200 border border-emerald-400/50'
+                        : 'bg-cyan-400 text-slate-950 shadow-sm'
+                    }`}>
+                      {solvedStamp ? '✓ 完成' : `已選 ${p2Selected.length} / 2 象限`}
+                    </span>
+                  ) : (
+                    <div className="flex items-center gap-1 shrink-0">
+                      {stepLabels.map((lbl, idx) => (
+                        <span
+                          key={lbl}
+                          className={`text-[10px] font-black px-1.5 py-0.5 rounded-full transition-all ${
+                            idx < subStep || solvedStamp
+                              ? 'bg-emerald-500/30 text-emerald-200 border border-emerald-400/50'
+                              : idx === subStep
+                              ? 'bg-amber-400 text-amber-950 shadow-sm'
+                              : 'bg-white/10 text-slate-400'
+                          }`}
+                        >
+                          {(idx < subStep || solvedStamp) ? '✓' : lbl}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 主操作舞台（Z 軸三層上疊：底層四象限盤 → 中層定義 → 上層正負，移除底部橫條讓盤面最大化） */}
                 <div className="relative flex-1 min-h-0 p-2.5 flex flex-col justify-between overflow-hidden select-none">
                   <HintBanner tip={conceptTip} />
 
-                  {question.phase < 2 ? (
-                    <div className="flex-1 min-h-0 grid grid-cols-[78px_1fr_78px] sm:grid-cols-[96px_1fr_96px] items-center gap-2">
-                      <button
-                        data-coach="lv11-neg"
-                        onClick={() => submitSort('neg')}
-                        className={`h-full max-h-[260px] rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
-                          wrongTargetKey === 'neg'
-                            ? 'bg-red-500/80 border-red-200 text-white btn-wrong-flash'
-                            : hoverTarget === 'neg'
-                            ? 'bg-rose-500 border-white text-white scale-105 shadow-[0_0_24px_rgba(244,63,94,0.8)]'
-                            : 'bg-rose-500/20 border-rose-400/60 text-rose-200 hover:bg-rose-500/35'
-                        }`}
-                      >
-                        <span className="text-2xl sm:text-3xl font-mono font-black">&lt; 0</span>
-                        <span className="text-xs font-black">負值聖壇</span>
-                        <span className="text-[10px] opacity-80">⬅ 左滑</span>
-                      </button>
+                  {/* ==================== P0：Z 軸三層上疊（正向推導） ==================== */}
+                  {question.phase === 0 && (
+                    <div className="flex-1 min-h-0 flex flex-col relative">
+                      {/* Layer 1（最底層・全程常駐）：2×2 四象限坐標盤（含十字 x/y 軸） */}
+                      <div className={`grid grid-cols-2 gap-3 flex-1 min-h-0 relative p-1 transition-all duration-300 ${
+                        subStep > 0 ? 'pointer-events-none' : ''
+                      }`}>
+                        {/* 中央十字 x / y 坐標軸 */}
+                        <div className="pointer-events-none absolute inset-0 z-10">
+                          <div className={`absolute left-1/2 -translate-x-1/2 top-0.5 bottom-0.5 w-[2px] rounded-full transition-opacity ${
+                            subStep > 0 ? 'bg-indigo-200/20' : 'bg-indigo-200/40'
+                          }`} />
+                          <div className={`absolute top-1/2 -translate-y-1/2 left-0.5 right-0.5 h-[2px] rounded-full transition-opacity ${
+                            subStep > 0 ? 'bg-indigo-200/20' : 'bg-indigo-200/40'
+                          }`} />
+                          <span className="absolute left-1/2 translate-x-1.5 top-0 text-[10px] font-serif italic font-black text-indigo-200/70">y</span>
+                          <span className="absolute right-0.5 top-1/2 -translate-y-4 text-[10px] font-serif italic font-black text-indigo-200/70">x</span>
+                        </div>
 
-                      <div className="relative h-full flex items-center justify-center">
-                        {nextPreview && nextPreview.phase === question.phase && (
-                          <div className="absolute w-full max-w-[220px] h-[136px] rounded-3xl bg-white/10 border border-white/20 scale-90 translate-y-4 opacity-50 flex items-center justify-center pointer-events-none px-2">
-                            <span className="font-serif font-bold text-white/60 text-xs sm:text-sm whitespace-nowrap">{nextPreview.expr}</span>
+                        {LV11_QUAD_GRID.map(qKey => {
+                          const info = LV11_QUAD_INFO[qKey];
+                          const isLockedWin = subStep >= 1 && question.quad === qKey;
+                          const isDimmedBg = subStep >= 1 && question.quad !== qKey;
+                          const isFlashed = flashQuad === qKey;
+                          const isWrong = subStep === 0 && wrongTargetKey === qKey;
+                          const isHover = subStep === 0 && hoverTarget === qKey;
+
+                          // 鎖定成底層時，文字靠向外側角落，避免被上層中央題卡或左右聖壇遮擋
+                          const cornerAlignCls = isLockedWin
+                            ? (qKey === '2' ? 'items-start justify-start p-2.5'
+                              : qKey === '1' ? 'items-end justify-start p-2.5'
+                              : qKey === '3' ? 'items-start justify-end p-2.5'
+                              : 'items-end justify-end p-2.5')
+                            : 'items-center justify-center p-2';
+
+                          return (
+                            <button
+                              key={qKey}
+                              type="button"
+                              disabled={subStep > 0}
+                              data-coach={qKey === '2' ? 'lv11-quadzone' : undefined}
+                              onClick={() => submitSignStep(qKey)}
+                              className={`rounded-2xl border-2 flex flex-col transition-all duration-300 ${cornerAlignCls} ${
+                                isWrong
+                                  ? 'bg-red-500/80 border-red-200 text-white btn-wrong-flash'
+                                  : isFlashed
+                                  ? 'bg-emerald-400 border-white text-emerald-950 scale-[1.03] shadow-[0_0_24px_rgba(52,211,153,0.9)]'
+                                  : isLockedWin
+                                  ? 'bg-emerald-500/30 border-emerald-300/90 text-emerald-50 shadow-[inset_0_0_32px_rgba(52,211,153,0.45),0_0_18px_rgba(52,211,153,0.3)]'
+                                  : isDimmedBg
+                                  ? 'bg-slate-950/55 border-white/10 text-slate-500/40 opacity-45'
+                                  : isHover
+                                  ? 'bg-amber-400 border-white text-amber-950 scale-[1.03] shadow-[0_0_20px_rgba(251,191,36,0.8)]'
+                                  : 'bg-indigo-900/55 border-indigo-400/45 text-indigo-100 hover:bg-indigo-800/70 active:scale-95'
+                              }`}
+                            >
+                              <span className={`font-serif font-black transition-all ${
+                                isLockedWin ? 'text-sm sm:text-base text-emerald-200' : 'text-lg sm:text-xl'
+                              }`}>
+                                {isLockedWin ? `✓ ${info.label}` : info.label}
+                              </span>
+                              {showCoordScaffold ? (
+                                <span className={`mt-0.5 px-2 py-0.5 rounded-full font-mono font-black transition-all ${
+                                  isLockedWin
+                                    ? 'text-sm sm:text-base bg-slate-950/80 border border-amber-300/80 shadow-md'
+                                    : isFlashed || isHover
+                                    ? 'text-xs sm:text-sm bg-black/15 text-current'
+                                    : isDimmedBg
+                                    ? 'text-[10px] bg-transparent text-slate-500/40'
+                                    : 'text-xs sm:text-sm bg-slate-950/60 text-amber-300 border border-amber-400/40'
+                                }`}>
+                                  {isLockedWin ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      <span className={info.xPos ? 'text-emerald-300' : 'text-rose-300'}>x{info.xPos ? '+' : '−'}</span>
+                                      <span className="text-slate-500">,</span>
+                                      <span className={info.yPos ? 'text-emerald-300' : 'text-rose-300'}>y{info.yPos ? '+' : '−'}</span>
+                                    </span>
+                                  ) : info.coord}
+                                </span>
+                              ) : (
+                                !isLockedWin && !isDimmedBg && (
+                                  <span className="text-[10px] font-bold opacity-70 mt-0.5">{info.arrow}</span>
+                                )
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Layer 1 中央拖曳題卡：角度（Step 1） */}
+                      {subStep === 0 && (
+                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-20">
+                          <div
+                            data-coach="lv11-card"
+                            onPointerDown={handleCardPointerDown}
+                            onPointerMove={handleCardPointerMove}
+                            onPointerUp={handleCardPointerUp}
+                            onPointerCancel={handleCardPointerUp}
+                            style={{
+                              transform: cardTransform,
+                              transition: isDragging ? 'none' : flyOutTarget ? 'transform 0.22s ease-out, opacity 0.22s ease-out' : 'transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                              opacity: flyOutTarget ? 0 : 1
+                            }}
+                            className={`pointer-events-auto min-w-[138px] sm:min-w-[160px] rounded-2xl bg-white border-4 px-4 py-2.5 shadow-2xl flex flex-col items-center justify-center gap-0.5 text-center cursor-grab active:cursor-grabbing touch-none ${
+                              isFever ? 'border-amber-400 shadow-[0_0_26px_rgba(251,191,36,0.65)]' : 'border-indigo-400'
+                            }`}
+                          >
+                            <span className="text-[10px] font-black text-indigo-500 tracking-wide">① 拖入所屬象限</span>
+                            <div className="text-2xl sm:text-3xl font-serif font-black text-indigo-950 whitespace-nowrap">{question.angleText}</div>
                           </div>
-                        )}
+                        </div>
+                      )}
+
+                      {/* Layer 2（中層・Step 2 浮上來）：上方三向定義槽，底層亮象限透出可見 */}
+                      {subStep === 1 && (
+                        <div className="absolute inset-0 z-30 p-2 flex flex-col justify-between bg-slate-950/20">
+                          <div className="grid grid-cols-3 gap-2 pt-1">
+                            {LV11_DEF_SLOTS.map(slot => {
+                              const isWrong = wrongTargetKey === slot.key;
+                              const isHover = hoverTarget === slot.key;
+                              return (
+                                <button
+                                  key={slot.key}
+                                  data-coach={slot.key === 'x/r' ? 'lv11-defslot' : undefined}
+                                  onClick={() => submitSignStep(slot.key)}
+                                  className={`min-h-[84px] sm:min-h-[96px] rounded-2xl border-2 backdrop-blur-md flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
+                                    isWrong
+                                      ? 'bg-red-500/85 border-red-200 text-white btn-wrong-flash'
+                                      : isHover
+                                      ? 'bg-sky-400 border-white text-slate-950 scale-105 shadow-[0_0_24px_rgba(56,189,248,0.85)]'
+                                      : 'bg-slate-900/75 border-sky-400/75 text-sky-100 hover:bg-sky-500/35 shadow-lg'
+                                  }`}
+                                >
+                                  <FracText value={slot.label} size="lg" className="font-black" />
+                                  <span className="text-[10px] font-bold opacity-80">{slot.arrow}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          <div className="flex-1 flex items-center justify-center relative">
+                            <div
+                              data-coach="lv11-card"
+                              onPointerDown={handleCardPointerDown}
+                              onPointerMove={handleCardPointerMove}
+                              onPointerUp={handleCardPointerUp}
+                              onPointerCancel={handleCardPointerUp}
+                              style={{
+                                transform: cardTransform,
+                                transition: isDragging ? 'none' : flyOutTarget ? 'transform 0.2s ease-out, opacity 0.2s ease-out' : 'transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                                opacity: flyOutTarget ? 0 : 1
+                              }}
+                              className={`relative z-20 min-w-[168px] max-w-[228px] rounded-3xl bg-white border-4 px-5 py-3.5 shadow-2xl flex flex-col items-center justify-center gap-1 text-center cursor-grab active:cursor-grabbing touch-none ${
+                                isFever ? 'border-amber-400 shadow-[0_0_28px_rgba(251,191,36,0.55)]' : 'border-sky-400'
+                              }`}
+                            >
+                              <span className="text-[10px] font-black text-sky-600">② 上滑選坐標定義</span>
+                              <div className="text-2xl sm:text-3xl font-serif font-black text-indigo-950 whitespace-nowrap">{question.fn} θ</div>
+                              <span className="text-[10px] font-bold text-slate-400">拖往上方或直接點擊</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Layer 2 鎖定保留標記（進入 Step 3 後留在中層上方，不消失！） */}
+                      {subStep === 2 && (
+                        <div className="pointer-events-none absolute top-2 left-1/2 -translate-x-1/2 z-30">
+                          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-2xl bg-sky-950/85 backdrop-blur-md border-2 border-sky-400/85 text-sky-100 shadow-[0_6px_22px_rgba(56,189,248,0.45)]">
+                            <span className="text-xs font-black text-sky-300">✓</span>
+                            <span className="text-sm sm:text-base font-serif font-black">{question.fn} θ =</span>
+                            <FracText value={question.def} size="md" className="font-black text-white" />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Layer 3（最上層・Step 3 浮上來）：左右正負聖壇與完整題卡，底下透出 Layer 1 亮象限 + Layer 2 定義 */}
+                      {subStep === 2 && (
+                        <div className="absolute inset-0 z-40 px-1.5 pt-16 pb-2 grid grid-cols-[78px_1fr_78px] sm:grid-cols-[96px_1fr_96px] items-center gap-2">
+                          <button
+                            data-coach="lv11-neg"
+                            onClick={() => submitSignStep('neg')}
+                            className={`h-full max-h-[210px] rounded-2xl border-2 backdrop-blur-sm flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
+                              wrongTargetKey === 'neg'
+                                ? 'bg-red-500/85 border-red-200 text-white btn-wrong-flash'
+                                : hoverTarget === 'neg' || solvedStamp?.ans === 'neg'
+                                ? 'bg-rose-500 border-white text-white scale-105 shadow-[0_0_24px_rgba(244,63,94,0.85)]'
+                                : 'bg-rose-950/65 border-rose-400/75 text-rose-100 hover:bg-rose-500/45 shadow-lg'
+                            }`}
+                          >
+                            <span className="text-2xl sm:text-3xl font-mono font-black">&lt; 0</span>
+                            <span className="text-xs font-black">負值聖壇</span>
+                            <span className="text-[10px] opacity-80">⬅ 左滑</span>
+                          </button>
+
+                          <div className="relative h-full flex items-center justify-center">
+                            <div
+                              data-coach="lv11-card"
+                              onPointerDown={handleCardPointerDown}
+                              onPointerMove={handleCardPointerMove}
+                              onPointerUp={handleCardPointerUp}
+                              onPointerCancel={handleCardPointerUp}
+                              style={{
+                                transform: cardTransform,
+                                transition: isDragging ? 'none' : flyOutTarget ? 'transform 0.2s ease-out, opacity 0.2s ease-out' : 'transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                                opacity: flyOutTarget ? 0 : 1
+                              }}
+                              className={`relative z-10 w-full max-w-[224px] min-h-[126px] rounded-3xl bg-white border-4 px-3 py-3.5 shadow-2xl flex flex-col items-center justify-center gap-1 text-center cursor-grab active:cursor-grabbing touch-none ${
+                                isFever ? 'border-amber-400 shadow-[0_0_28px_rgba(251,191,36,0.55)]' : 'border-emerald-400'
+                              }`}
+                            >
+                              <span className="text-[10px] font-black text-emerald-600">③ 左右滑判定正負</span>
+                              <div className={`font-serif font-black text-indigo-950 whitespace-nowrap ${
+                                question.expr.length > 10 ? 'text-xl sm:text-2xl' : 'text-2xl sm:text-3xl'
+                              }`}>{question.expr}</div>
+                            </div>
+                          </div>
+
+                          <button
+                            data-coach="lv11-pos"
+                            onClick={() => submitSignStep('pos')}
+                            className={`h-full max-h-[210px] rounded-2xl border-2 backdrop-blur-sm flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
+                              wrongTargetKey === 'pos'
+                                ? 'bg-red-500/85 border-red-200 text-white btn-wrong-flash'
+                                : hoverTarget === 'pos' || solvedStamp?.ans === 'pos'
+                                ? 'bg-emerald-500 border-white text-white scale-105 shadow-[0_0_24px_rgba(52,211,153,0.85)]'
+                                : 'bg-emerald-950/65 border-emerald-400/75 text-emerald-100 hover:bg-emerald-500/45 shadow-lg'
+                            }`}
+                          >
+                            <span className="text-2xl sm:text-3xl font-mono font-black">&gt; 0</span>
+                            <span className="text-xs font-black">正值聖壇</span>
+                            <span className="text-[10px] opacity-80">右滑 ➡</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ==================== P1：單條件逆推（逐格四向滑入 2 象限） ==================== */}
+                  {question.phase === 1 && (
+                    <div className="flex-1 min-h-0 flex flex-col relative">
+                      <div className="grid grid-cols-2 gap-3 flex-1 min-h-0 relative p-1">
+                        {/* 中央十字 x / y 坐標軸 */}
+                        <div className="pointer-events-none absolute inset-0 z-10">
+                          <div className="absolute left-1/2 -translate-x-1/2 top-0.5 bottom-0.5 w-[2px] bg-indigo-200/35 rounded-full" />
+                          <div className="absolute top-1/2 -translate-y-1/2 left-0.5 right-0.5 h-[2px] bg-indigo-200/35 rounded-full" />
+                          <span className="absolute left-1/2 translate-x-1.5 top-0 text-[10px] font-serif italic font-black text-indigo-200/80">y</span>
+                          <span className="absolute right-0.5 top-1/2 -translate-y-4 text-[10px] font-serif italic font-black text-indigo-200/80">x</span>
+                        </div>
+
+                        {LV11_QUAD_GRID.map(qKey => {
+                          const info = LV11_QUAD_INFO[qKey];
+                          const isLocked = p2Cond1Locked.includes(qKey);
+                          const isPicked = p2Selected.includes(qKey);
+                          const isWrong = wrongTargetKey === qKey;
+                          const isHover = hoverTarget === qKey;
+
+                          let cellCls = 'bg-indigo-900/50 border-indigo-400/45 text-indigo-100 hover:bg-indigo-800/70';
+                          if (isWrong) {
+                            cellCls = 'bg-red-500/80 border-red-200 text-white btn-wrong-flash';
+                          } else if (isLocked) {
+                            cellCls = 'bg-emerald-400/85 border-white text-emerald-950 scale-[1.02] shadow-[0_0_24px_rgba(52,211,153,0.85)]';
+                          } else if (isHover) {
+                            cellCls = 'bg-cyan-400 border-white text-slate-950 scale-[1.03] shadow-[0_0_22px_rgba(34,211,238,0.85)]';
+                          } else if (isPicked) {
+                            cellCls = 'bg-cyan-500/45 border-cyan-200 text-white scale-[1.02] shadow-[0_0_16px_rgba(34,211,238,0.65)]';
+                          }
+
+                          return (
+                            <button
+                              key={qKey}
+                              data-coach={qKey === '2' ? 'lv11-p1grid' : undefined}
+                              onClick={() => handleQuadPhaseSelect(qKey)}
+                              className={`relative rounded-2xl border-2 flex flex-col items-center justify-center p-2 transition-all active:scale-95 ${cellCls}`}
+                            >
+                              {(isPicked || isLocked) && (
+                                <span className={`absolute top-1.5 left-1.5 text-[10px] font-black px-1.5 py-0.5 rounded-full shadow ${
+                                  isLocked ? 'bg-emerald-950 text-emerald-300' : 'bg-cyan-400 text-slate-950'
+                                }`}>
+                                  {isLocked ? '✓' : '已選'}
+                                </span>
+                              )}
+                              <span className="text-lg sm:text-xl font-serif font-black">{info.label}</span>
+                              <span className="text-[10px] font-bold opacity-75">{info.arrow}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* 中央單條件拖曳滑卡（逐格滑入 2 象限，或直接點擊 2 象限） */}
+                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-20">
                         <div
-                          data-coach="lv11-card"
+                          data-coach="lv11-p1card"
                           onPointerDown={handleCardPointerDown}
                           onPointerMove={handleCardPointerMove}
                           onPointerUp={handleCardPointerUp}
@@ -11231,77 +11901,155 @@
                             transition: isDragging ? 'none' : flyOutTarget ? 'transform 0.2s ease-out, opacity 0.2s ease-out' : 'transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)',
                             opacity: flyOutTarget ? 0 : 1
                           }}
-                          className={`relative z-10 w-full max-w-[240px] min-h-[148px] rounded-3xl bg-white border-4 px-3 py-4 shadow-2xl flex items-center justify-center text-center cursor-grab active:cursor-grabbing touch-none ${
-                            isFever ? 'border-amber-400 shadow-[0_0_28px_rgba(251,191,36,0.55)]' : 'border-indigo-300'
+                          className={`pointer-events-auto min-w-[158px] sm:min-w-[180px] rounded-2xl bg-white border-4 px-4 py-3 shadow-2xl flex flex-col items-center justify-center gap-0.5 text-center cursor-grab active:cursor-grabbing touch-none ${
+                            isFever ? 'border-amber-400 shadow-[0_0_26px_rgba(251,191,36,0.65)]' : 'border-cyan-400'
                           }`}
                         >
-                          <div className={`font-serif font-black text-indigo-950 whitespace-nowrap ${
-                            question.expr.length > 12 ? 'text-lg sm:text-xl' : 'text-2xl sm:text-3xl'
-                          }`}>{question.expr}</div>
+                          <span className="text-[10px] font-black text-cyan-600">逐格滑入 2 個象限 ({p2Selected.length}/2)</span>
+                          <div className="text-xl sm:text-2xl font-serif font-black text-indigo-950 whitespace-nowrap">{question.cond.text}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ==================== P2：雙條件光膜層層上疊（全程四向滑卡＋點擊兼容） ==================== */}
+                  {question.phase === 2 && (
+                    <div className="flex-1 min-h-0 flex flex-col gap-2 relative">
+                      {/* 雙條件聚焦列（鎖定後直接顯示篩出的象限） */}
+                      <div className="grid grid-cols-2 gap-1.5 shrink-0">
+                        <div className={`rounded-xl px-2.5 py-1.5 border text-center transition-all ${
+                          subStep === 0
+                            ? 'bg-cyan-500/25 border-cyan-300 text-white shadow-[0_0_14px_rgba(34,211,238,0.45)]'
+                            : 'bg-cyan-950/55 border-cyan-400/50 text-cyan-100'
+                        }`}>
+                          <div className="text-[10px] font-black text-cyan-300">
+                            {subStep === 0
+                              ? `① 滑入或點選 2 象限 (${p2Selected.length}/2)`
+                              : `✓ 已鎖定：${p2Cond1Locked.map(k => LV11_QUAD_INFO[k].roman).join(', ')}`}
+                          </div>
+                          <div className="text-xs sm:text-sm font-serif font-black whitespace-nowrap">{question.cond1.text}</div>
+                        </div>
+
+                        <div className={`rounded-xl px-2.5 py-1.5 border text-center transition-all ${
+                          subStep === 1
+                            ? 'bg-fuchsia-500/25 border-fuchsia-300 text-white shadow-[0_0_14px_rgba(232,121,249,0.45)]'
+                            : subStep === 2
+                            ? 'bg-fuchsia-950/55 border-fuchsia-400/50 text-fuchsia-100'
+                            : 'bg-slate-900/60 border-white/10 text-slate-400'
+                        }`}>
+                          <div className="text-[10px] font-black text-fuchsia-300">
+                            {subStep === 1
+                              ? `② 滑入或點選 2 象限 (${p2Selected.length}/2)`
+                              : subStep === 2
+                              ? `✓ 已鎖定：${p2Cond2Locked.map(k => LV11_QUAD_INFO[k].roman).join(', ')}`
+                              : '② 待篩選'}
+                          </div>
+                          <div className="text-xs sm:text-sm font-serif font-black whitespace-nowrap">{question.cond2.text}</div>
                         </div>
                       </div>
 
-                      <button
-                        data-coach="lv11-pos"
-                        onClick={() => submitSort('pos')}
-                        className={`h-full max-h-[260px] rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
-                          wrongTargetKey === 'pos'
-                            ? 'bg-red-500/80 border-red-200 text-white btn-wrong-flash'
-                            : hoverTarget === 'pos'
-                            ? 'bg-emerald-500 border-white text-white scale-105 shadow-[0_0_24px_rgba(52,211,153,0.8)]'
-                            : 'bg-emerald-500/20 border-emerald-400/60 text-emerald-200 hover:bg-emerald-500/35'
-                        }`}
-                      >
-                        <span className="text-2xl sm:text-3xl font-mono font-black">&gt; 0</span>
-                        <span className="text-xs font-black">正值聖壇</span>
-                        <span className="text-[10px] opacity-80">右滑 ➡</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex-1 min-h-0 flex flex-col justify-between gap-2 relative">
-                      <div className="grid grid-cols-2 gap-2 flex-1 min-h-0">
-                        {[
-                          { key: '2', label: '第 II 象限', sub: '↖ 左上' },
-                          { key: '1', label: '第 I 象限', sub: '↗ 右上' },
-                          { key: '3', label: '第 III 象限', sub: '↙ 左下' },
-                          { key: '4', label: '第 IV 象限', sub: '↘ 右下' }
-                        ].map(item => (
-                          <button
-                            key={item.key}
-                            onClick={() => submitSort(item.key)}
-                            className={`rounded-2xl border-2 flex flex-col items-center justify-center p-2 transition-all active:scale-95 ${
-                              wrongTargetKey === item.key
-                                ? 'bg-red-500/80 border-red-200 text-white btn-wrong-flash'
-                                : hoverTarget === item.key
-                                ? 'bg-amber-400 border-white text-amber-950 scale-[1.03] shadow-[0_0_20px_rgba(251,191,36,0.8)]'
-                                : 'bg-indigo-900/55 border-indigo-400/50 text-indigo-100 hover:bg-indigo-800/70'
+                      {/* 2×2 象限交集盤（Layer 1 青膜 → Layer 2 洋紅膜 → Layer 3 金色交集＋中央條件滑卡） */}
+                      <div className="grid grid-cols-2 gap-3 flex-1 min-h-0 relative p-1">
+                        <div className="pointer-events-none absolute inset-0 z-10">
+                          <div className="absolute left-1/2 -translate-x-1/2 top-0.5 bottom-0.5 w-[2px] bg-indigo-200/35 rounded-full" />
+                          <div className="absolute top-1/2 -translate-y-1/2 left-0.5 right-0.5 h-[2px] bg-indigo-200/35 rounded-full" />
+                          <span className="absolute left-1/2 translate-x-1.5 top-0 text-[10px] font-serif italic font-black text-indigo-200/80">y</span>
+                          <span className="absolute right-0.5 top-1/2 -translate-y-4 text-[10px] font-serif italic font-black text-indigo-200/80">x</span>
+                        </div>
+
+                        {LV11_QUAD_GRID.map(qKey => {
+                          const info = LV11_QUAD_INFO[qKey];
+                          const inC1 = p2Cond1Locked.includes(qKey);
+                          const inC2 = p2Cond2Locked.includes(qKey);
+                          const isIntersection = inC1 && inC2;
+                          const isPicked = p2Selected.includes(qKey);
+                          const isWrong = wrongTargetKey === qKey;
+                          const isHover = hoverTarget === qKey;
+
+                          let cellCls = 'bg-indigo-900/45 border-indigo-400/40 text-indigo-100 hover:bg-indigo-800/65';
+                          if (isWrong) {
+                            cellCls = 'bg-red-500/80 border-red-200 text-white btn-wrong-flash';
+                          } else if (isHover && subStep === 2) {
+                            cellCls = 'bg-amber-400 border-white text-amber-950 scale-[1.03] shadow-[0_0_24px_rgba(251,191,36,0.9)]';
+                          } else if (isHover && subStep === 0) {
+                            cellCls = 'bg-cyan-400 border-white text-slate-950 scale-[1.03] shadow-[0_0_22px_rgba(34,211,238,0.85)]';
+                          } else if (isHover && subStep === 1) {
+                            cellCls = 'bg-fuchsia-400 border-white text-slate-950 scale-[1.03] shadow-[0_0_22px_rgba(232,121,249,0.85)]';
+                          } else if (isIntersection) {
+                            cellCls = 'bg-gradient-to-br from-amber-400/90 via-yellow-300/90 to-amber-500/90 border-white text-amber-950 ring-2 ring-amber-300 shadow-[0_0_24px_rgba(251,191,36,0.75)]';
+                          } else if (isPicked && subStep === 0) {
+                            cellCls = 'bg-cyan-500/45 border-cyan-200 text-white scale-[1.02] shadow-[0_0_16px_rgba(34,211,238,0.65)]';
+                          } else if (isPicked && subStep === 1) {
+                            cellCls = 'bg-fuchsia-500/45 border-fuchsia-200 text-white scale-[1.02] shadow-[0_0_16px_rgba(232,121,249,0.65)]';
+                          } else if (inC1) {
+                            cellCls = 'bg-cyan-500/25 border-cyan-400/70 text-cyan-100';
+                          } else if (inC2) {
+                            cellCls = 'bg-fuchsia-500/25 border-fuchsia-400/70 text-fuchsia-100';
+                          }
+
+                          return (
+                            <button
+                              key={qKey}
+                              data-coach={qKey === '2' ? 'lv11-p2grid' : undefined}
+                              onClick={() => handleQuadPhaseSelect(qKey)}
+                              className={`relative rounded-2xl border-2 flex flex-col items-center justify-center p-2 transition-all active:scale-95 ${cellCls}`}
+                            >
+                              <div className="absolute top-1.5 left-1.5 flex items-center gap-1">
+                                {(inC1 || (isPicked && subStep === 0)) && (
+                                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-cyan-400 text-slate-950 shadow">①</span>
+                                )}
+                                {(inC2 || (isPicked && subStep === 1)) && (
+                                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-fuchsia-400 text-slate-950 shadow">②</span>
+                                )}
+                              </div>
+                              {isIntersection && (
+                                <span className="absolute top-1.5 right-1.5 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-amber-950 text-amber-300 animate-pulse">★ 交集</span>
+                              )}
+                              <span className="text-lg sm:text-xl font-serif font-black">{info.label}</span>
+                              <span className="text-[10px] font-bold opacity-75">{info.arrow}</span>
+                            </button>
+                          );
+                        })}
+
+                        {/* 中央拖曳條件卡：Step 1 青色條件一 → Step 2 洋紅條件二 → Step 3 金色完整交集卡 */}
+                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-20">
+                          <div
+                            data-coach="lv11-quadcard"
+                            onPointerDown={handleCardPointerDown}
+                            onPointerMove={handleCardPointerMove}
+                            onPointerUp={handleCardPointerUp}
+                            onPointerCancel={handleCardPointerUp}
+                            style={{
+                              transform: cardTransform,
+                              transition: isDragging ? 'none' : flyOutTarget ? 'transform 0.2s ease-out, opacity 0.2s ease-out' : 'transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                              opacity: flyOutTarget ? 0 : 1
+                            }}
+                            className={`pointer-events-auto min-w-[156px] max-w-[228px] rounded-2xl bg-white border-4 px-3.5 py-2.5 flex flex-col items-center justify-center gap-0.5 text-center cursor-grab active:cursor-grabbing touch-none ${
+                              subStep === 0
+                                ? 'border-cyan-400 shadow-[0_0_22px_rgba(34,211,238,0.55)]'
+                                : subStep === 1
+                                ? 'border-fuchsia-400 shadow-[0_0_22px_rgba(232,121,249,0.55)]'
+                                : 'border-amber-400 shadow-[0_0_24px_rgba(251,191,36,0.65)]'
                             }`}
                           >
-                            <span className="text-lg sm:text-xl font-serif font-black">{item.label}</span>
-                            <span className="text-[10px] font-bold opacity-75">{item.sub}</span>
-                          </button>
-                        ))}
-                      </div>
-
-                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                        <div
-                          data-coach="lv11-quadcard"
-                          onPointerDown={handleCardPointerDown}
-                          onPointerMove={handleCardPointerMove}
-                          onPointerUp={handleCardPointerUp}
-                          onPointerCancel={handleCardPointerUp}
-                          style={{
-                            transform: cardTransform,
-                            transition: isDragging ? 'none' : flyOutTarget ? 'transform 0.2s ease-out, opacity 0.2s ease-out' : 'transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)',
-                            opacity: flyOutTarget ? 0 : 1
-                          }}
-                          className={`pointer-events-auto z-20 min-w-[170px] max-w-[240px] rounded-2xl bg-white border-4 px-4 py-3 shadow-2xl flex flex-col items-center justify-center gap-0.5 text-center cursor-grab active:cursor-grabbing touch-none ${
-                            isFever ? 'border-amber-400 shadow-[0_0_26px_rgba(251,191,36,0.65)]' : 'border-indigo-400'
-                          }`}
-                        >
-                          {(question.lines || [question.expr]).map((line, idx) => (
-                            <div key={idx} className="text-base sm:text-lg font-serif font-black text-indigo-950 leading-snug whitespace-nowrap">{line}</div>
-                          ))}
+                            {subStep === 0 ? (
+                              <>
+                                <span className="text-[10px] font-black text-cyan-600">① 逐格滑入 2 象限 ({p2Selected.length}/2)</span>
+                                <div className="text-base sm:text-lg font-serif font-black text-indigo-950 whitespace-nowrap">{question.cond1.text}</div>
+                              </>
+                            ) : subStep === 1 ? (
+                              <>
+                                <span className="text-[10px] font-black text-fuchsia-600">② 逐格滑入 2 象限 ({p2Selected.length}/2)</span>
+                                <div className="text-base sm:text-lg font-serif font-black text-indigo-950 whitespace-nowrap">{question.cond2.text}</div>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-[10px] font-black text-amber-600">③ 滑入或點選金色交集</span>
+                                <div className="text-xs sm:text-sm font-serif font-black text-indigo-950 leading-tight whitespace-nowrap">{question.cond1.text}</div>
+                                <div className="text-xs sm:text-sm font-serif font-black text-indigo-950 leading-tight whitespace-nowrap">{question.cond2.text}</div>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -11337,32 +12085,53 @@
             active={guideMode === 'manual' || (showGuide && gameState === 'playing')}
             mode={guideMode || 'spotlight'}
             onDismiss={dismissGuide}
-            steps={question?.phase < 2 ? [
+            steps={question?.phase === 2 ? (subStep === 2 ? [
               {
-                target: 'lv11-card',
-                text: '判斷題卡正負，左右拖曳或點擊聖壇',
+                target: 'lv11-quadcard',
+                text: '雙色重疊的金色象限就是答案！滑入或輕點鎖定它',
                 shape: 'ellipse',
                 pad: 10,
-                swipe: 'x'
-              },
-              {
-                targets: [
-                  { id: 'lv11-neg', shape: 'ellipse', pad: 6 },
-                  { id: 'lv11-pos', shape: 'ellipse', pad: 6 }
-                ],
-                target: 'lv11-neg',
-                text: '負值拖左邊，正值拖右邊',
-                shape: 'ellipse',
-                pad: 6,
                 tap: false
               }
             ] : [
               {
                 target: 'lv11-quadcard',
-                text: '依正負條件，拖往對應象限',
+                text: '抓著條件卡逐格滑入符合的 2 個象限（或直接點擊 2 格），疊出兩層光膜找交集！',
                 shape: 'ellipse',
                 pad: 10,
                 tap: false
+              }
+            ]) : question?.phase === 1 ? [
+              {
+                target: 'lv11-p1card',
+                text: '單條件逆推！將條件卡依序滑入符合的 2 個象限（或直接點 2 格）',
+                shape: 'ellipse',
+                pad: 10,
+                tap: false
+              }
+            ] : subStep === 0 ? [
+              {
+                target: 'lv11-card',
+                text: '第 1 步：先把角度拖進對應象限（或直接點擊象限）',
+                shape: 'ellipse',
+                pad: 10,
+                tap: false
+              }
+            ] : subStep === 1 ? [
+              {
+                target: 'lv11-defslot',
+                text: '第 2 步：上滑選擇對應的坐標定義（y/r、x/r 或 y/x）',
+                shape: 'rect',
+                pad: 8,
+                tap: false
+              }
+            ] : [
+              {
+                target: 'lv11-card',
+                text: '第 3 步：對照底層亮象限與中層定義，左滑負值、右滑正值！',
+                shape: 'ellipse',
+                pad: 10,
+                swipe: 'x'
               }
             ]}
           />
