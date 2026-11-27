@@ -623,7 +623,8 @@
         return className ? <span className={className}>{str}</span> : <>{str}</>;
       }
       const parts = [];
-      const regex = /√\(([^)]+)\)|√([0-9a-zA-Zθ]+)/g;
+      // 將緊鄰根號前的正負號與係數（如 -2√3、+3√2）綁定在同一不換行群組，避免窄按鈕或標題列把係數與根號拆成兩行
+      const regex = /([+-]?\d*)√(?:\(([^)]+)\)|([0-9a-zA-Zθ]+))/g;
       let lastIndex = 0;
       let match;
       let keyIdx = 0;
@@ -631,14 +632,21 @@
         if (match.index > lastIndex) {
           parts.push(<React.Fragment key={`t-${keyIdx++}`}>{str.slice(lastIndex, match.index)}</React.Fragment>);
         }
-        const radicand = match[1] !== undefined ? match[1] : match[2];
-        parts.push(<RadicalBox key={`r-${keyIdx++}`}>{radicand}</RadicalBox>);
+        const coeff = match[1] || '';
+        const radicand = match[2] !== undefined ? match[2] : match[3];
+        parts.push(
+          <span key={`r-${keyIdx++}`} className="inline-flex items-center whitespace-nowrap shrink-0">
+            {coeff}
+            <RadicalBox>{radicand}</RadicalBox>
+          </span>
+        );
         lastIndex = regex.lastIndex;
       }
       if (lastIndex < str.length) {
         parts.push(<React.Fragment key={`t-${keyIdx++}`}>{str.slice(lastIndex)}</React.Fragment>);
       }
-      return <span className={`inline-flex items-center flex-wrap gap-0 ${className}`}>{parts}</span>;
+      const wrapCls = str.length > 10 ? 'flex-wrap' : 'whitespace-nowrap';
+      return <span className={`inline-flex items-center ${wrapCls} gap-0 ${className}`}>{parts}</span>;
     };
 
     // ==================== 共用直式分數渲染元件 ====================
@@ -14372,6 +14380,87 @@
       return { x: lx, y: ly, anchor };
     };
 
+    // 純原生 SVG 課本標準帶頂線根式標籤（避免 iOS Safari foreignObject 模糊偏移，亦徹底消除粗描邊 Unicode √ 變形）
+    const Lv14SvgSqrtLabel = ({ x, y, anchor = 'start', fill = '#fecdd3', stroke = '#12091c', text = '', fontSize = 11.5 }) => {
+      const str = String(text ?? '');
+      if (!str.includes('√')) {
+        return (
+          <text
+            x={x} y={y} textAnchor={anchor}
+            fill={fill} fontSize={fontSize} fontWeight="900" className="font-mono"
+            style={{ paintOrder: 'stroke', stroke, strokeWidth: '3.5px', strokeLinejoin: 'round' }}
+          >
+            {str}
+          </text>
+        );
+      }
+      const measurePlain = (s) => {
+        let w = 0;
+        for (const ch of s) {
+          if (ch === ' ') w += fontSize * 0.34;
+          else if ('(),.'.includes(ch)) w += fontSize * 0.44;
+          else if ('+-='.includes(ch)) w += fontSize * 0.62;
+          else w += fontSize * 0.62;
+        }
+        return w;
+      };
+      const tokens = [];
+      const regex = /√([0-9a-zA-Z]+)/g;
+      let lastIdx = 0;
+      let m;
+      while ((m = regex.exec(str)) !== null) {
+        if (m.index > lastIdx) {
+          const t = str.slice(lastIdx, m.index);
+          tokens.push({ kind: 'text', val: t, w: measurePlain(t) });
+        }
+        const rad = m[1];
+        const hookW = fontSize * 0.72;
+        const radW = measurePlain(rad) + fontSize * 0.16;
+        tokens.push({ kind: 'sqrt', val: rad, hookW, radW, w: hookW + radW + 1 });
+        lastIdx = regex.lastIndex;
+      }
+      if (lastIdx < str.length) {
+        const t = str.slice(lastIdx);
+        tokens.push({ kind: 'text', val: t, w: measurePlain(t) });
+      }
+      const totalW = tokens.reduce((acc, tk) => acc + tk.w, 0);
+      let curX = anchor === 'middle' ? x - totalW / 2 : anchor === 'end' ? x - totalW : x;
+      const h = fontSize;
+      return (
+        <g>
+          {tokens.map((tk, i) => {
+            const x0 = curX;
+            curX += tk.w;
+            if (tk.kind === 'text') {
+              return (
+                <text
+                  key={i} x={x0} y={y} textAnchor="start"
+                  fill={fill} fontSize={fontSize} fontWeight="900" className="font-mono"
+                  style={{ paintOrder: 'stroke', stroke, strokeWidth: '3.5px', strokeLinejoin: 'round' }}
+                >
+                  {tk.val}
+                </text>
+              );
+            }
+            const d = `M ${(x0 + 0.5).toFixed(1)} ${(y - h * 0.34).toFixed(1)} L ${(x0 + tk.hookW * 0.30).toFixed(1)} ${(y - h * 0.44).toFixed(1)} L ${(x0 + tk.hookW * 0.56).toFixed(1)} ${(y + h * 0.04).toFixed(1)} L ${(x0 + tk.hookW * 0.96).toFixed(1)} ${(y - h * 0.88).toFixed(1)} L ${(x0 + tk.hookW + tk.radW).toFixed(1)} ${(y - h * 0.88).toFixed(1)}`;
+            return (
+              <g key={i}>
+                <path d={d} fill="none" stroke={stroke} strokeWidth="4.2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d={d} fill="none" stroke={fill} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <text
+                  x={x0 + tk.hookW + 0.8} y={y} textAnchor="start"
+                  fill={fill} fontSize={fontSize} fontWeight="900" className="font-mono"
+                  style={{ paintOrder: 'stroke', stroke, strokeWidth: '3.5px', strokeLinejoin: 'round' }}
+                >
+                  {tk.val}
+                </text>
+              </g>
+            );
+          })}
+        </g>
+      );
+    };
+
     // 3:3 完美均衡出題：P0(0,1 極轉直) → P1(2,3 直轉極要塞反擊) → P2(4 極轉直遠距/軸上角, 5 直轉極隱形要塞盲射)
     const generateLevel16Question = (curProg, bagState = null) => {
       const quadSpecs = [
@@ -14536,7 +14625,7 @@
             <div
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
-              className={`absolute bottom-[88px] left-1/2 -translate-x-1/2 z-40 w-[160px] p-1.5 rounded-2xl bg-slate-900/95 border-2 ${isCyan ? 'border-cyan-400/85 shadow-[0_8px_24px_rgba(34,211,238,0.35)]' : 'border-amber-400/85 shadow-[0_8px_24px_rgba(251,191,36,0.35)]'} backdrop-blur-sm`}
+              className={`absolute bottom-[88px] left-1/2 -translate-x-1/2 z-40 w-[208px] p-1.5 rounded-2xl bg-slate-900/95 border-2 ${isCyan ? 'border-cyan-400/85 shadow-[0_8px_24px_rgba(34,211,238,0.35)]' : 'border-amber-400/85 shadow-[0_8px_24px_rgba(251,191,36,0.35)]'} backdrop-blur-sm`}
             >
               <div className="grid grid-cols-4 gap-1">
                 {items.map((mag, i) => {
@@ -14547,7 +14636,7 @@
                       key={mag}
                       type="button"
                       onClick={() => { audio.sfxThrottleStep(i); onChange(i); setPickerOpen(false); }}
-                      className={`h-[28px] rounded-lg font-serif font-black text-[11px] flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
+                      className={`h-[32px] px-0.5 rounded-lg font-serif font-black text-[11.5px] whitespace-nowrap flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
                         active
                           ? isCyan ? 'bg-cyan-400 text-slate-950 shadow' : 'bg-amber-400 text-slate-950 shadow'
                           : 'bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700'
@@ -15814,14 +15903,13 @@
                           </g>
                         )}
                         {droneAnim.active && (
-                          <text
-                            x={droneLbl.x} y={droneLbl.y} textAnchor={droneLbl.anchor}
+                          <Lv14SvgSqrtLabel
+                            x={droneLbl.x} y={droneLbl.y} anchor={droneLbl.anchor}
                             fill={flightState === 'missed' ? '#fda4af' : flightState === 'docked' ? '#6ee7b7' : '#fde68a'}
-                            fontSize="11.5" fontWeight="900" className="font-mono"
-                            style={{ paintOrder: 'stroke', stroke: '#04121e', strokeWidth: '3.5px', strokeLinejoin: 'round' }}
-                          >
-                            {droneAnim.label}
-                          </text>
+                            stroke="#04121e"
+                            text={droneAnim.label}
+                            fontSize={11.5}
+                          />
                         )}
                       </g>
                     )}
@@ -15862,15 +15950,15 @@
                           {enemyAnim.pingX && (enemyAnim.stage === 'scanX' || enemyAnim.stage === 'pauseScan' || enemyAnim.stage === 'scanY') && (
                             <g>
                               <line x1={CX} y1={targetSvg.sy} x2={targetSvg.sx} y2={targetSvg.sy} stroke="#67e8f9" strokeWidth="1.4" strokeDasharray="4 3" opacity="0.85" />
-                              <text
+                              <Lv14SvgSqrtLabel
                                 x={(CX + targetSvg.sx) / 2}
                                 y={Math.max(28, targetSvg.sy - 8)}
-                                textAnchor="middle"
-                                fill="#a5f3fc" fontSize="11" fontWeight="900" className="font-mono"
-                                style={{ paintOrder: 'stroke', stroke: '#12091c', strokeWidth: '3.5px', strokeLinejoin: 'round' }}
-                              >
-                                x = {question.xStr}
-                              </text>
+                                anchor="middle"
+                                fill="#a5f3fc"
+                                stroke="#12091c"
+                                text={`x = ${question.xStr}`}
+                                fontSize={11}
+                              />
                             </g>
                           )}
 
@@ -15895,15 +15983,15 @@
                           {enemyAnim.pingY && enemyAnim.stage === 'scanY' && (
                             <g>
                               <line x1={targetSvg.sx} y1={CY} x2={targetSvg.sx} y2={targetSvg.sy} stroke="#f472b6" strokeWidth="1.4" strokeDasharray="4 3" opacity="0.85" />
-                              <text
+                              <Lv14SvgSqrtLabel
                                 x={Math.max(36, Math.min(284, targetSvg.sx + (question.nx >= 0 ? 10 : -10)))}
                                 y={(CY + targetSvg.sy) / 2 + 4}
-                                textAnchor={question.nx >= 0 ? 'start' : 'end'}
-                                fill="#fbcfe8" fontSize="11" fontWeight="900" className="font-mono"
-                                style={{ paintOrder: 'stroke', stroke: '#12091c', strokeWidth: '3.5px', strokeLinejoin: 'round' }}
-                              >
-                                y = {question.yStr}
-                              </text>
+                                anchor={question.nx >= 0 ? 'start' : 'end'}
+                                fill="#fbcfe8"
+                                stroke="#12091c"
+                                text={`y = ${question.yStr}`}
+                                fontSize={11}
+                              />
                             </g>
                           )}
 
@@ -15932,13 +16020,12 @@
 
                           {/* 掃描鎖定完成後顯示精確坐標（360° 安全框防出界） */}
                           {enemyAnim.stage === 'locked' && !enemyCloaked && (
-                            <text
-                              x={enemyLbl.x} y={enemyLbl.y} textAnchor={enemyLbl.anchor}
-                              fill="#fecdd3" fontSize="11.5" fontWeight="900" className="font-mono"
-                              style={{ paintOrder: 'stroke', stroke: '#12091c', strokeWidth: '3.5px', strokeLinejoin: 'round' }}
-                            >
-                              {enemyLabelText}
-                            </text>
+                            <Lv14SvgSqrtLabel
+                              x={enemyLbl.x} y={enemyLbl.y} anchor={enemyLbl.anchor}
+                              fill="#fecdd3" stroke="#12091c"
+                              text={enemyLabelText}
+                              fontSize={11.5}
+                            />
                           )}
 
                           {/* 開火轉砲預備方向虛線（開火前絕不顯示，杜絕瞄準作弊） */}
