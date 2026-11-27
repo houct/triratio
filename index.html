@@ -17464,6 +17464,28 @@
       }
     ];
 
+    // P0 物理探索：沿外接圓拖曳頂點 A，親眼見證「同弧圓周角不變」並拉出過圓心直徑 2R（Thales 直角定理導出 a/sinA = 2R）
+    const LV16_SINE_P0_EXPLORE = [
+      {
+        id: 'se0_1',
+        kind: 'explore_2r',
+        angA: 30,
+        aLabel: '6',
+        twoRLabel: '12',
+        initTheta: 95,
+        formula: '圓周角 A = 30° 恆不變！拉成直徑 2R 時成直角三角形 ⇒ sin 30° = 6 / 2R ⇒ 6 / sin 30° = 2R！'
+      },
+      {
+        id: 'se0_2',
+        kind: 'explore_2r',
+        angA: 45,
+        aLabel: '6√2',
+        twoRLabel: '12',
+        initTheta: 90,
+        formula: '無論 A 移到圓周哪裡，∠A 永遠是 45°！過圓心成直徑 2R 時 ⇒ 6√2 / sin 45° = 2R！'
+      }
+    ];
+
     const Level16SineBridgeMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
       const starsThreshold = [2, 4, 6];
@@ -17476,6 +17498,7 @@
       } = useLivesLevelSession({ starThresholds: starsThreshold, maxLives, healTarget, currentStars, onUpdateStars });
 
       const [question, setQuestion] = useState(null);
+      const [thetaA, setThetaA] = useState(95); // P0 物理探索：頂點 A 在外接圓上的角度 (25°~155°, 5° 吸附)
       const [pickedEdge, setPickedEdge] = useState(null);
       const [pickedAngle, setPickedAngle] = useState(null);
       const [pickedAns, setPickedAns] = useState(null);
@@ -17484,8 +17507,9 @@
       const [feedbackAnim, setFeedbackAnim] = useState('');
 
       const qPhase = question ? question.phase : 0;
+      const isDragPhase = qPhase === 0 && question?.kind === 'explore_2r';
       const needCalc = qPhase === 2 && Boolean(pickedEdge) && Boolean(pickedAngle);
-      const activeStageKey = !question || isSolved ? null : (needCalc ? 'p2_calc' : `p${qPhase}_fill`);
+      const activeStageKey = !question || isSolved ? null : (isDragPhase ? 'p0_drag' : needCalc ? 'p2_calc' : `p${qPhase}_fill`);
       const { showGuide, guideMode, openGuide, dismissGuide } = useStagedLevelGuide({
         currentStars,
         hasSeenGuide,
@@ -17497,6 +17521,7 @@
       });
 
       const containerRef = useRef(null);
+      const svgRef = useRef(null);
       const deckRef = useRef([]);
       const questionMissedRef = useRef(false);
       const pendingNextRef = useRef(null);
@@ -17511,9 +17536,11 @@
         fn();
       };
 
+      // P0：2 題外接圓物理探索（30° → 45°）｜P1：1 題對邊對角比例 ＋ 1 題外接圓 2R（不限邊角順序）｜P2：2 題列式＋心算
       const buildDeck = () => [
-        ...shuffle([...LV16_SINE_P0]).slice(0, 2).map(q => ({ ...q, phase: 0 })),
-        ...shuffle([...LV16_SINE_P1]).slice(0, 2).map(q => ({ ...q, phase: 1 })),
+        ...LV16_SINE_P0_EXPLORE.map(q => ({ ...q, phase: 0 })),
+        { ...shuffle([...LV16_SINE_P0])[0], phase: 1 },
+        { ...shuffle([...LV16_SINE_P1])[0], phase: 1 },
         ...shuffle([...LV16_SINE_P2]).slice(0, 2).map(q => ({ ...q, phase: 2, opts: shuffle([...q.opts]) }))
       ];
 
@@ -17521,6 +17548,7 @@
         const q = deckRef.current[Math.min(curProg, deckRef.current.length - 1)] || buildDeck()[0];
         questionMissedRef.current = false;
         setQuestion(q);
+        setThetaA(q.initTheta ?? 95);
         setPickedEdge(null);
         setPickedAngle(null);
         setPickedAns(null);
@@ -17570,8 +17598,77 @@
         if (!gameOver) setTimeout(() => setFeedbackAnim(''), 360);
       };
 
+      // ===== P0 外接圓拖曳頂點 A（全畫板點拖 ＋ getScreenCTM 精準座標換算） =====
+      const P0_CX = 160, P0_CY = 112, P0_R = 80;
+      const updateThetaFromClient = (clientX, clientY) => {
+        const svg = svgRef.current;
+        if (!svg) return;
+        let sx, sy;
+        const ctm = svg.getScreenCTM ? svg.getScreenCTM() : null;
+        if (ctm) {
+          const pt = svg.createSVGPoint();
+          pt.x = clientX;
+          pt.y = clientY;
+          const svgPt = pt.matrixTransform(ctm.inverse());
+          sx = svgPt.x;
+          sy = svgPt.y;
+        } else {
+          const rect = svg.getBoundingClientRect();
+          const scale = Math.min(rect.width / 320, rect.height / 218);
+          const offX = (rect.width - 320 * scale) / 2;
+          const offY = (rect.height - 218 * scale) / 2;
+          sx = (clientX - rect.left - offX) / scale;
+          sy = (clientY - rect.top - offY) / scale;
+        }
+        let deg = Math.atan2(P0_CY - sy, sx - P0_CX) * (180 / Math.PI);
+        if (deg < 0) deg = sx >= P0_CX ? 25 : 155;
+        deg = Math.max(25, Math.min(155, Math.round(deg / 5) * 5));
+        setThetaA(prev => {
+          if (prev !== deg) audio.sfxTick();
+          return deg;
+        });
+      };
+
+      const handleCirclePointerDown = (e) => {
+        if (gameState !== 'playing' || !question || !isDragPhase || isSolved) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (showGuide) dismissGuide();
+        if (e.currentTarget.setPointerCapture) {
+          try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+        }
+        updateThetaFromClient(e.clientX, e.clientY);
+        const onMove = (ev) => {
+          if (ev.cancelable) ev.preventDefault();
+          updateThetaFromClient(ev.clientX, ev.clientY);
+        };
+        const onUp = () => {
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('pointerup', onUp);
+          window.removeEventListener('pointercancel', onUp);
+        };
+        window.addEventListener('pointermove', onMove, { passive: false });
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', onUp);
+      };
+
+      const isP0DiamRight = isDragPhase && question && thetaA === (90 - question.angA);
+      const isP0DiamLeft = isDragPhase && question && thetaA === (90 + question.angA);
+      const isP0DiameterHit = isP0DiamRight || isP0DiamLeft;
+
+      const handleConfirmP0 = () => {
+        if (gameState !== 'playing' || !question || !isDragPhase || isSolved || (!isRelaxMode && lives <= 0)) return;
+        if (showGuide) dismissGuide();
+        if (isP0DiameterHit) {
+          finishSolved(question);
+        } else {
+          triggerMistake(`邊線還沒通過圓心 O 喔！把金球 A 往左或往右拖到橘色虛線處，讓其中一邊穿過圓心形成直徑 2R！`);
+        }
+      };
+
+      // ===== P1/P2 解除邊角先後順序限制：先點對邊或先點對角皆可直接填入對應槽 =====
       const handleClickEdge = (edge) => {
-        if (gameState !== 'playing' || !question || isSolved || (!isRelaxMode && lives <= 0)) return;
+        if (gameState !== 'playing' || !question || isDragPhase || isSolved || (!isRelaxMode && lives <= 0)) return;
         if (showGuide) dismissGuide();
         if (edge.isGiven) {
           audio.sfxClick();
@@ -17580,7 +17677,7 @@
         }
         if (pickedEdge) {
           audio.sfxClick();
-          setConceptTip({ text: '分子的邊已填好，請改點它正對面的「對角」喔！', id: Date.now() });
+          setConceptTip({ text: '分子的邊已填好，請點選它正對面的「對角」喔！', id: Date.now() });
           return;
         }
         if (!edge.ok) {
@@ -17590,30 +17687,30 @@
         audio.sfxClick();
         setConceptTip(null);
         setPickedEdge(edge);
+        if (qPhase === 1 && pickedAngle) finishSolved(question);
       };
 
       const handleClickAngle = (ang) => {
-        if (gameState !== 'playing' || !question || isSolved || (!isRelaxMode && lives <= 0)) return;
+        if (gameState !== 'playing' || !question || isDragPhase || isSolved || (!isRelaxMode && lives <= 0)) return;
         if (showGuide) dismissGuide();
         if (ang.isGiven) {
           audio.sfxClick();
-          setConceptTip({ text: `${ang.deg} 已經在左側公式裡囉，請找右側分子的對角！`, id: Date.now() });
+          setConceptTip({ text: `${ang.deg} 已經在左側公式裡囉，請找右側的對角！`, id: Date.now() });
           return;
         }
-        if (!pickedEdge) {
+        if (pickedAngle) {
           audio.sfxClick();
-          setConceptTip({ text: '請先點選圖上要填入分子的 [對邊]，再點它的對角！', id: Date.now() });
+          setConceptTip({ text: '分母的對角已填好，請點選它正對面的「對邊」喔！', id: Date.now() });
           return;
         }
-        if (pickedAngle) return;
         if (!ang.ok) {
-          triggerMistake(question.hintAngle || `${ang.deg} 不是 ${pickedEdge.label} 正對面的角喔！`);
+          triggerMistake(question.hintAngle || `${ang.deg} 不是這組配對的對角喔！請找正對面的角度！`);
           return;
         }
         audio.sfxClick();
         setConceptTip(null);
         setPickedAngle(ang);
-        if (qPhase < 2) finishSolved(question);
+        if (qPhase === 1 && pickedEdge) finishSolved(question);
       };
 
       const handlePickCalcOpt = (opt) => {
@@ -17660,9 +17757,9 @@
         };
       };
 
-      const slotEdgeActive = !isSolved && !pickedEdge;
-      const slotAngleActive = !isSolved && Boolean(pickedEdge) && !pickedAngle;
-      const slotAnsActive = !isSolved && needCalc && !pickedAns;
+      const slotEdgeActive = !isDragPhase && !isSolved && !pickedEdge;
+      const slotAngleActive = !isDragPhase && !isSolved && !pickedAngle;
+      const slotAnsActive = !isDragPhase && !isSolved && needCalc && !pickedAns;
 
       return (
         <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
@@ -17674,192 +17771,360 @@
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-900 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${isSolved ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                <StagePhaseStrip phase={qPhase} labels={['對邊對角配對 • 填入正弦定理比例', '外接圓結構 • 抓出完整對邊對角 = 2R', '列式＋心算 • 填完公式秒殺求值']} />
+                <StagePhaseStrip phase={qPhase} labels={['外接圓探索 • 拖曳頂點見證直徑 2R', '防干擾列式 • 不限順序配對對邊與對角', '列式＋心算 • 填完公式秒殺求值']} />
 
-                {/* 置頂標準課本直式分數正弦定理填空列 */}
-                <div data-coach="lv16-prompt" className="bg-slate-800 h-[72px] px-3 flex justify-between items-center text-white border-b-2 border-slate-700 shrink-0">
-                  <div className="flex-1 flex items-center justify-center gap-2 font-serif font-black text-sm sm:text-base">
-                    {question.mode === 'ratio' && (
-                      <>
-                        <div className="inline-flex flex-col items-center leading-tight">
-                          <span className="px-1.5 text-sky-200 font-mono text-sm">{question.givenNum}</span>
-                          <span className="w-full h-[1.5px] bg-slate-400 my-0.5" />
-                          <span className="px-1 text-sky-200 font-mono text-xs">sin {question.givenDen}</span>
-                        </div>
-                        <span className="text-slate-400 text-lg">=</span>
-                      </>
-                    )}
-
-                    {/* 待填直式分數槽 */}
-                    <div className="inline-flex flex-col items-center leading-tight">
-                      <span className={`min-w-[44px] h-[24px] px-1.5 rounded-md border-2 inline-flex items-center justify-center font-mono text-xs sm:text-sm transition-all ${
-                        pickedEdge
-                          ? 'border-emerald-400 bg-emerald-500/25 text-emerald-100'
-                          : slotEdgeActive
-                          ? 'border-amber-300 bg-amber-400/30 text-amber-100 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]'
-                          : 'border-dashed border-white/40 bg-white/5 text-white/40'
-                      }`}>
-                        {pickedEdge ? <SqrtText text={pickedEdge.label} /> : '對邊'}
-                      </span>
-                      <span className="w-full h-[1.5px] bg-slate-300 my-1" />
-                      <div className="inline-flex items-center gap-1">
-                        <span className="text-slate-300 text-xs">sin</span>
-                        <span className={`min-w-[42px] h-[24px] px-1.5 rounded-md border-2 inline-flex items-center justify-center font-mono text-xs transition-all ${
-                          pickedAngle
-                            ? 'border-emerald-400 bg-emerald-500/25 text-emerald-100'
-                            : slotAngleActive
-                            ? 'border-amber-300 bg-amber-400/30 text-amber-100 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]'
-                            : 'border-dashed border-white/40 bg-white/5 text-white/40'
-                        }`}>
-                          {pickedAngle ? pickedAngle.deg : '對角'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {question.mode === '2R' && (
-                      <>
-                        <span className="text-slate-400 text-lg">=</span>
-                        <span className="text-amber-300 font-mono text-base sm:text-lg">2R</span>
-                      </>
-                    )}
-
-                    {qPhase === 2 && (
-                      <>
-                        <span className="text-slate-400 text-sm mx-0.5">⇒ {question.askLabel} =</span>
-                        <span className={`min-w-[42px] h-[28px] px-1.5 rounded-lg border-2 inline-flex items-center justify-center font-mono text-sm transition-all ${
-                          pickedAns
-                            ? 'border-emerald-400 bg-emerald-500/30 text-emerald-100'
-                            : slotAnsActive
-                            ? 'border-amber-300 bg-amber-400/30 text-amber-100 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]'
-                            : 'border-dashed border-white/40 bg-white/5 text-white/40'
-                        }`}>
-                          {pickedAns ? <SqrtText text={pickedAns} /> : '?'}
-                        </span>
-                      </>
-                    )}
+                {/* 置頂清爽指令列 */}
+                <div className="bg-gradient-to-r from-sky-900 to-indigo-900 min-h-[44px] px-3 py-1.5 flex justify-between items-center text-white border-b-2 border-indigo-950 shrink-0">
+                  <div className="flex-1 text-center font-black text-xs sm:text-sm text-sky-50 leading-snug">
+                    {isDragPhase
+                      ? `沿外接圓拖曳金球 A，讓一邊穿過圓心形成直徑 2R！`
+                      : question.mode === '2R'
+                      ? '不限順序！點選圖上「已知對邊」與「對角」填入 = 2R！'
+                      : '不限順序！點選圖上互為正對的「對邊」與「對角」完成比例！'}
                   </div>
                   <span className="w-6 h-6 inline-flex items-center justify-center shrink-0">
                     <SuccessBadge show={isSolved} />
                   </span>
                 </div>
 
-                {/* 純淨幾何畫板（2R 模式附淡藍外接圓虛線與半徑 R） */}
+                {/* 繪圖區頂部：滿寬大字直式分數正弦定理公式區 */}
+                <div data-coach="lv16-prompt" className="bg-sky-50/90 border-b border-sky-200/90 px-2.5 py-2 shrink-0 flex items-center justify-center">
+                  {isDragPhase ? (
+                    <div className="flex items-center justify-center gap-2 font-serif font-black text-sm sm:text-base text-sky-950">
+                      <div className="inline-flex flex-col items-center leading-tight">
+                        <span className="px-1.5 text-sky-800 font-mono"><SqrtText text={question.aLabel} /></span>
+                        <span className="w-full h-[1.5px] bg-sky-700 my-0.5" />
+                        <span className="px-1 text-emerald-700 font-mono text-xs sm:text-sm">sin {question.angA}°</span>
+                      </div>
+                      <span className="text-slate-400 text-lg">=</span>
+                      <span className={`px-2.5 py-1 rounded-xl border-2 font-mono text-sm sm:text-base transition-all ${
+                        isP0DiameterHit
+                          ? 'bg-emerald-100 border-emerald-500 text-emerald-800 shadow-[0_0_12px_rgba(16,185,129,0.45)]'
+                          : 'bg-amber-50 border-amber-300 text-amber-800'
+                      }`}>
+                        {isP0DiameterHit ? '2R ✓（直角導出！）' : '2R（拉成直徑看看）'}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2 font-serif font-black text-sm sm:text-base text-slate-800">
+                      {question.mode === 'ratio' && (
+                        <>
+                          <div className="inline-flex flex-col items-center leading-tight">
+                            <span className="px-1.5 text-sky-800 font-mono text-sm">{question.givenNum}</span>
+                            <span className="w-full h-[1.5px] bg-slate-500 my-0.5" />
+                            <span className="px-1 text-sky-800 font-mono text-xs">sin {question.givenDen}</span>
+                          </div>
+                          <span className="text-slate-400 text-lg">=</span>
+                        </>
+                      )}
+
+                      {/* 待填直式分數槽（邊／角不限先後順序） */}
+                      <div className="inline-flex flex-col items-center leading-tight">
+                        <span className={`min-w-[46px] h-[26px] px-1.5 rounded-lg border-2 inline-flex items-center justify-center font-mono text-xs sm:text-sm transition-all ${
+                          pickedEdge
+                            ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
+                            : slotEdgeActive
+                            ? 'border-amber-400 bg-amber-100 text-amber-900 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.55)]'
+                            : 'border-dashed border-slate-300 bg-white text-slate-400'
+                        }`}>
+                          {pickedEdge ? <SqrtText text={pickedEdge.label} /> : '對邊'}
+                        </span>
+                        <span className="w-full h-[1.5px] bg-slate-500 my-1" />
+                        <div className="inline-flex items-center gap-1">
+                          <span className="text-slate-600 text-xs">sin</span>
+                          <span className={`min-w-[44px] h-[26px] px-1.5 rounded-lg border-2 inline-flex items-center justify-center font-mono text-xs transition-all ${
+                            pickedAngle
+                              ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
+                              : slotAngleActive
+                              ? 'border-amber-400 bg-amber-100 text-amber-900 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.55)]'
+                              : 'border-dashed border-slate-300 bg-white text-slate-400'
+                          }`}>
+                            {pickedAngle ? pickedAngle.deg : '對角'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {question.mode === '2R' && (
+                        <>
+                          <span className="text-slate-400 text-lg">=</span>
+                          <span className="text-amber-700 font-mono text-base sm:text-lg">2R</span>
+                        </>
+                      )}
+
+                      {qPhase === 2 && (
+                        <>
+                          <span className="text-slate-500 text-sm mx-0.5">⇒ {question.askLabel} =</span>
+                          <span className={`min-w-[44px] h-[30px] px-1.5 rounded-xl border-2 inline-flex items-center justify-center font-mono text-sm transition-all ${
+                            pickedAns
+                              ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
+                              : slotAnsActive
+                              ? 'border-amber-400 bg-amber-100 text-amber-900 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.55)]'
+                              : 'border-dashed border-slate-300 bg-white text-slate-400'
+                          }`}>
+                            {pickedAns ? <SqrtText text={pickedAns} /> : '?'}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* 純淨幾何畫板（P0 外接圓物理探索 ｜ P1/P2 對邊對角互動＋共振光橋） */}
                 <div className="relative w-full flex-1 min-h-0 bg-gradient-to-b from-sky-50/40 to-white flex flex-col items-center justify-center overflow-hidden px-2 py-1">
                   <HintBanner tip={conceptTip} />
 
-                  <svg data-coach="lv16-board" viewBox="0 0 320 218" className="w-full h-full max-w-[420px] object-contain select-none">
-                    {/* 2R 題型繪製柔和外接圓與半徑 R */}
-                    {question.mode === '2R' && (
-                      <g className="pointer-events-none">
-                        <circle cx="160" cy="122" r="88" fill="rgba(56,189,248,0.06)" stroke="#38bdf8" strokeWidth="1.8" strokeDasharray="5 4" />
-                        <line x1="160" y1="122" x2="248" y2="122" stroke="#0284c7" strokeWidth="1.6" strokeDasharray="3 3" />
-                        <circle cx="160" cy="122" r="3" fill="#0284c7" />
-                        <text x="206" y="114" fill="#0369a1" fontSize="12" fontWeight="900" textAnchor="middle" className="font-serif italic">R</text>
-                      </g>
-                    )}
+                  {isDragPhase ? (() => {
+                    const radB = ((270 - question.angA) * Math.PI) / 180;
+                    const radC = ((270 + question.angA) * Math.PI) / 180;
+                    const radA = (thetaA * Math.PI) / 180;
+                    const Bx = P0_CX + P0_R * Math.cos(radB), By = P0_CY - P0_R * Math.sin(radB);
+                    const Cx = P0_CX + P0_R * Math.cos(radC), Cy = P0_CY - P0_R * Math.sin(radC);
+                    const Ax = P0_CX + P0_R * Math.cos(radA), Ay = P0_CY - P0_R * Math.sin(radA);
 
-                    {/* 三角形本體 */}
-                    <polygon
-                      points={question.pts.map(p => p.join(',')).join(' ')}
-                      fill={isSolved ? 'rgba(16,185,129,0.16)' : 'rgba(56,189,248,0.08)'}
-                      stroke="#334155"
-                      strokeWidth="2.6"
-                      strokeLinejoin="round"
-                    />
+                    // 兩處對稱直徑目標點（BA 過圓心 或 CA 過圓心）
+                    const radT1 = ((90 - question.angA) * Math.PI) / 180;
+                    const radT2 = ((90 + question.angA) * Math.PI) / 180;
+                    const T1x = P0_CX + P0_R * Math.cos(radT1), T1y = P0_CY - P0_R * Math.sin(radT1);
+                    const T2x = P0_CX + P0_R * Math.cos(radT2), T2y = P0_CY - P0_R * Math.sin(radT2);
 
-                    {/* 答對時畫出「對邊中點 ↔ 對角頂點」金色對位連線 */}
-                    {isSolved && pickedEdge && pickedAngle && (() => {
-                      const ec = getEdgeCoords(question.pts, pickedEdge.idx);
-                      const vp = question.pts[pickedAngle.v];
-                      return (
-                        <line
-                          x1={ec.mx} y1={ec.my} x2={vp[0]} y2={vp[1]}
-                          stroke="#10b981" strokeWidth="2.6" strokeDasharray="5 4"
+                    // 頂點 A 的恆定圓周角弧線
+                    const acA = getAngleCoords([[Ax, Ay], [Bx, By], [Cx, Cy]], 0);
+
+                    // 若形成直徑，畫出 Thales 直角符號（在 C 或 B）
+                    const rightCorner = isP0DiamRight ? [Cx, Cy] : isP0DiamLeft ? [Bx, By] : null;
+                    const otherBase = isP0DiamRight ? [Bx, By] : [Cx, Cy];
+                    let rightSqPath = null;
+                    if (rightCorner) {
+                      const u1x = Ax - rightCorner[0], u1y = Ay - rightCorner[1];
+                      const l1 = Math.hypot(u1x, u1y) || 1;
+                      const u2x = otherBase[0] - rightCorner[0], u2y = otherBase[1] - rightCorner[1];
+                      const l2 = Math.hypot(u2x, u2y) || 1;
+                      const sq = 11;
+                      const r1 = [rightCorner[0] + (u1x / l1) * sq, rightCorner[1] + (u1y / l1) * sq];
+                      const r2 = [r1[0] + (u2x / l2) * sq, r1[1] + (u2y / l2) * sq];
+                      const r3 = [rightCorner[0] + (u2x / l2) * sq, rightCorner[1] + (u2y / l2) * sq];
+                      rightSqPath = `M ${r1[0]} ${r1[1]} L ${r2[0]} ${r2[1]} L ${r3[0]} ${r3[1]}`;
+                    }
+
+                    return (
+                      <svg
+                        ref={svgRef}
+                        data-coach="lv16-board"
+                        viewBox="0 0 320 218"
+                        onPointerDown={handleCirclePointerDown}
+                        style={{ touchAction: 'none' }}
+                        className={`w-full h-full max-w-[420px] object-contain select-none touch-none ${isSolved ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
+                      >
+                        {/* 外接圓與圓心 O */}
+                        <circle cx={P0_CX} cy={P0_CY} r={P0_R} fill="rgba(56,189,248,0.06)" stroke="#38bdf8" strokeWidth="2" strokeDasharray="5 4" />
+                        {/* 兩條淡橘直徑引導目標點 */}
+                        <line x1={Bx} y1={By} x2={T1x} y2={T1y} stroke="#f59e0b" strokeWidth="1.2" strokeDasharray="4 4" opacity={isP0DiamRight ? 0.9 : 0.35} />
+                        <line x1={Cx} y1={Cy} x2={T2x} y2={T2y} stroke="#f59e0b" strokeWidth="1.2" strokeDasharray="4 4" opacity={isP0DiamLeft ? 0.9 : 0.35} />
+                        <circle cx={T1x} cy={T1y} r="5.5" fill="none" stroke="#f59e0b" strokeWidth="1.6" strokeDasharray="2 2" opacity={isP0DiamRight ? 0 : 0.7} />
+                        <circle cx={T2x} cy={T2y} r="5.5" fill="none" stroke="#f59e0b" strokeWidth="1.6" strokeDasharray="2 2" opacity={isP0DiamLeft ? 0 : 0.7} />
+
+                        {/* 三角形填色 */}
+                        <polygon
+                          points={`${Ax},${Ay} ${Bx},${By} ${Cx},${Cy}`}
+                          fill={isP0DiameterHit ? 'rgba(16,185,129,0.22)' : 'rgba(56,189,248,0.12)'}
+                          stroke="#334155" strokeWidth="2.4" strokeLinejoin="round"
                         />
-                      );
-                    })()}
 
-                    {/* 角度標籤 */}
-                    {question.angles.map((ang) => {
-                      const ac = getAngleCoords(question.pts, ang.v);
-                      const isPicked = pickedAngle?.v === ang.v;
-                      const isHighlight = isPicked || (isSolved && ang.ok);
-                      return (
-                        <g
-                          key={`ang-${ang.v}`}
-                          onClick={(e) => { e.stopPropagation(); handleClickAngle(ang); }}
-                          className="cursor-pointer"
-                        >
-                          <path
-                            d={ac.arcPath}
-                            fill={ang.isGiven ? 'rgba(56,189,248,0.22)' : isHighlight ? 'rgba(16,185,129,0.35)' : 'rgba(251,191,36,0.22)'}
-                            stroke={ang.isGiven ? '#0284c7' : isHighlight ? '#059669' : '#f59e0b'}
-                            strokeWidth="1.8"
-                          />
-                          <g transform={`translate(${ac.lx}, ${ac.ly})`}>
-                            <rect
-                              x="-24" y="-12" width="48" height="24" rx="12"
-                              fill={ang.isGiven ? '#e0f2fe' : isHighlight ? '#059669' : slotAngleActive ? '#fef3c7' : '#ffffff'}
-                              stroke={ang.isGiven ? '#0284c7' : isHighlight ? '#047857' : slotAngleActive ? '#f59e0b' : '#cbd5e1'}
-                              strokeWidth={slotAngleActive && !ang.isGiven ? '2.4' : '1.8'}
-                            />
-                            <text
-                              x="0" y="1"
-                              fill={ang.isGiven ? '#0369a1' : isHighlight ? '#ffffff' : '#92400e'}
-                              fontSize="11.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono"
-                            >
-                              {ang.deg.replace('(頂)', '')}
-                            </text>
-                          </g>
-                        </g>
-                      );
-                    })}
+                        {/* 過圓心直徑發光標示 */}
+                        {isP0DiamRight && (
+                          <>
+                            <line x1={Bx} y1={By} x2={Ax} y2={Ay} stroke="#f59e0b" strokeWidth="4.5" strokeLinecap="round" />
+                            <rect x={P0_CX - 18} y={P0_CY - 12} width="36" height="20" rx="10" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1.8" />
+                            <text x={P0_CX} y={P0_CY - 1} fill="#b45309" fontSize="11.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">2R</text>
+                          </>
+                        )}
+                        {isP0DiamLeft && (
+                          <>
+                            <line x1={Cx} y1={Cy} x2={Ax} y2={Ay} stroke="#f59e0b" strokeWidth="4.5" strokeLinecap="round" />
+                            <rect x={P0_CX - 18} y={P0_CY - 12} width="36" height="20" rx="10" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1.8" />
+                            <text x={P0_CX} y={P0_CY - 1} fill="#b45309" fontSize="11.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">2R</text>
+                          </>
+                        )}
 
-                    {/* 邊長標籤 */}
-                    {question.edges.map((edge) => {
-                      const ec = getEdgeCoords(question.pts, edge.idx);
-                      const isPicked = pickedEdge?.idx === edge.idx;
-                      const isHighlight = isPicked || (isSolved && edge.ok);
-                      return (
-                        <g
-                          key={`edge-${edge.idx}`}
-                          onClick={(e) => { e.stopPropagation(); handleClickEdge(edge); }}
-                          className="cursor-pointer"
-                        >
-                          {(isHighlight || edge.isGiven) && (
-                            <line
-                              x1={ec.p1[0]} y1={ec.p1[1]} x2={ec.p2[0]} y2={ec.p2[1]}
-                              stroke={edge.isGiven ? '#0284c7' : '#059669'} strokeWidth={isHighlight ? '5' : '3.8'} strokeLinecap="round"
-                            />
+                        {/* Thales 直角記號 */}
+                        {rightSqPath && (
+                          <path d={rightSqPath} fill="none" stroke="#059669" strokeWidth="2.4" strokeLinejoin="round" />
+                        )}
+
+                        {/* 圓心 O */}
+                        <circle cx={P0_CX} cy={P0_CY} r="4.2" fill={isP0DiameterHit ? '#f59e0b' : '#0284c7'} stroke="#ffffff" strokeWidth="1.8" />
+                        {!isP0DiameterHit && (
+                          <text x={P0_CX + 9} y={P0_CY + 4} fill="#0369a1" fontSize="11" fontWeight="900" className="font-serif italic">O</text>
+                        )}
+
+                        {/* 頂點 A 恆定圓周角標示 */}
+                        <path d={acA.arcPath} fill="rgba(16,185,129,0.32)" stroke="#059669" strokeWidth="1.8" />
+                        <rect x={acA.lx - 18} y={acA.ly - 10} width="36" height="20" rx="10" fill="#ecfdf5" stroke="#059669" strokeWidth="1.6" />
+                        <text x={acA.lx} y={acA.ly + 1} fill="#047857" fontSize="11" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">
+                          {question.angA}°
+                        </text>
+
+                        {/* 固定底邊 a */}
+                        <line x1={Bx} y1={By} x2={Cx} y2={Cy} stroke="#0284c7" strokeWidth="4.2" strokeLinecap="round" />
+                        <circle cx={Bx} cy={By} r="4.5" fill="#ffffff" stroke="#0284c7" strokeWidth="2.2" />
+                        <circle cx={Cx} cy={Cy} r="4.5" fill="#ffffff" stroke="#0284c7" strokeWidth="2.2" />
+                        <rect x={(Bx + Cx) / 2 - 22} y={By + 6} width="44" height="21" rx="10.5" fill="#e0f2fe" stroke="#0284c7" strokeWidth="1.8" />
+                        <text x={(Bx + Cx) / 2} y={By + 17.5} fill="#0369a1" fontSize="11.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">
+                          a={question.aLabel}
+                        </text>
+
+                        {/* 可拖曳頂點 A 金球 */}
+                        <g className="pointer-events-none">
+                          {!isSolved && (
+                            <circle cx={Ax} cy={Ay} r="21" fill="rgba(245,158,11,0.18)" stroke="rgba(245,158,11,0.45)" strokeWidth="1.5" />
                           )}
-                          <line x1={ec.p1[0]} y1={ec.p1[1]} x2={ec.p2[0]} y2={ec.p2[1]} stroke="transparent" strokeWidth="18" />
-                          <g transform={`translate(${ec.lx}, ${ec.ly})`}>
-                            <rect
-                              x="-22" y="-13" width="44" height="26" rx="13"
-                              fill={edge.isGiven ? '#e0f2fe' : isHighlight ? '#059669' : slotEdgeActive ? '#fffbeb' : '#ffffff'}
-                              stroke={edge.isGiven ? '#0284c7' : isHighlight ? '#047857' : slotEdgeActive ? '#f59e0b' : '#64748b'}
-                              strokeWidth={slotEdgeActive && !edge.isGiven ? '2.4' : '1.8'}
-                            />
-                            <text
-                              x="0" y="1"
-                              fill={edge.isGiven ? '#0369a1' : isHighlight ? '#ffffff' : '#0f172a'}
-                              fontSize="13.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono"
-                            >
-                              {edge.label}
-                            </text>
-                          </g>
+                          <circle cx={Ax} cy={Ay} r="13.5" fill={isP0DiameterHit ? '#10b981' : '#f59e0b'} stroke="#ffffff" strokeWidth="2.8" className={isSolved ? '' : 'animate-pulse'} />
+                          <text x={Ax} y={Ay + 1} fill="#ffffff" fontSize="12" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-serif italic">A</text>
                         </g>
-                      );
-                    })}
-                  </svg>
+                      </svg>
+                    );
+                  })() : (
+                    <svg data-coach="lv16-board" viewBox="0 0 320 218" className="w-full h-full max-w-[420px] object-contain select-none">
+                      {/* 2R 題型繪製柔和外接圓與半徑 R（答對時額外點亮直徑 2R） */}
+                      {question.mode === '2R' && (
+                        <g className="pointer-events-none">
+                          <circle cx="160" cy="122" r="88" fill="rgba(56,189,248,0.06)" stroke="#38bdf8" strokeWidth="1.8" strokeDasharray="5 4" />
+                          {isSolved ? (
+                            <>
+                              <line x1="72" y1="122" x2="248" y2="122" stroke="#f59e0b" strokeWidth="2.4" strokeDasharray="6 3" />
+                              <text x="160" y="112" fill="#b45309" fontSize="12" fontWeight="900" textAnchor="middle" className="font-mono">2R</text>
+                            </>
+                          ) : (
+                            <>
+                              <line x1="160" y1="122" x2="248" y2="122" stroke="#0284c7" strokeWidth="1.6" strokeDasharray="3 3" />
+                              <text x="206" y="114" fill="#0369a1" fontSize="12" fontWeight="900" textAnchor="middle" className="font-serif italic">R</text>
+                            </>
+                          )}
+                          <circle cx="160" cy="122" r="3" fill={isSolved ? '#f59e0b' : '#0284c7'} />
+                        </g>
+                      )}
+
+                      {/* 三角形本體 */}
+                      <polygon
+                        points={question.pts.map(p => p.join(',')).join(' ')}
+                        fill={isSolved ? 'rgba(16,185,129,0.16)' : 'rgba(56,189,248,0.08)'}
+                        stroke="#334155"
+                        strokeWidth="2.6"
+                        strokeLinejoin="round"
+                      />
+
+                      {/* 選滿對邊與對角即亮起「對邊中點 ↔ 對角頂點」金色共振光橋 */}
+                      {pickedEdge && pickedAngle && (() => {
+                        const ec = getEdgeCoords(question.pts, pickedEdge.idx);
+                        const vp = question.pts[pickedAngle.v];
+                        return (
+                          <g className="pointer-events-none">
+                            <line x1={ec.mx} y1={ec.my} x2={vp[0]} y2={vp[1]} stroke="rgba(251,191,36,0.45)" strokeWidth="7" strokeLinecap="round" />
+                            <line x1={ec.mx} y1={ec.my} x2={vp[0]} y2={vp[1]} stroke="#10b981" strokeWidth="2.8" strokeDasharray="6 4" strokeLinecap="round" />
+                          </g>
+                        );
+                      })()}
+
+                      {/* 角度標籤 */}
+                      {question.angles.map((ang) => {
+                        const ac = getAngleCoords(question.pts, ang.v);
+                        const isPicked = pickedAngle?.v === ang.v;
+                        const isHighlight = isPicked || (isSolved && ang.ok);
+                        return (
+                          <g
+                            key={`ang-${ang.v}`}
+                            onClick={(e) => { e.stopPropagation(); handleClickAngle(ang); }}
+                            className="cursor-pointer"
+                          >
+                            <path
+                              d={ac.arcPath}
+                              fill={ang.isGiven ? 'rgba(56,189,248,0.22)' : isHighlight ? 'rgba(16,185,129,0.35)' : 'rgba(251,191,36,0.22)'}
+                              stroke={ang.isGiven ? '#0284c7' : isHighlight ? '#059669' : '#f59e0b'}
+                              strokeWidth="1.8"
+                            />
+                            <g transform={`translate(${ac.lx}, ${ac.ly})`}>
+                              <rect
+                                x="-24" y="-12" width="48" height="24" rx="12"
+                                fill={ang.isGiven ? '#e0f2fe' : isHighlight ? '#059669' : slotAngleActive ? '#fef3c7' : '#ffffff'}
+                                stroke={ang.isGiven ? '#0284c7' : isHighlight ? '#047857' : slotAngleActive ? '#f59e0b' : '#cbd5e1'}
+                                strokeWidth={slotAngleActive && !ang.isGiven ? '2.4' : '1.8'}
+                              />
+                              <text
+                                x="0" y="1"
+                                fill={ang.isGiven ? '#0369a1' : isHighlight ? '#ffffff' : '#92400e'}
+                                fontSize="11.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono"
+                              >
+                                {ang.deg.replace('(頂)', '')}
+                              </text>
+                            </g>
+                          </g>
+                        );
+                      })}
+
+                      {/* 邊長標籤 */}
+                      {question.edges.map((edge) => {
+                        const ec = getEdgeCoords(question.pts, edge.idx);
+                        const isPicked = pickedEdge?.idx === edge.idx;
+                        const isHighlight = isPicked || (isSolved && edge.ok);
+                        return (
+                          <g
+                            key={`edge-${edge.idx}`}
+                            onClick={(e) => { e.stopPropagation(); handleClickEdge(edge); }}
+                            className="cursor-pointer"
+                          >
+                            {(isHighlight || edge.isGiven) && (
+                              <line
+                                x1={ec.p1[0]} y1={ec.p1[1]} x2={ec.p2[0]} y2={ec.p2[1]}
+                                stroke={edge.isGiven ? '#0284c7' : '#059669'} strokeWidth={isHighlight ? '5' : '3.8'} strokeLinecap="round"
+                              />
+                            )}
+                            <line x1={ec.p1[0]} y1={ec.p1[1]} x2={ec.p2[0]} y2={ec.p2[1]} stroke="transparent" strokeWidth="18" />
+                            <g transform={`translate(${ec.lx}, ${ec.ly})`}>
+                              <rect
+                                x="-22" y="-13" width="44" height="26" rx="13"
+                                fill={edge.isGiven ? '#e0f2fe' : isHighlight ? '#059669' : slotEdgeActive ? '#fffbeb' : '#ffffff'}
+                                stroke={edge.isGiven ? '#0284c7' : isHighlight ? '#047857' : slotEdgeActive ? '#f59e0b' : '#64748b'}
+                                strokeWidth={slotEdgeActive && !edge.isGiven ? '2.4' : '1.8'}
+                              />
+                              <text
+                                x="0" y="1"
+                                fill={edge.isGiven ? '#0369a1' : isHighlight ? '#ffffff' : '#0f172a'}
+                                fontSize="13.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono"
+                              >
+                                {edge.label}
+                              </text>
+                            </g>
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  )}
                 </div>
 
-                {/* P2 填完公式後浮出的深色琥珀金心算列 */}
+                {/* 底部互動列：P0 鎖定直徑驗證鈕 ｜ P2 填完公式後浮出心算列 */}
+                {isDragPhase && (
+                  <div className="bg-slate-900 border-t-2 border-slate-800 px-3 py-2.5 shrink-0">
+                    <button
+                      type="button"
+                      disabled={isSolved}
+                      onClick={(e) => { e.stopPropagation(); handleConfirmP0(); }}
+                      className={`w-full h-[46px] rounded-xl font-black text-sm tracking-wide flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
+                        isSolved
+                          ? 'bg-emerald-500 text-white'
+                          : isP0DiameterHit
+                          ? 'bg-gradient-to-r from-emerald-400 to-teal-400 border-b-[3px] border-emerald-700 text-emerald-950 shadow-lg'
+                          : 'bg-gradient-to-r from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 hover:brightness-105'
+                      }`}
+                    >
+                      <span>{isP0DiameterHit ? '✨ 已形成直徑 2R！點此鎖定驗證' : '🔒 鎖定目前位置驗證'}</span>
+                    </button>
+                  </div>
+                )}
                 {qPhase === 2 && (
                   <div data-coach="lv16-opts" className="bg-slate-900 border-t-2 border-slate-800 px-2.5 py-2.5 shrink-0">
                     {!needCalc ? (
                       <div className="h-[46px] flex items-center justify-center text-xs font-bold text-slate-400">
-                        請先點選圖上互為正對的「對邊」與「對角」完成公式
+                        請點選圖上互為正對的「對邊」與「對角」完成公式（順序不限）
                       </div>
                     ) : (
                       <div className="grid grid-cols-4 gap-2">
@@ -17890,12 +18155,15 @@
                 mode={guideMode || 'spotlight'}
                 onDismiss={dismissGuide}
                 steps={guideMode === 'manual' ? [
-                  { desc: '正弦定理核心是「對邊 ÷ sin(對角) 相等 = 2R」：先點選分子的對邊，再點它正對面的角度！' },
-                  { desc: '第 3 階段填完公式後，從底部心算選出 R 或 x 的答案！' }
+                  { desc: '第一階段：沿外接圓拖曳金球 A，親眼觀察同弧圓周角不變，並讓一邊穿過圓心形成直徑 2R！' },
+                  { desc: '第二、三階段：點選圖上互為正對的「對邊」與「對角」填入正弦定理公式（順序不限）！' },
+                  { desc: '第三階段填完公式後，利用特殊角 sin 值心算選出 R 或 x！' }
+                ] : isDragPhase ? [
+                  { target: 'lv16-board', shape: 'rect', pad: 6, swipe: 'x', placement: 'bottom', desc: '按住畫板左右拖曳金球 A 沿外接圓移動，讓其中一邊穿過圓心 O 形成直徑 2R，再按下方鎖定！' }
                 ] : needCalc ? [
                   { target: 'lv16-opts', shape: 'pill', pad: 6, tap: false, placement: 'top', desc: '公式已列好！利用特殊角 sin 值心算選出答案！' }
                 ] : [
-                  { target: 'lv16-board', shape: 'rect', pad: 6, tap: false, placement: 'bottom', desc: qPhase === 1 ? '在有外接圓的圖形中，找出一組「邊與對角都已知」的配對填入公式 = 2R！' : '先點選圖上待求的邊，再點選它正對面的角度，填入上方正弦定理分數槽！' }
+                  { target: 'lv16-board', shape: 'rect', pad: 6, tap: false, placement: 'bottom', desc: '點選（順序不限）圖上互為正對的「對邊」與「對角」，填入上方正弦定理分數槽！' }
                 ]}
               />
             </div>
@@ -18087,6 +18355,28 @@
       }
     ];
 
+    // P0 物理探索：拖曳光臂張合夾角 C（30°~150°, 15° 吸附），親眼看見「餘弦定理 ＝ 畢氏定理 ± 角度修正項」
+    const LV17_COS_P0_EXPLORE = [
+      {
+        id: 'ce0_1',
+        kind: 'pythagoras',
+        a: 4,
+        b: 3,
+        initDeg: 45,
+        targetDeg: 90,
+        formula: '當 C = 90° 時 cos 90° = 0，修正項 −2ab·cos C 歸零 ⇒ c² = 4² + 3² = 25（退化成畢氏定理 c = 5）！'
+      },
+      {
+        id: 'ce0_2',
+        kind: 'obtuse',
+        a: 4,
+        b: 3,
+        initDeg: 60,
+        targetDeg: 120,
+        formula: '鈍角 cos 120° = −½ 負負得正！c² = 16 + 9 − 2·4·3·(−½) = 37 ⇒ c = √37 ≈ 6.1（比 5 更長）！'
+      }
+    ];
+
     const Level17CosineScaleMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
       const starsThreshold = [2, 4, 6];
@@ -18099,8 +18389,9 @@
       } = useLivesLevelSession({ starThresholds: starsThreshold, maxLives, healTarget, currentStars, onUpdateStars });
 
       const [question, setQuestion] = useState(null);
-      // side 模式槽位：{ a: {id, label} | null, b: {id, label} | null, ang: {id, label} | null }
-      // cos  模式槽位：{ a: {id, label} | null, b: {id, label} | null, opp: {id, label} | null }
+      const [armDeg, setArmDeg] = useState(45); // P0 物理張合夾角（30°~150°, 15° 吸附）
+      // side 模式槽位：{ a: {id, label} | null, b: {id, label} | null, third: {id, label} (夾角) | null }
+      // cos  模式槽位：{ a: {id, label} | null, b: {id, label} | null, third: {id, label} (對邊) | null }
       const [slots, setSlots] = useState({ a: null, b: null, third: null });
       const [formulaDone, setFormulaDone] = useState(false);
       const [solvedAns, setSolvedAns] = useState(null);
@@ -18110,14 +18401,20 @@
       const [feedbackAnim, setFeedbackAnim] = useState('');
 
       const qPhase = question ? question.phase : 0;
-      const { showGuide, guideMode, openGuide, dismissGuide } = useStagedLevelGuide(
+      const isDragPhase = qPhase === 0 && Boolean(question?.kind);
+      const activeStageKey = !question || solvedAns ? null : (isDragPhase ? 'p0_drag' : (qPhase === 2 && formulaDone) ? 'p2_calc' : `p${qPhase}_fill`);
+      const { showGuide, guideMode, openGuide, dismissGuide } = useStagedLevelGuide({
         currentStars,
-        qPhase,
-        gameState === 'playing' && !solvedAns,
-        onMarkGuideSeen
-      );
+        hasSeenGuide,
+        onMarkGuideSeen,
+        activeStageKey,
+        phase: qPhase,
+        enabled: gameState === 'playing' && !solvedAns,
+        finalStageKey: 'p2_calc'
+      });
 
       const containerRef = useRef(null);
+      const svgRef = useRef(null);
       const deckRef = useRef([]);
       const questionMissedRef = useRef(false);
       const pendingNextRef = useRef(null);
@@ -18132,12 +18429,11 @@
         fn();
       };
 
+      // P0：2 題物理探索（90° 畢氏退化 → 120° 鈍角變長）｜P1：1 題防干擾求邊 ＋ 1 題反求 cos θ（不限順序）｜P2：2 題列式＋輕量心算
       const buildDeck = () => [
-        ...shuffle([...LV17_COS_P0]).slice(0, 2).map(q => ({ ...q, phase: 0 })),
-        ...shuffle([
-          { ...shuffle([...LV17_COS_P1_SIDE])[0], phase: 1 },
-          { ...shuffle([...LV17_COS_P1_COS])[0], phase: 1 }
-        ]),
+        ...LV17_COS_P0_EXPLORE.map(q => ({ ...q, phase: 0 })),
+        { ...shuffle([...LV17_COS_P1_SIDE])[0], phase: 1 },
+        { ...shuffle([...LV17_COS_P1_COS])[0], phase: 1 },
         ...shuffle([...LV17_COS_P2]).slice(0, 2).map(q => ({ ...q, phase: 2, shuffledOpts: shuffle([...q.opts]) }))
       ];
 
@@ -18145,6 +18441,7 @@
         const q = deckRef.current[Math.min(curProg, deckRef.current.length - 1)] || buildDeck()[0];
         questionMissedRef.current = false;
         setQuestion(q);
+        setArmDeg(q.initDeg ?? 45);
         setSlots({ a: null, b: null, third: null });
         setFormulaDone(false);
         setSolvedAns(null);
@@ -18203,71 +18500,147 @@
         }
       };
 
+      // ===== P0 物理張合夾角拖曳處理（getScreenCTM 精準座標換算 ＋ 全畫板點拖防手機捲動） =====
+      const P0_OX = 148, P0_OY = 178, P0_BASE = 112, P0_ARM = 84;
+      const updateCosArmFromClient = (clientX, clientY) => {
+        const svg = svgRef.current;
+        if (!svg) return;
+        let sx, sy;
+        const ctm = svg.getScreenCTM ? svg.getScreenCTM() : null;
+        if (ctm) {
+          const pt = svg.createSVGPoint();
+          pt.x = clientX;
+          pt.y = clientY;
+          const svgPt = pt.matrixTransform(ctm.inverse());
+          sx = svgPt.x;
+          sy = svgPt.y;
+        } else {
+          const rect = svg.getBoundingClientRect();
+          const scale = Math.min(rect.width / 340, rect.height / 220);
+          const offX = (rect.width - 340 * scale) / 2;
+          const offY = (rect.height - 220 * scale) / 2;
+          sx = (clientX - rect.left - offX) / scale;
+          sy = (clientY - rect.top - offY) / scale;
+        }
+        const dx = sx - P0_OX;
+        const dy = P0_OY - sy;
+        let deg = Math.atan2(Math.max(8, dy), dx) * (180 / Math.PI);
+        deg = Math.max(30, Math.min(150, Math.round(deg / 15) * 15));
+        setArmDeg(prev => {
+          if (prev !== deg) audio.sfxTick();
+          return deg;
+        });
+      };
+
+      const handleCosArmPointerDown = (e) => {
+        if (gameState !== 'playing' || !question || !isDragPhase || solvedAns) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (showGuide) dismissGuide();
+        if (e.currentTarget.setPointerCapture) {
+          try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+        }
+        updateCosArmFromClient(e.clientX, e.clientY);
+        const onMove = (ev) => {
+          if (ev.cancelable) ev.preventDefault();
+          updateCosArmFromClient(ev.clientX, ev.clientY);
+        };
+        const onUp = () => {
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('pointerup', onUp);
+          window.removeEventListener('pointercancel', onUp);
+        };
+        window.addEventListener('pointermove', onMove, { passive: false });
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', onUp);
+      };
+
+      const handleConfirmP0 = () => {
+        if (gameState !== 'playing' || !question || !isDragPhase || solvedAns || (!isRelaxMode && lives <= 0)) return;
+        if (showGuide) dismissGuide();
+        if (armDeg === question.targetDeg) {
+          triggerSuccess(`${armDeg}°`);
+        } else if (question.kind === 'pythagoras') {
+          triggerWrong(`目前 ${armDeg}° 的修正項還沒歸零喔！試試把夾角轉直成 90°（cos 90° = 0）！`);
+        } else {
+          triggerWrong(`目標是鈍角 120°（cos 120° = −½），往左拉開到 120° 看看對邊如何突破 5！`);
+        }
+      };
+
       const activeSlotKey = !slots.a ? 'a' : !slots.b ? 'b' : !slots.third ? 'third' : null;
 
+      // ===== P1/P2 全面解除邊角點擊先後順序限制：點到正確鄰邊、夾角或對邊直接歸位對應槽 =====
+      const checkFormulaComplete = (nextSlots) => {
+        if (nextSlots.a && nextSlots.b && nextSlots.third) {
+          setFormulaDone(true);
+          if (!question.needCalc) {
+            triggerSuccess('公式完成');
+          }
+        }
+      };
+
       const handlePickEdge = (edge) => {
-        if (gameState !== 'playing' || !question || formulaDone || solvedAns || (!isRelaxMode && lives <= 0)) return;
+        if (gameState !== 'playing' || !question || isDragPhase || formulaDone || solvedAns || (!isRelaxMode && lives <= 0)) return;
         if (showGuide) dismissGuide();
         if (edge.role === 'unknown') {
-          triggerWrong('x 是我們要求解的未知邊（已經在等號左邊囉），請點選「已知的兩鄰邊」！', edge.id);
+          triggerWrong('x 是我們要求解的未知邊（已經在等號左邊囉），請點選「已知的兩鄰邊」或「夾角」！', edge.id);
           return;
         }
-        // 已選過同一條邊則忽略
         if ((slots.a && slots.a.id === edge.id) || (slots.b && slots.b.id === edge.id) || (slots.third && slots.third.id === edge.id)) return;
 
         if (question.mode === 'side') {
-          if (activeSlotKey === 'third') {
-            triggerWrong('兩條鄰邊已經填好囉！最後一格請點選圖中的「夾角」填入 cos( )！', edge.id);
-            return;
-          }
           if (edge.role === 'adj') {
+            const targetKey = !slots.a ? 'a' : !slots.b ? 'b' : null;
+            if (!targetKey) {
+              audio.sfxClick();
+              setConceptTip({ text: '兩條鄰邊已填好，請改點圖中的「夾角」填入 cos( )！', id: Date.now() });
+              return;
+            }
             audio.sfxTick();
-            const nextSlots = { ...slots, [activeSlotKey]: { id: edge.id, label: edge.label } };
+            const nextSlots = { ...slots, [targetKey]: { id: edge.id, label: edge.label } };
             setSlots(nextSlots);
             setConceptTip(null);
+            checkFormulaComplete(nextSlots);
           }
         } else {
-          // mode === 'cos'：前兩格要填夾住 θ 的兩鄰邊 (adj)，第三格要填 θ 的對邊 (opp)
-          if (activeSlotKey === 'a' || activeSlotKey === 'b') {
-            if (edge.role === 'adj') {
-              audio.sfxTick();
-              setSlots({ ...slots, [activeSlotKey]: { id: edge.id, label: edge.label } });
-              setConceptTip(null);
-            } else {
-              triggerWrong(`邊 ${edge.label} 是角 θ 的「對邊」，要放在減號後面！前兩格請先點「夾住 θ 的兩鄰邊」！`, edge.id);
+          // mode === 'cos'：不限順序！鄰邊自動填前兩格並同步分母，對邊自動填減號後
+          if (edge.role === 'adj') {
+            const targetKey = !slots.a ? 'a' : !slots.b ? 'b' : null;
+            if (!targetKey) {
+              audio.sfxClick();
+              setConceptTip({ text: '兩條鄰邊已填好，請點選「角 θ 的對邊」放入減號後面！', id: Date.now() });
+              return;
             }
-          } else if (activeSlotKey === 'third') {
-            if (edge.role === 'opp') {
-              audio.sfxTick();
-              setSlots({ ...slots, third: { id: edge.id, label: edge.label } });
-              setFormulaDone(true);
-              triggerSuccess('公式完成');
-            } else {
-              triggerWrong('減號後面要放的是「角 θ 的對邊」喔！', edge.id);
-            }
+            audio.sfxTick();
+            const nextSlots = { ...slots, [targetKey]: { id: edge.id, label: edge.label } };
+            setSlots(nextSlots);
+            setConceptTip(null);
+            checkFormulaComplete(nextSlots);
+          } else if (edge.role === 'opp') {
+            if (slots.third) return;
+            audio.sfxTick();
+            const nextSlots = { ...slots, third: { id: edge.id, label: edge.label } };
+            setSlots(nextSlots);
+            setConceptTip(null);
+            checkFormulaComplete(nextSlots);
           }
         }
       };
 
       const handlePickAngle = (ang) => {
-        if (gameState !== 'playing' || !question || formulaDone || solvedAns || (!isRelaxMode && lives <= 0)) return;
+        if (gameState !== 'playing' || !question || isDragPhase || formulaDone || solvedAns || (!isRelaxMode && lives <= 0)) return;
         if (showGuide) dismissGuide();
         if (question.mode === 'cos') {
           triggerWrong('θ 已經在公式左邊 cos θ 了！請點選三角形的「三條邊」填入右邊分數！', ang.id);
           return;
         }
-        if (activeSlotKey !== 'third') {
-          triggerWrong('請先點選圖中夾住已知角的「兩條鄰邊」，最後再點選「夾角」！', ang.id);
-          return;
-        }
+        if (slots.third) return;
         if (ang.role === 'inc') {
           audio.sfxTick();
-          setSlots({ ...slots, third: { id: ang.id, label: ang.label } });
-          setFormulaDone(true);
+          const nextSlots = { ...slots, third: { id: ang.id, label: ang.label } };
+          setSlots(nextSlots);
           setConceptTip(null);
-          if (!question.needCalc) {
-            triggerSuccess('公式完成');
-          }
+          checkFormulaComplete(nextSlots);
         } else {
           triggerWrong(`${ang.label} 不是兩鄰邊的夾角（也不是 x 的對角），請選「正對未知邊 x 的夾角」！`, ang.id);
         }
@@ -18283,15 +18656,24 @@
         }
       };
 
-      const slotBoxClass = (key, filled) => {
-        if (filled) return 'border-emerald-300 bg-emerald-400/25 text-emerald-100';
-        if (activeSlotKey === key) return 'border-amber-300 bg-amber-400/30 text-amber-100 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]';
-        return 'border-dashed border-white/40 bg-white/5 text-white/50';
+      const slotBoxClass = (filled) => {
+        if (filled) return 'border-emerald-500 bg-emerald-100 text-emerald-900';
+        return 'border-amber-400 bg-amber-100 text-amber-900 animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.5)]';
       };
 
       const isSideMode = !question || question.mode === 'side';
       const usedEdgeIds = new Set([slots.a?.id, slots.b?.id, question?.mode === 'cos' ? slots.third?.id : null].filter(Boolean));
       const usedAngId = question?.mode === 'side' ? slots.third?.id : null;
+
+      // P0 即時幾何與餘弦修正項數據
+      const p0Rad = (armDeg * Math.PI) / 180;
+      const p0Ax = P0_OX + P0_ARM * Math.cos(p0Rad);
+      const p0Ay = P0_OY - P0_ARM * Math.sin(p0Rad);
+      const p0Bx = P0_OX + P0_BASE, p0By = P0_OY;
+      const p0CosVal = Math.cos(p0Rad);
+      const p0CorrTerm = isDragPhase && question ? (-2 * question.a * question.b * p0CosVal) : 0;
+      const p0C2 = isDragPhase && question ? (question.a * question.a + question.b * question.b + p0CorrTerm) : 25;
+      const p0C = Math.sqrt(Math.max(0.01, p0C2));
 
       return (
         <div ref={containerRef} className="w-full h-full flex-1 flex flex-col justify-between pt-0.5 pb-1 relative animate-jelly min-h-0">
@@ -18303,90 +18685,207 @@
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-amber-900 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${solvedAns ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                <StagePhaseStrip phase={qPhase} labels={['基礎公式代入 • 兩鄰邊與夾角', '干擾辨識 × 反求 cos θ 公式', '公式代入 ＋ 輕量心算求邊長']} />
+                <StagePhaseStrip phase={qPhase} labels={['物理探索 • 張合夾角看畢氏與餘弦修正項', '防干擾列式 × 反求 cos θ（順序不限）', '公式代入 ＋ 輕量心算求邊長']} />
 
-                {/* 置頂教科書餘弦定理公式槽 */}
-                <div data-coach="lv17-formula" className="bg-gradient-to-r from-amber-600 to-orange-700 min-h-[76px] px-3 py-1.5 flex justify-between items-center text-white border-b-2 border-amber-950 shrink-0 gap-2">
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <span className="text-[10px] font-bold text-amber-100/90 leading-tight truncate">
-                      {!formulaDone
-                        ? (isSideMode
-                            ? (activeSlotKey === 'third' ? '最後點擊圖中的「夾角（x 的對角）」填入 cos( )' : '點擊圖中「夾住已知角的兩鄰邊」自動同步代入')
-                            : (activeSlotKey === 'third' ? '最後點擊「角 θ 的對邊」放入減號後面' : '點擊「夾住角 θ 的兩鄰邊」自動同步分子與分母'))
-                        : (question.needCalc && !solvedAns ? `公式完成！搭配 ${question.cosHint} 心算選出 x` : '餘弦定理公式代入完成！')}
-                    </span>
-
-                    {isSideMode ? (
-                      <div className="flex items-center flex-wrap gap-1 font-serif font-black text-sm sm:text-base leading-none mt-1">
-                        <span className="text-amber-200 italic">x²</span>
-                        <span>=</span>
-                        <span className={`min-w-[26px] h-[26px] px-1 rounded-lg border-2 inline-flex items-center justify-center font-mono text-xs sm:text-sm ${slotBoxClass('a', slots.a)}`}>
-                          {slots.a ? slots.a.label : 'a'}
-                        </span>
-                        <sup className="-ml-0.5 text-[11px]">2</sup>
-                        <span>+</span>
-                        <span className={`min-w-[26px] h-[26px] px-1 rounded-lg border-2 inline-flex items-center justify-center font-mono text-xs sm:text-sm ${slotBoxClass('b', slots.b)}`}>
-                          {slots.b ? slots.b.label : 'b'}
-                        </span>
-                        <sup className="-ml-0.5 text-[11px]">2</sup>
-                        <span>− 2·</span>
-                        <span className={`min-w-[22px] h-[24px] px-1 rounded-md border inline-flex items-center justify-center font-mono text-xs ${slots.a ? 'border-emerald-300/70 bg-emerald-400/20 text-emerald-100' : 'border-white/25 bg-white/5 text-white/40'}`}>
-                          {slots.a ? slots.a.label : 'a'}
-                        </span>
-                        <span>·</span>
-                        <span className={`min-w-[22px] h-[24px] px-1 rounded-md border inline-flex items-center justify-center font-mono text-xs ${slots.b ? 'border-emerald-300/70 bg-emerald-400/20 text-emerald-100' : 'border-white/25 bg-white/5 text-white/40'}`}>
-                          {slots.b ? slots.b.label : 'b'}
-                        </span>
-                        <span>·cos(</span>
-                        <span className={`min-w-[38px] h-[26px] px-1.5 rounded-lg border-2 inline-flex items-center justify-center font-mono text-xs sm:text-sm ${slotBoxClass('third', slots.third)}`}>
-                          {slots.third ? slots.third.label : '夾角'}
-                        </span>
-                        <span>)</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 font-serif font-black text-sm sm:text-base leading-none mt-1">
-                        <span className="text-amber-200 whitespace-nowrap">cos θ =</span>
-                        <div className="inline-flex flex-col items-center">
-                          <div className="flex items-center gap-0.5 pb-1">
-                            <span className={`min-w-[26px] h-[24px] px-1 rounded-lg border-2 inline-flex items-center justify-center font-mono text-xs ${slotBoxClass('a', slots.a)}`}>
-                              {slots.a ? slots.a.label : '鄰'}
-                            </span>
-                            <sup className="text-[10px]">2</sup>
-                            <span className="mx-0.5">+</span>
-                            <span className={`min-w-[26px] h-[24px] px-1 rounded-lg border-2 inline-flex items-center justify-center font-mono text-xs ${slotBoxClass('b', slots.b)}`}>
-                              {slots.b ? slots.b.label : '鄰'}
-                            </span>
-                            <sup className="text-[10px]">2</sup>
-                            <span className="mx-0.5 text-rose-200">−</span>
-                            <span className={`min-w-[30px] h-[24px] px-1 rounded-lg border-2 inline-flex items-center justify-center font-mono text-xs ${slotBoxClass('third', slots.third)}`}>
-                              {slots.third ? slots.third.label : '對邊'}
-                            </span>
-                            <sup className="text-[10px]">2</sup>
-                          </div>
-                          <div className="w-full h-[2px] bg-white/85 rounded-full" />
-                          <div className="flex items-center gap-0.5 pt-1 text-xs">
-                            <span>2 ·</span>
-                            <span className={`min-w-[22px] h-[22px] px-1 rounded-md border inline-flex items-center justify-center font-mono ${slots.a ? 'border-emerald-300/70 bg-emerald-400/20 text-emerald-100' : 'border-white/25 bg-white/5 text-white/40'}`}>
-                              {slots.a ? slots.a.label : '鄰'}
-                            </span>
-                            <span>·</span>
-                            <span className={`min-w-[22px] h-[22px] px-1 rounded-md border inline-flex items-center justify-center font-mono ${slots.b ? 'border-emerald-300/70 bg-emerald-400/20 text-emerald-100' : 'border-white/25 bg-white/5 text-white/40'}`}>
-                              {slots.b ? slots.b.label : '鄰'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                {/* 置頂清爽指令列（比照 Lv.15 / Lv.16 統一高易讀版面） */}
+                <div className="bg-gradient-to-r from-amber-800 to-orange-900 min-h-[44px] px-3 py-1.5 flex justify-between items-center text-white border-b-2 border-amber-950 shrink-0">
+                  <div className="flex-1 text-center font-black text-xs sm:text-sm text-amber-50 leading-snug">
+                    {isDragPhase
+                      ? (question.kind === 'pythagoras'
+                          ? '拖曳光臂張合夾角，找出讓修正項歸零（退化為畢氏定理）的角度！'
+                          : '拉開夾角至 120°（鈍角），觀察 cos 120° = −½ 如何讓對邊突破 5！')
+                      : !formulaDone
+                      ? (isSideMode
+                          ? '不限順序！點擊圖中「兩條鄰邊」與「夾角」自動同步代入！'
+                          : '不限順序！點擊「兩鄰邊」與「θ 的對邊（放減號後）」！')
+                      : (question.needCalc && !solvedAns ? `公式完成！搭配 ${question.cosHint} 心算選出 x` : '餘弦定理公式代入完成！')}
                   </div>
                   <span className="w-6 h-6 inline-flex items-center justify-center shrink-0">
                     <SuccessBadge show={Boolean(solvedAns)} />
                   </span>
                 </div>
 
-                {/* 乾淨明亮幾何三角形互動畫板 */}
+                {/* 繪圖區頂部：滿寬大字餘弦定理公式區 */}
+                <div data-coach="lv17-formula" className="bg-amber-50/90 border-b border-amber-200/90 px-2.5 py-2 shrink-0 flex items-center justify-center">
+                  {isDragPhase ? (
+                    <div className="flex flex-col items-center gap-0.5">
+                      <div className="flex items-center justify-center flex-wrap gap-1 font-serif font-black text-sm sm:text-base text-amber-950 leading-none">
+                        <span className="text-amber-700 italic">c²</span>
+                        <span>= {question.a}² + {question.b}²</span>
+                        <span className={`px-1.5 py-0.5 rounded-lg font-mono text-xs sm:text-sm border ${
+                          armDeg === 90
+                            ? 'bg-emerald-100 border-emerald-500 text-emerald-800'
+                            : armDeg > 90
+                            ? 'bg-rose-100 border-rose-400 text-rose-800'
+                            : 'bg-sky-100 border-sky-400 text-sky-800'
+                        }`}>
+                          {armDeg === 90 ? '− 0（畢氏！）' : p0CorrTerm > 0 ? `+ ${Math.abs(p0CorrTerm).toFixed(1)}` : `− ${Math.abs(p0CorrTerm).toFixed(1)}`}
+                        </span>
+                        <span className="text-amber-800 font-mono text-xs sm:text-sm">⇒ c ≈ {Math.abs(p0C - Math.round(p0C)) < 0.02 ? Math.round(p0C) : p0C.toFixed(1)}</span>
+                      </div>
+                    </div>
+                  ) : isSideMode ? (
+                    <div className="flex items-center justify-center flex-wrap gap-1 font-serif font-black text-sm sm:text-base text-slate-800 leading-none">
+                      <span className="text-amber-700 italic">x²</span>
+                      <span>=</span>
+                      <span className={`min-w-[28px] h-[28px] px-1.5 rounded-lg border-2 inline-flex items-center justify-center font-mono text-xs sm:text-sm ${slotBoxClass(slots.a)}`}>
+                        {slots.a ? slots.a.label : '鄰'}
+                      </span>
+                      <sup className="-ml-0.5 text-[11px]">2</sup>
+                      <span>+</span>
+                      <span className={`min-w-[28px] h-[28px] px-1.5 rounded-lg border-2 inline-flex items-center justify-center font-mono text-xs sm:text-sm ${slotBoxClass(slots.b)}`}>
+                        {slots.b ? slots.b.label : '鄰'}
+                      </span>
+                      <sup className="-ml-0.5 text-[11px]">2</sup>
+                      <span>− 2·</span>
+                      <span className={`min-w-[22px] h-[24px] px-1 rounded-md border inline-flex items-center justify-center font-mono text-xs ${slots.a ? 'border-emerald-400 bg-emerald-100 text-emerald-900' : 'border-slate-300 bg-white text-slate-400'}`}>
+                        {slots.a ? slots.a.label : '鄰'}
+                      </span>
+                      <span>·</span>
+                      <span className={`min-w-[22px] h-[24px] px-1 rounded-md border inline-flex items-center justify-center font-mono text-xs ${slots.b ? 'border-emerald-400 bg-emerald-100 text-emerald-900' : 'border-slate-300 bg-white text-slate-400'}`}>
+                        {slots.b ? slots.b.label : '鄰'}
+                      </span>
+                      <span>·cos(</span>
+                      <span className={`min-w-[40px] h-[28px] px-1.5 rounded-lg border-2 inline-flex items-center justify-center font-mono text-xs sm:text-sm ${slotBoxClass(slots.third)}`}>
+                        {slots.third ? slots.third.label : '夾角'}
+                      </span>
+                      <span>)</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2 font-serif font-black text-sm sm:text-base text-slate-800 leading-none">
+                      <span className="text-amber-800 whitespace-nowrap">cos θ =</span>
+                      <div className="inline-flex flex-col items-center">
+                        <div className="flex items-center gap-0.5 pb-1">
+                          <span className={`min-w-[28px] h-[25px] px-1.5 rounded-lg border-2 inline-flex items-center justify-center font-mono text-xs ${slotBoxClass(slots.a)}`}>
+                            {slots.a ? slots.a.label : '鄰'}
+                          </span>
+                          <sup className="text-[10px]">2</sup>
+                          <span className="mx-0.5">+</span>
+                          <span className={`min-w-[28px] h-[25px] px-1.5 rounded-lg border-2 inline-flex items-center justify-center font-mono text-xs ${slotBoxClass(slots.b)}`}>
+                            {slots.b ? slots.b.label : '鄰'}
+                          </span>
+                          <sup className="text-[10px]">2</sup>
+                          <span className="mx-0.5 text-rose-600">−</span>
+                          <span className={`min-w-[34px] h-[25px] px-1.5 rounded-lg border-2 inline-flex items-center justify-center font-mono text-xs ${slotBoxClass(slots.third)}`}>
+                            {slots.third ? slots.third.label : '對邊'}
+                          </span>
+                          <sup className="text-[10px]">2</sup>
+                        </div>
+                        <div className="w-full h-[2px] bg-slate-600 rounded-full" />
+                        <div className="flex items-center gap-0.5 pt-1 text-xs">
+                          <span>2 ·</span>
+                          <span className={`min-w-[22px] h-[22px] px-1 rounded-md border inline-flex items-center justify-center font-mono ${slots.a ? 'border-emerald-400 bg-emerald-100 text-emerald-900' : 'border-slate-300 bg-white text-slate-400'}`}>
+                            {slots.a ? slots.a.label : '鄰'}
+                          </span>
+                          <span>·</span>
+                          <span className={`min-w-[22px] h-[22px] px-1 rounded-md border inline-flex items-center justify-center font-mono ${slots.b ? 'border-emerald-400 bg-emerald-100 text-emerald-900' : 'border-slate-300 bg-white text-slate-400'}`}>
+                            {slots.b ? slots.b.label : '鄰'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 乾淨明亮幾何三角形互動畫板（P0 物理張合光臂 ｜ P1/P2 不限順序點選代入） */}
                 <div data-coach="lv17-board" className="relative w-full flex-1 min-h-0 bg-gradient-to-b from-amber-50/40 via-white to-slate-50/70 flex items-center justify-center overflow-hidden px-2 py-1">
                   <HintBanner tip={conceptTip} />
-                  {(() => {
+                  {isDragPhase ? (
+                    <svg
+                      ref={svgRef}
+                      viewBox="0 0 340 220"
+                      onPointerDown={handleCosArmPointerDown}
+                      style={{ touchAction: 'none' }}
+                      className={`w-full h-full max-w-[430px] object-contain select-none touch-none ${solvedAns ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
+                    >
+                      {/* 15° 半圓量角雷達弧 */}
+                      <path
+                        d={`M ${P0_OX + P0_ARM} ${P0_OY} A ${P0_ARM} ${P0_ARM} 0 0 0 ${P0_OX - P0_ARM} ${P0_OY}`}
+                        fill="none" stroke="#cbd5e1" strokeWidth="1.4" strokeDasharray="4 4"
+                      />
+                      {/* 90° 畢氏基準虛線參考 */}
+                      <line x1={P0_OX} y1={P0_OY} x2={P0_OX} y2={P0_OY - P0_ARM} stroke="#10b981" strokeWidth="1.3" strokeDasharray="4 4" opacity={armDeg === 90 ? 0.9 : 0.38} />
+                      <line x1={P0_OX} y1={P0_OY - P0_ARM} x2={p0Bx} y2={p0By} stroke="#10b981" strokeWidth="1.2" strokeDasharray="4 4" opacity={armDeg === 90 ? 0 : 0.3} />
+
+                      {/* 三角形淡色填充 */}
+                      <polygon
+                        points={`${P0_OX},${P0_OY} ${p0Bx},${p0By} ${p0Ax},${p0Ay}`}
+                        fill={armDeg === 90 ? 'rgba(16,185,129,0.20)' : armDeg > 90 ? 'rgba(244,63,94,0.14)' : 'rgba(56,189,248,0.14)'}
+                        stroke="none"
+                      />
+
+                      {/* 夾角扇形與度數（90° 時改畫直角符號） */}
+                      {armDeg === 90 ? (
+                        <path d={`M ${P0_OX + 16} ${P0_OY} L ${P0_OX + 16} ${P0_OY - 16} L ${P0_OX} ${P0_OY - 16}`} fill="none" stroke="#059669" strokeWidth="2.4" />
+                      ) : (
+                        <path
+                          d={`M ${P0_OX} ${P0_OY} L ${P0_OX + 28} ${P0_OY} A 28 28 0 0 0 ${P0_OX + 28 * Math.cos(p0Rad)} ${P0_OY - 28 * Math.sin(p0Rad)} Z`}
+                          fill={armDeg > 90 ? 'rgba(244,63,94,0.24)' : 'rgba(56,189,248,0.24)'}
+                          stroke={armDeg > 90 ? '#e11d48' : '#0284c7'}
+                          strokeWidth="1.8"
+                        />
+                      )}
+                      <text
+                        x={P0_OX + 44 * Math.cos(p0Rad / 2)}
+                        y={P0_OY - 44 * Math.sin(p0Rad / 2) + 4}
+                        fill={armDeg === 90 ? '#047857' : armDeg > 90 ? '#be123c' : '#0369a1'}
+                        fontSize="12.5" fontWeight="900" textAnchor="middle" className="font-mono"
+                      >
+                        {armDeg}°
+                      </text>
+
+                      {/* 固定底邊 a = 4 */}
+                      <line x1={P0_OX} y1={P0_OY} x2={p0Bx} y2={p0By} stroke="#1e293b" strokeWidth="4" strokeLinecap="round" />
+                      <rect x={(P0_OX + p0Bx) / 2 - 16} y={P0_OY + 8} width="32" height="21" rx="10.5" fill="#ffffff" stroke="#475569" strokeWidth="1.8" />
+                      <text x={(P0_OX + p0Bx) / 2} y={P0_OY + 19.5} fill="#0f172a" fontSize="12.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">{question.a}</text>
+
+                      {/* 可旋轉光臂 b = 3 */}
+                      <line x1={P0_OX} y1={P0_OY} x2={p0Ax} y2={p0Ay} stroke="#d97706" strokeWidth="4" strokeLinecap="round" />
+
+                      {/* 動態伸縮對邊 c（依銳/直/鈍變色與即時顯示長度） */}
+                      <line
+                        x1={p0Ax} y1={p0Ay} x2={p0Bx} y2={p0By}
+                        stroke={armDeg === 90 ? '#059669' : armDeg > 90 ? '#e11d48' : '#0284c7'}
+                        strokeWidth="4.2" strokeLinecap="round"
+                      />
+                      {(() => {
+                        const mx = (p0Ax + p0Bx) / 2;
+                        const my = (p0Ay + p0By) / 2;
+                        return (
+                          <g className="pointer-events-none">
+                            <rect
+                              x={mx - 28} y={my - 26} width="56" height="22" rx="11"
+                              fill={armDeg === 90 ? '#ecfdf5' : armDeg > 90 ? '#fff1f2' : '#f0f9ff'}
+                              stroke={armDeg === 90 ? '#059669' : armDeg > 90 ? '#e11d48' : '#0284c7'}
+                              strokeWidth="1.8"
+                            />
+                            <text
+                              x={mx} y={my - 14}
+                              fill={armDeg === 90 ? '#047857' : armDeg > 90 ? '#be123c' : '#0369a1'}
+                              fontSize="11.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono"
+                            >
+                              c={Math.abs(p0C - Math.round(p0C)) < 0.02 ? Math.round(p0C) : p0C.toFixed(1)}
+                            </text>
+                          </g>
+                        );
+                      })()}
+
+                      {/* 固定頂點 */}
+                      <circle cx={P0_OX} cy={P0_OY} r="5" fill="#0f172a" stroke="#ffffff" strokeWidth="2" />
+                      <circle cx={p0Bx} cy={p0By} r="4.5" fill="#ffffff" stroke="#1e293b" strokeWidth="2" />
+
+                      {/* 可拖曳金色拉柄 b = 3 */}
+                      <g className="pointer-events-none">
+                        {!solvedAns && (
+                          <circle cx={p0Ax} cy={p0Ay} r="22" fill="rgba(245,158,11,0.18)" stroke="rgba(245,158,11,0.45)" strokeWidth="1.5" />
+                        )}
+                        <circle cx={p0Ax} cy={p0Ay} r="14.5" fill="#f59e0b" stroke="#ffffff" strokeWidth="2.8" className={solvedAns ? '' : 'animate-pulse'} />
+                        <text x={p0Ax} y={p0Ay + 1} fill="#ffffff" fontSize="12" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">
+                          {question.b}
+                        </text>
+                      </g>
+                    </svg>
+                  ) : (() => {
                     const [p0, p1, p2] = question.pts;
                     const cx = (p0[0] + p1[0] + p2[0]) / 3;
                     const cy = (p0[1] + p1[1] + p2[1]) / 3;
@@ -18553,16 +19052,29 @@
                   })()}
                 </div>
 
-                {/* 底部互動區：P0/P1 顯示步驟提示條；P2 公式完成後出現 4 選 1 心算膠囊 */}
-                {question.needCalc ? (
+                {/* 底部互動區：P0 鎖定夾角鈕 ｜ P1 提示條 ｜ P2 4 選 1 心算膠囊 */}
+                {isDragPhase ? (
+                  <div className="bg-slate-900 border-t-2 border-slate-800 px-3 py-2.5 shrink-0">
+                    <button
+                      type="button"
+                      disabled={Boolean(solvedAns)}
+                      onClick={(e) => { e.stopPropagation(); handleConfirmP0(); }}
+                      className={`w-full h-[46px] rounded-xl font-black text-sm tracking-wide flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
+                        solvedAns
+                          ? 'bg-emerald-500 text-white'
+                          : armDeg === question.targetDeg
+                          ? 'bg-gradient-to-r from-emerald-400 to-teal-400 border-b-[3px] border-emerald-700 text-emerald-950 shadow-lg'
+                          : 'bg-gradient-to-r from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 hover:brightness-105'
+                      }`}
+                    >
+                      <span>{armDeg === question.targetDeg ? `✨ 鎖定 ${armDeg}° 驗證！` : `🔒 鎖定目前夾角（${armDeg}°）`}</span>
+                    </button>
+                  </div>
+                ) : question.needCalc ? (
                   <div className="bg-slate-900 border-t-2 border-slate-800 px-2.5 py-2 shrink-0">
                     {!formulaDone ? (
                       <div className="h-[46px] rounded-xl bg-slate-800/90 border border-slate-700 flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-amber-200">
-                        <span>👆 先點選圖中的</span>
-                        <span className="px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-400/40 text-amber-100">
-                          {activeSlotKey === 'third' ? '夾角（x 的對角）' : '兩條鄰邊'}
-                        </span>
-                        <span>完成餘弦公式</span>
+                        <span>👆 點選圖中的「兩條鄰邊」與「夾角」（順序不限）完成餘弦公式</span>
                       </div>
                     ) : (
                       <div data-coach="lv17-opts" className="flex flex-col gap-1.5">
@@ -18597,9 +19109,9 @@
                     {solvedAns ? (
                       <span className="text-emerald-700">✓ 公式填入完全正確！輕點畫面繼續下一題</span>
                     ) : isSideMode ? (
-                      <span>👆 依序點擊圖中的「兩條鄰邊」與「夾角」填入上方餘弦公式（免計算）</span>
+                      <span>👆 點擊圖中的「兩條鄰邊」與「夾角」填入上方公式（順序不限・免計算）</span>
                     ) : (
-                      <span>👆 先點「夾住 θ 的兩鄰邊」，最後點「θ 的對邊」放減號後（免計算）</span>
+                      <span>👆 點擊「兩鄰邊」與「θ 的對邊（自動放減號後）」（順序不限・免計算）</span>
                     )}
                   </div>
                 )}
@@ -18611,16 +19123,15 @@
                 mode={guideMode || 'spotlight'}
                 onDismiss={dismissGuide}
                 steps={guideMode === 'manual' ? [
-                  { desc: '餘弦定理求邊：x² = a² + b² − 2ab cos C。依序點擊圖中夾住已知角的「兩條鄰邊」與「夾角」，系統會自動同步填入公式！' },
-                  { desc: '反求 cos θ 時，前兩格放「夾住 θ 的兩鄰邊」，減號後面永遠放「θ 的對邊」！' },
-                  { desc: '第三階段填完公式後，再搭配小提示心算選出最終邊長 x！' }
-                ] : qPhase === 0 ? [
-                  { target: 'lv17-formula', shape: 'pill', pad: 6, tap: false, placement: 'bottom', desc: '看上方餘弦定理公式！點選兩條鄰邊時，後面的 2·a·b 會自動同步填入！' },
-                  { target: 'lv17-board', shape: 'rect', pad: 6, tap: false, placement: 'bottom', desc: '直接點擊三角形上的「兩條鄰邊」與「夾角」，這一關前兩階段完全不用計算！' }
-                ] : qPhase === 1 ? [
-                  { target: 'lv17-formula', shape: 'pill', pad: 6, tap: false, placement: 'bottom', desc: '進階變形！注意干擾角，以及反求 cos θ 時「減號後面永遠放 θ 的對邊」喔！' }
+                  { desc: '第一階段：拖曳光臂張合夾角，觀察 90° 時修正項歸零成畢氏定理、120° 鈍角時負負得正變長！' },
+                  { desc: '第二、三階段：點選圖中「兩條鄰邊」與「夾角」（或反求 cos θ 時點「對邊」），順序不限、系統自動同步代入！' },
+                  { desc: '第三階段填完公式後，搭配小提示心算選出邊長 x！' }
+                ] : isDragPhase ? [
+                  { target: 'lv17-board', shape: 'rect', pad: 6, swipe: 'x', placement: 'bottom', desc: '按住畫板左右拖曳光臂張合夾角，觀察上方修正項與對邊 c 的變化，調好後按下方鎖定！' }
+                ] : (qPhase === 2 && formulaDone) ? [
+                  { target: 'lv17-opts', shape: 'pill', pad: 6, tap: false, placement: 'top', desc: '公式已完成！搭配 cos 提示心算選出邊長 x！' }
                 ] : [
-                  { target: 'lv17-board', shape: 'rect', pad: 6, tap: false, placement: 'bottom', desc: '最終階段：先點擊三角形填完餘弦公式，再用下方提示心算選出邊長 x！' }
+                  { target: 'lv17-board', shape: 'rect', pad: 6, tap: false, placement: 'bottom', desc: '直接點選三角形上的鄰邊與夾角（或對邊，順序不限），系統會自動同步代入上方公式！' }
                 ]}
               />
             </div>
