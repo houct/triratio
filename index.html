@@ -6388,6 +6388,7 @@
           pad: 4,
           shape: 'rect',
           tap: false,
+          placement: 'bottom',
           desc: '先點選左欄任一張三角比關係式'
         },
         {
@@ -6395,6 +6396,7 @@
           pad: 4,
           shape: 'rect',
           tap: false,
+          placement: 'bottom',
           desc: '再點選右欄對應的等價結果完成配對！'
         }
       ]), []);
@@ -6903,7 +6905,7 @@
               anchorY: 0.5,
               pad: 8,
               shape: 'rect',
-              tap: true,
+              tap: false,
               desc: '第二階段起需先求出第三邊！依畢氏算式心算後，請點選下方數字填入「?」邊（亦支援拖曳）'
             }
           ];
@@ -6916,7 +6918,7 @@
               anchorY: 0.5,
               pad: 8,
               shape: 'rect',
-              tap: true,
+              tap: false,
               desc: '第三階段隱藏算式提示並翻轉圖形！請純心算第三邊並點選下方數字填入（亦支援拖曳）'
             }
           ];
@@ -6929,6 +6931,7 @@
             pad: 10,
             shape: 'rect',
             tap: false,
+            placement: 'bottom',
             desc: '三邊已就緒！請直接點擊三角形上的邊長數字填入分子與分母槽（亦支援拖曳）'
           }
         ];
@@ -7734,7 +7737,7 @@
                 shape: 'pill',
                 pad: 6,
                 tap: true,
-                desc: '角度對準後點擊「鎖定終邊驗證」，接著再點選終邊所在的象限或座標軸！'
+                desc: '角度對準後點擊「鎖定終邊驗證」，接著再點選終邊所在的象限或坐標軸！'
               }
             ];
           }
@@ -7744,7 +7747,8 @@
               shape: 'rect',
               pad: 4,
               tap: false,
-              desc: '點擊畫板的「第 I～IV 象限」；若終邊落在座標軸上（如 90°、180°），請點「座標大十字／中央圓心（軸上）」。'
+              placement: 'bottom',
+              desc: '點擊畫板的「第 I～IV 象限」；若終邊落在坐標軸上（如 90°、180°），請點「坐標大十字／中央圓心（軸上）」。'
             }
           ];
         }
@@ -7755,6 +7759,7 @@
               shape: 'rect',
               pad: 4,
               tap: false,
+              placement: 'bottom',
               desc: '進階題會先隱藏終邊！請先點擊「第 I～IV 象限」或「大十字／圓心（軸上）」預判終邊位置（不立即扣心）。'
             }
           ];
@@ -8596,6 +8601,7 @@
           pad: 4,
           shape: 'rect',
           tap: false,
+          placement: 'bottom',
           desc: '在星空中滑動一筆連（或依序點擊）串起 3 顆同界角星！'
         }
       ]), []);
@@ -8694,7 +8700,7 @@
         };
       };
 
-      const findHitStar = (pt) => {
+      const findHitStar = (pt, hitRadius = 44) => {
         if (!pt) return null;
         let best = null;
         let bestDist = Infinity;
@@ -8705,7 +8711,7 @@
           const dx = ((pt.x - bx) / 100) * pt.w;
           const dy = ((pt.y - by) / 100) * pt.h;
           const dist = Math.hypot(dx, dy);
-          if (dist <= 44 && dist < bestDist) {
+          if (dist <= hitRadius && dist < bestDist) {
             best = b;
             bestDist = dist;
           }
@@ -8743,7 +8749,8 @@
         const pt = getBoardPct(e.clientX, e.clientY);
         if (!pt) return;
         setDragLinePt({ x: pt.x, y: pt.y });
-        const hit = findHitStar(pt);
+        // 拖曳一筆連時縮小判定半徑（30px），避免滑過干擾星邊緣時誤觸扣心；單點仍維持 44px 寬鬆好按
+        const hit = findHitStar(pt, 30);
         if (hit) {
           handleBubbleTap(hit);
         }
@@ -8867,10 +8874,6 @@
                       className="pointer-events-none absolute rounded-full bg-indigo-100/75 animate-twinkle"
                     />
                   ))}
-                  {/* 頂部警戒微光線 */}
-                  <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-amber-400/12 to-transparent">
-                    <div className="w-full h-[2px] bg-gradient-to-r from-transparent via-amber-400/65 to-transparent" />
-                  </div>
                   {/* 清波極光閃爍 */}
                   {waveCleared && (
                     <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-emerald-400/15 via-amber-300/10 to-transparent animate-pulse" />
@@ -9898,7 +9901,7 @@
                   { id: 'lv10-r-drop', shape: 'pill', pad: 12 }
                 ],
                 target: 'lv10-r-opts',
-                tap: true,
+                tap: false,
                 text: '依 r = √(x² + y²) 請點選下方正確的 r 膠囊填入動徑 r = ?（亦可拖曳貼上）！',
                 shape: 'pill',
                 pad: 8
@@ -9918,7 +9921,8 @@
                   { id: 'lv10-ratio-box', shape: 'pill', pad: 10 }
                 ],
                 target: 'lv10-demo-tag',
-                tap: true,
+                tap: false,
+                placement: 'bottom',
                 text: '請依序點擊圖上的 x、y 或 r 標籤填入上方「分子 / 分母」框（亦可直接拖曳）！',
                 shape: 'pill',
                 pad: 10
@@ -9934,8 +9938,8 @@
                 target: 'lv10-coord-chip',
                 drag: true,
                 text: showTargetRing
-                  ? '按住題目上的座標膠囊，直接拖進網格目標點放開（也可直接在網格拖曳）！'
-                  : '按住題目上的座標膠囊，拖到網格對應的 (x, y) 整數格點放開！',
+                  ? '按住題目上的坐標膠囊，直接拖進網格目標點放開（也可直接在網格拖曳）！'
+                  : '按住題目上的坐標膠囊，拖到網格對應的 (x, y) 整數格點放開！',
                 shape: 'pill',
                 pad: 8
               }
@@ -10882,7 +10886,8 @@
                   { id: 'lv11-ratio-box', shape: 'pill', pad: 10 }
                 ],
                 target: 'lv11-demo-tag',
-                tap: true,
+                tap: false,
+                placement: 'bottom',
                 text: '請依序點擊圖上的 x、y 或 r 標籤填入上方「分子 / 分母」框（亦可直接拖曳）！',
                 shape: 'pill',
                 pad: 10
@@ -11045,7 +11050,7 @@
       } = useLivesLevelSession({ starThresholds: starsThreshold, maxLives, healTarget, currentStars, onUpdateStars });
 
       const [question, setQuestion] = useState(null);
-      const [subStep, setSubStep] = useState(0); // P0/P1: 0=象限, 1=定義, 2=正負 | P2: 0=條件1, 1=條件2, 2=交集
+      const [subStep, setSubStep] = useState(0); // P0: 0=象限, 1=定義, 2=正負 | P1: 0=定義, 1=2象限 | P2: 0=條件1, 1=條件2, 2=交集
       const [isTransitioning, setIsTransitioning] = useState(false);
       const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
       const [isDragging, setIsDragging] = useState(false);
@@ -11065,7 +11070,7 @@
         ? (question.phase === 0
             ? `p0_s${subStep}`
             : question.phase === 1
-            ? 'p1_s0'
+            ? `p1_s${subStep}`
             : question.phase === 2 && (subStep === 0 || subStep === 2)
             ? `p2_s${subStep}`
             : null)
@@ -11168,8 +11173,9 @@
         return [q1, q2, q3];
       };
 
-      // P1：單條件逆推 3 題（sin / cos / tan 各 1 題，保證正負皆出現）
+      // P1：單條件逆推 3 題（sin / cos / tan 各 1 題，保證正負皆出現；先選定義再選 2 象限）
       const buildP1Phase3 = () => {
+        const defMap = { sin: 'y/r', cos: 'x/r', tan: 'y/x' };
         const fns = shuffle(['sin', 'cos', 'tan']);
         const signs = shuffle(['pos', 'neg', Math.random() < 0.5 ? 'pos' : 'neg']);
         return fns.map((fn, idx) => {
@@ -11177,6 +11183,8 @@
           return {
             id: `p1_${key}`,
             phase: 1,
+            fn,
+            def: defMap[fn],
             cond: LV11_P2_CONDS[key]
           };
         });
@@ -11332,9 +11340,29 @@
         }
       };
 
-      // P1（單條件逆推 2 象限）& P2（雙條件逐格滑入 2 象限＋交集）共用處理
+      // P1 Step 1：先選坐標定義（y/r、x/r、y/x），再進 Step 2 選 2 象限
+      const submitP1DefStep = (choice) => {
+        if (gameState !== 'playing' || !question || question.phase !== 1 || subStep !== 0 || isTransitioning || (!isRelaxMode && lives <= 0)) return;
+        if (showGuide) dismissGuide();
+        if (choice === question.def) {
+          setIsTransitioning(true);
+          setConceptTip(null);
+          audio.sfxClick();
+          setFlyOutTarget(getFlyVector(choice));
+          timerRef.current = setTimeout(() => {
+            setFlyOutTarget(null);
+            setDragOffset({ x: 0, y: 0 });
+            setSubStep(1);
+            setIsTransitioning(false);
+          }, 260);
+        } else {
+          triggerWrong(choice, `回想廣義角定義：sin θ = y/r、cos θ = x/r、tan θ = y/x（本題為 ${question.fn} θ）`);
+        }
+      };
+
+      // P1（Step 2 單條件逆推 2 象限）& P2（雙條件逐格滑入 2 象限＋交集）共用處理
       const handleQuadPhaseSelect = (qKey) => {
-        if (gameState !== 'playing' || !question || question.phase === 0 || isTransitioning || (!isRelaxMode && lives <= 0)) return;
+        if (gameState !== 'playing' || !question || question.phase === 0 || (question.phase === 1 && subStep === 0) || isTransitioning || (!isRelaxMode && lives <= 0)) return;
         if (showGuide) dismissGuide();
 
         // P2 Step 3：滑入或點選金色交集象限
@@ -11395,22 +11423,22 @@
 
       const getHoverTarget = (dx, dy) => {
         if (!question) return null;
-        // 2×2 象限四向滑動：P0 Step 1、P1 全程、P2 全程
-        if ((question.phase === 0 && subStep === 0) || question.phase >= 1) {
-          if (Math.hypot(dx, dy) < 42) return null;
-          if (dx >= 0 && dy < 0) return '1';
-          if (dx < 0 && dy < 0) return '2';
-          if (dx < 0 && dy >= 0) return '3';
-          return '4';
-        }
-        // P0 Step 2：上方三向定義槽
-        if (question.phase === 0 && subStep === 1) {
+        // 上方三向定義槽：P0 Step 2、P1 Step 1
+        if ((question.phase === 0 && subStep === 1) || (question.phase === 1 && subStep === 0)) {
           if (dy > -24 && Math.hypot(dx, dy) < 52) return null;
           if (dy > 20) return null;
           if (dx < -38) return 'y/r';
           if (dx > 38) return 'y/x';
           if (dy < -36) return 'x/r';
           return null;
+        }
+        // 2×2 象限四向滑動：P0 Step 1、P1 Step 2、P2 全程
+        if ((question.phase === 0 && subStep === 0) || (question.phase === 1 && subStep === 1) || question.phase === 2) {
+          if (Math.hypot(dx, dy) < 42) return null;
+          if (dx >= 0 && dy < 0) return '1';
+          if (dx < 0 && dy < 0) return '2';
+          if (dx < 0 && dy >= 0) return '3';
+          return '4';
         }
         // P0 Step 3：左右正負
         if (question.phase === 0 && subStep === 2) {
@@ -11442,7 +11470,9 @@
         dragStartRef.current = null;
         const target = getHoverTarget(dragOffset.x, dragOffset.y);
         if (target) {
-          if (question?.phase >= 1) {
+          if (question?.phase === 1 && subStep === 0) {
+            submitP1DefStep(target);
+          } else if (question?.phase >= 1) {
             handleQuadPhaseSelect(target);
           } else {
             submitSignStep(target);
@@ -11463,6 +11493,8 @@
 
       const stepLabels = question?.phase === 2
         ? ['① 條件一', '② 條件二', '③ 交集']
+        : question?.phase === 1
+        ? ['① 定義', subStep === 1 && !solvedStamp ? `② 象限 (${p2Selected.length}/2)` : '② 2 象限']
         : ['① 象限', '② 定義', '③ 正負'];
 
       return (
@@ -11513,7 +11545,7 @@
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${question.phase === 0 ? 'bg-emerald-400' : question.phase === 1 ? 'bg-sky-400' : 'bg-amber-400'}`} />
                     <span className="text-[11px] font-bold text-slate-200 truncate">
-                      {question.phase === 0 ? 'P0 正向推導 • 象限 → 定義 → 正負' : question.phase === 1 ? 'P1 單條件逆推 • 逐格滑入 2 個象限' : `P2 雙條件交集 • ${question.tierLabel}`}
+                      {question.phase === 0 ? 'P0 正向推導 • 象限 → 定義 → 正負' : question.phase === 1 ? 'P1 單條件逆推 • 定義 → 選 2 象限' : `P2 雙條件交集 • ${question.tierLabel}`}
                     </span>
                   </div>
                   {isFever ? (
@@ -11568,32 +11600,22 @@
                   )}
 
                   {/* 右側步驟／進度膠囊 */}
-                  {question.phase === 1 ? (
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 transition-all ${
-                      solvedStamp
-                        ? 'bg-emerald-500/30 text-emerald-200 border border-emerald-400/50'
-                        : 'bg-cyan-400 text-slate-950 shadow-sm'
-                    }`}>
-                      {solvedStamp ? '✓ 完成' : `已選 ${p2Selected.length} / 2 象限`}
-                    </span>
-                  ) : (
-                    <div className="flex items-center gap-1 shrink-0">
-                      {stepLabels.map((lbl, idx) => (
-                        <span
-                          key={lbl}
-                          className={`text-[10px] font-black px-1.5 py-0.5 rounded-full transition-all ${
-                            idx < subStep || solvedStamp
-                              ? 'bg-emerald-500/30 text-emerald-200 border border-emerald-400/50'
-                              : idx === subStep
-                              ? 'bg-amber-400 text-amber-950 shadow-sm'
-                              : 'bg-white/10 text-slate-400'
-                          }`}
-                        >
-                          {(idx < subStep || solvedStamp) ? '✓' : lbl}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {stepLabels.map((lbl, idx) => (
+                      <span
+                        key={idx}
+                        className={`text-[10px] font-black px-1.5 py-0.5 rounded-full transition-all ${
+                          idx < subStep || solvedStamp
+                            ? 'bg-emerald-500/30 text-emerald-200 border border-emerald-400/50'
+                            : idx === subStep
+                            ? (question.phase === 1 ? 'bg-cyan-400 text-slate-950 shadow-sm' : 'bg-amber-400 text-amber-950 shadow-sm')
+                            : 'bg-white/10 text-slate-400'
+                        }`}
+                      >
+                        {(idx < subStep || solvedStamp) ? '✓' : lbl}
+                      </span>
+                    ))}
+                  </div>
                 </div>
 
                 {/* 主操作舞台（Z 軸三層上疊：底層四象限盤 → 中層定義 → 上層正負，移除底部橫條讓盤面最大化） */}
@@ -11715,17 +11737,16 @@
 
                       {/* Layer 2（中層・Step 2 浮上來）：上方三向定義槽，底層亮象限透出可見 */}
                       {subStep === 1 && (
-                        <div className="absolute inset-0 z-30 p-2 flex flex-col justify-between bg-slate-950/20">
-                          <div className="grid grid-cols-3 gap-2 pt-1">
+                        <div className="absolute inset-0 z-30 p-2 bg-slate-950/20">
+                          <div data-coach="lv11-defslot" className="relative z-30 grid grid-cols-3 gap-2 pt-1">
                             {LV11_DEF_SLOTS.map(slot => {
                               const isWrong = wrongTargetKey === slot.key;
                               const isHover = hoverTarget === slot.key;
                               return (
                                 <button
                                   key={slot.key}
-                                  data-coach={slot.key === 'x/r' ? 'lv11-defslot' : undefined}
                                   onClick={() => submitSignStep(slot.key)}
-                                  className={`min-h-[84px] sm:min-h-[96px] rounded-2xl border-2 backdrop-blur-md flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
+                                  className={`min-h-[78px] sm:min-h-[88px] rounded-2xl border-2 backdrop-blur-md flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
                                     isWrong
                                       ? 'bg-red-500/85 border-red-200 text-white btn-wrong-flash'
                                       : isHover
@@ -11740,7 +11761,7 @@
                             })}
                           </div>
 
-                          <div className="flex-1 flex items-center justify-center relative">
+                          <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-20">
                             <div
                               data-coach="lv11-card"
                               onPointerDown={handleCardPointerDown}
@@ -11752,7 +11773,7 @@
                                 transition: isDragging ? 'none' : flyOutTarget ? 'transform 0.2s ease-out, opacity 0.2s ease-out' : 'transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)',
                                 opacity: flyOutTarget ? 0 : 1
                               }}
-                              className={`relative z-20 min-w-[168px] max-w-[228px] rounded-3xl bg-white border-4 px-5 py-3.5 shadow-2xl flex flex-col items-center justify-center gap-1 text-center cursor-grab active:cursor-grabbing touch-none ${
+                              className={`pointer-events-auto min-w-[168px] max-w-[228px] rounded-3xl bg-white border-4 px-5 py-3.5 shadow-2xl flex flex-col items-center justify-center gap-1 text-center cursor-grab active:cursor-grabbing touch-none ${
                                 isFever ? 'border-amber-400 shadow-[0_0_28px_rgba(251,191,36,0.55)]' : 'border-sky-400'
                               }`}
                             >
@@ -11837,10 +11858,12 @@
                     </div>
                   )}
 
-                  {/* ==================== P1：單條件逆推（逐格四向滑入 2 象限） ==================== */}
+                  {/* ==================== P1：單條件逆推（① 先選定義 → ② 逐格四向滑入 2 象限，不顯示 (+,+)） ==================== */}
                   {question.phase === 1 && (
                     <div className="flex-1 min-h-0 flex flex-col relative">
-                      <div className="grid grid-cols-2 gap-3 flex-1 min-h-0 relative p-1">
+                      <div className={`grid grid-cols-2 gap-3 flex-1 min-h-0 relative p-1 transition-all duration-300 ${
+                        subStep === 0 ? 'pointer-events-none opacity-45' : ''
+                      }`}>
                         {/* 中央十字 x / y 坐標軸 */}
                         <div className="pointer-events-none absolute inset-0 z-10">
                           <div className="absolute left-1/2 -translate-x-1/2 top-0.5 bottom-0.5 w-[2px] bg-indigo-200/35 rounded-full" />
@@ -11853,8 +11876,8 @@
                           const info = LV11_QUAD_INFO[qKey];
                           const isLocked = p2Cond1Locked.includes(qKey);
                           const isPicked = p2Selected.includes(qKey);
-                          const isWrong = wrongTargetKey === qKey;
-                          const isHover = hoverTarget === qKey;
+                          const isWrong = subStep === 1 && wrongTargetKey === qKey;
+                          const isHover = subStep === 1 && hoverTarget === qKey;
 
                           let cellCls = 'bg-indigo-900/50 border-indigo-400/45 text-indigo-100 hover:bg-indigo-800/70';
                           if (isWrong) {
@@ -11870,6 +11893,7 @@
                           return (
                             <button
                               key={qKey}
+                              disabled={subStep === 0}
                               data-coach={qKey === '2' ? 'lv11-p1grid' : undefined}
                               onClick={() => handleQuadPhaseSelect(qKey)}
                               className={`relative rounded-2xl border-2 flex flex-col items-center justify-center p-2 transition-all active:scale-95 ${cellCls}`}
@@ -11888,27 +11912,90 @@
                         })}
                       </div>
 
-                      {/* 中央單條件拖曳滑卡（逐格滑入 2 象限，或直接點擊 2 象限） */}
-                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-20">
-                        <div
-                          data-coach="lv11-p1card"
-                          onPointerDown={handleCardPointerDown}
-                          onPointerMove={handleCardPointerMove}
-                          onPointerUp={handleCardPointerUp}
-                          onPointerCancel={handleCardPointerUp}
-                          style={{
-                            transform: cardTransform,
-                            transition: isDragging ? 'none' : flyOutTarget ? 'transform 0.2s ease-out, opacity 0.2s ease-out' : 'transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)',
-                            opacity: flyOutTarget ? 0 : 1
-                          }}
-                          className={`pointer-events-auto min-w-[158px] sm:min-w-[180px] rounded-2xl bg-white border-4 px-4 py-3 shadow-2xl flex flex-col items-center justify-center gap-0.5 text-center cursor-grab active:cursor-grabbing touch-none ${
-                            isFever ? 'border-amber-400 shadow-[0_0_26px_rgba(251,191,36,0.65)]' : 'border-cyan-400'
-                          }`}
-                        >
-                          <span className="text-[10px] font-black text-cyan-600">逐格滑入 2 個象限 ({p2Selected.length}/2)</span>
-                          <div className="text-xl sm:text-2xl font-serif font-black text-indigo-950 whitespace-nowrap">{question.cond.text}</div>
+                      {/* P1 Step 1（subStep === 0）：上方三向坐標定義槽＋正中央函數卡（與十字軸原點對齊） */}
+                      {subStep === 0 && (
+                        <div className="absolute inset-0 z-30 p-2 bg-slate-950/20">
+                          <div data-coach="lv11-p1defslot" className="relative z-30 grid grid-cols-3 gap-2 pt-1">
+                            {LV11_DEF_SLOTS.map(slot => {
+                              const isWrong = wrongTargetKey === slot.key;
+                              const isHover = hoverTarget === slot.key;
+                              return (
+                                <button
+                                  key={slot.key}
+                                  onClick={() => submitP1DefStep(slot.key)}
+                                  className={`min-h-[78px] sm:min-h-[88px] rounded-2xl border-2 backdrop-blur-md flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
+                                    isWrong
+                                      ? 'bg-red-500/85 border-red-200 text-white btn-wrong-flash'
+                                      : isHover
+                                      ? 'bg-sky-400 border-white text-slate-950 scale-105 shadow-[0_0_24px_rgba(56,189,248,0.85)]'
+                                      : 'bg-slate-900/75 border-sky-400/75 text-sky-100 hover:bg-sky-500/35 shadow-lg'
+                                  }`}
+                                >
+                                  <FracText value={slot.label} size="lg" className="font-black" />
+                                  <span className="text-[10px] font-bold opacity-80">{slot.arrow}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-20">
+                            <div
+                              data-coach="lv11-p1defcard"
+                              onPointerDown={handleCardPointerDown}
+                              onPointerMove={handleCardPointerMove}
+                              onPointerUp={handleCardPointerUp}
+                              onPointerCancel={handleCardPointerUp}
+                              style={{
+                                transform: cardTransform,
+                                transition: isDragging ? 'none' : flyOutTarget ? 'transform 0.2s ease-out, opacity 0.2s ease-out' : 'transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                                opacity: flyOutTarget ? 0 : 1
+                              }}
+                              className={`pointer-events-auto min-w-[168px] max-w-[228px] rounded-3xl bg-white border-4 px-5 py-3.5 shadow-2xl flex flex-col items-center justify-center gap-1 text-center cursor-grab active:cursor-grabbing touch-none ${
+                                isFever ? 'border-amber-400 shadow-[0_0_28px_rgba(251,191,36,0.55)]' : 'border-sky-400'
+                              }`}
+                            >
+                              <span className="text-[10px] font-black text-sky-600">① 上滑選坐標定義</span>
+                              <div className="text-2xl sm:text-3xl font-serif font-black text-indigo-950 whitespace-nowrap">{question.fn} θ</div>
+                              <span className="text-[10px] font-bold text-slate-400">拖往上方或直接點擊</span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      )}
+
+                      {/* P1 Step 2（subStep === 1）：頂部鎖定定義標記（僅顯示 ✓ fn θ = def） */}
+                      {subStep === 1 && (
+                        <div className="pointer-events-none absolute top-2 left-1/2 -translate-x-1/2 z-30">
+                          <div data-coach="lv11-p1defbadge" className="inline-flex items-center gap-2 px-4 py-1.5 rounded-2xl bg-sky-950/85 backdrop-blur-md border-2 border-sky-400/85 text-sky-100 shadow-[0_6px_22px_rgba(56,189,248,0.45)]">
+                            <span className="text-xs font-black text-sky-300">✓</span>
+                            <span className="text-sm sm:text-base font-serif font-black">{question.fn} θ =</span>
+                            <FracText value={question.def} size="md" className="font-black text-white" />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* P1 Step 2（subStep === 1）：中央單條件拖曳滑卡（逐格滑入 2 象限，或直接點擊 2 象限） */}
+                      {subStep === 1 && (
+                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-20">
+                          <div
+                            data-coach="lv11-p1card"
+                            onPointerDown={handleCardPointerDown}
+                            onPointerMove={handleCardPointerMove}
+                            onPointerUp={handleCardPointerUp}
+                            onPointerCancel={handleCardPointerUp}
+                            style={{
+                              transform: cardTransform,
+                              transition: isDragging ? 'none' : flyOutTarget ? 'transform 0.2s ease-out, opacity 0.2s ease-out' : 'transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                              opacity: flyOutTarget ? 0 : 1
+                            }}
+                            className={`pointer-events-auto min-w-[158px] sm:min-w-[180px] rounded-2xl bg-white border-4 px-4 py-3 shadow-2xl flex flex-col items-center justify-center gap-0.5 text-center cursor-grab active:cursor-grabbing touch-none ${
+                              isFever ? 'border-amber-400 shadow-[0_0_26px_rgba(251,191,36,0.65)]' : 'border-cyan-400'
+                            }`}
+                          >
+                            <span className="text-[10px] font-black text-cyan-600">② 逐格滑入 2 個象限 ({p2Selected.length}/2)</span>
+                            <div className="text-xl sm:text-2xl font-serif font-black text-indigo-950 whitespace-nowrap">{question.cond.text}</div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -12089,48 +12176,68 @@
               {
                 target: 'lv11-quadcard',
                 text: '雙色重疊的金色象限就是答案！滑入或輕點鎖定它',
-                shape: 'ellipse',
+                shape: 'rect',
                 pad: 10,
+                placement: 'bottom',
                 tap: false
               }
             ] : [
               {
                 target: 'lv11-quadcard',
                 text: '抓著條件卡逐格滑入符合的 2 個象限（或直接點擊 2 格），疊出兩層光膜找交集！',
-                shape: 'ellipse',
-                pad: 10,
-                tap: false
-              }
-            ]) : question?.phase === 1 ? [
-              {
-                target: 'lv11-p1card',
-                text: '單條件逆推！將條件卡依序滑入符合的 2 個象限（或直接點 2 格）',
-                shape: 'ellipse',
-                pad: 10,
-                tap: false
-              }
-            ] : subStep === 0 ? [
-              {
-                target: 'lv11-card',
-                text: '第 1 步：先把角度拖進對應象限（或直接點擊象限）',
-                shape: 'ellipse',
-                pad: 10,
-                tap: false
-              }
-            ] : subStep === 1 ? [
-              {
-                target: 'lv11-defslot',
-                text: '第 2 步：上滑選擇對應的坐標定義（y/r、x/r 或 y/x）',
                 shape: 'rect',
-                pad: 8,
+                pad: 10,
+                placement: 'bottom',
+                tap: false
+              }
+            ]) : question?.phase === 1 ? (subStep === 0 ? [
+              {
+                targets: [
+                  { id: 'lv11-p1defslot', shape: 'rect', pad: 8 },
+                  { id: 'lv11-p1defcard', shape: 'rect', pad: 10 }
+                ],
+                text: '單條件逆推！第 1 步先上滑或點擊選出對應的坐標定義（y/r、x/r 或 y/x）',
+                placement: 'bottom',
                 tap: false
               }
             ] : [
               {
+                targets: [
+                  { id: 'lv11-p1card', shape: 'rect', pad: 10 },
+                  { id: 'lv11-p1defbadge', shape: 'pill', pad: 8 }
+                ],
+                text: '第 2 步：對照上方鎖定的定義，將條件卡依序滑入符合的 2 個象限（或直接點 2 格）',
+                placement: 'bottom',
+                tap: false
+              }
+            ]) : subStep === 0 ? [
+              {
                 target: 'lv11-card',
-                text: '第 3 步：對照底層亮象限與中層定義，左滑負值、右滑正值！',
-                shape: 'ellipse',
+                text: '第 1 步：先把角度拖進對應象限（或直接點擊象限）',
+                shape: 'rect',
                 pad: 10,
+                placement: 'bottom',
+                tap: false
+              }
+            ] : subStep === 1 ? [
+              {
+                targets: [
+                  { id: 'lv11-defslot', shape: 'rect', pad: 8 },
+                  { id: 'lv11-card', shape: 'rect', pad: 10 }
+                ],
+                text: '第 2 步：上滑或點擊選擇對應的坐標定義（y/r、x/r 或 y/x）',
+                placement: 'bottom',
+                tap: false
+              }
+            ] : [
+              {
+                targets: [
+                  { id: 'lv11-card', shape: 'rect', pad: 8 },
+                  { id: 'lv11-neg', shape: 'rect', pad: 6 },
+                  { id: 'lv11-pos', shape: 'rect', pad: 6 }
+                ],
+                text: '第 3 步：對照底層亮象限與上方定義，左滑負值、右滑正值！',
+                placement: 'bottom',
                 swipe: 'x'
               }
             ]}
@@ -12301,7 +12408,7 @@
           desc: '觀察單位圓終邊與坐標正負，將廣義角化為「± 三角比 銳角」'
         },
         {
-          target: 'lv12-ref-wheel',
+          target: 'lv12-wheel',
           pad: 4,
           shape: 'rect',
           swipe: 'y',
@@ -13441,8 +13548,8 @@
           return [
             { desc: '下方第一區（單選）：依畢氏三元數選出目標三角比的絕對值。' },
             { desc: '下方第二、三區（獨立開關）：依兩個條件點亮對應象限（田字排列即 II｜I / III｜IV）。' },
-            { desc: '三區按錯不扣心也不提示；唯有三區全部正確，上方防火牆滑門才會自動滑開！' },
-            { desc: '滑門開啟後，對照下方點亮的兩組象限判斷正負號，點選（或拖曳）正確金鑰填入左側空格完成解碼！' }
+            { desc: '三區按錯不扣心也不提示；唯有三區全部正確，上方氣閘雙門才會自動滑開！' },
+            { desc: '氣閘開啟後，對照下方點亮的兩組象限交集判斷正負號，點選（或拖曳）正確 IC 晶片插入左側插槽完成解碼！' }
           ];
         }
         if (bombStage === 'wires') {
@@ -17004,11 +17111,11 @@
                   { desc: '第二、三階段：點選（或拖曳）圖上「夾住角度的兩條邊」與「夾角」填入頂部面積公式 Δ = ½·a·b·sin C（順序不限）！' },
                   { desc: '第三階段填完公式後，從底部心算選出最終面積！' }
                 ] : isDragPhase ? [
-                  { target: 'lv15-board', shape: 'ellipse', pad: 6, swipe: 'x', desc: '按住金色圓球左右拖曳旋轉光臂，即時觀察高 h 與面積變化，調好後按下方按鈕鎖定！' }
+                  { target: 'lv15-board', shape: 'rect', pad: 6, swipe: 'x', placement: 'bottom', desc: '按住金色圓球左右拖曳旋轉光臂，即時觀察高 h 與面積變化，調好後按下方按鈕鎖定！' }
                 ] : needCalc ? [
-                  { target: 'lv15-opts', shape: 'pill', pad: 6, tap: false, desc: '公式已列好！心算約分後，點選正確的面積答案！' }
+                  { target: 'lv15-opts', shape: 'pill', pad: 6, tap: false, placement: 'top', desc: '公式已列好！心算約分後，點選正確的面積答案！' }
                 ] : [
-                  { target: 'lv15-board', shape: 'ellipse', pad: 6, tap: false, desc: '小心干擾邊角！點選（順序不限）圖上「夾住角度的兩條邊」與「夾角」填入上方公式！' }
+                  { target: 'lv15-board', shape: 'rect', pad: 6, tap: false, placement: 'bottom', desc: '小心干擾邊角！點選（順序不限）圖上「夾住角度的兩條邊」與「夾角」填入上方公式！' }
                 ]}
               />
             </div>
@@ -17623,9 +17730,9 @@
                   { desc: '正弦定理核心是「對邊 ÷ sin(對角) 相等 = 2R」：先點選分子的對邊，再點它正對面的角度！' },
                   { desc: '第 3 階段填完公式後，從底部心算選出 R 或 x 的答案！' }
                 ] : needCalc ? [
-                  { target: 'lv16-opts', shape: 'pill', pad: 6, tap: false, desc: '公式已列好！利用特殊角 sin 值心算選出答案！' }
+                  { target: 'lv16-opts', shape: 'pill', pad: 6, tap: false, placement: 'top', desc: '公式已列好！利用特殊角 sin 值心算選出答案！' }
                 ] : [
-                  { target: 'lv16-board', shape: 'ellipse', pad: 6, tap: false, desc: qPhase === 1 ? '在有外接圓的圖形中，找出一組「邊與對角都已知」的配對填入公式 = 2R！' : '先點選圖上待求的邊，再點選它正對面的角度，填入上方正弦定理分數槽！' }
+                  { target: 'lv16-board', shape: 'rect', pad: 6, tap: false, placement: 'bottom', desc: qPhase === 1 ? '在有外接圓的圖形中，找出一組「邊與對角都已知」的配對填入公式 = 2R！' : '先點選圖上待求的邊，再點選它正對面的角度，填入上方正弦定理分數槽！' }
                 ]}
               />
             </div>
@@ -18346,11 +18453,11 @@
                   { desc: '第三階段填完公式後，再搭配小提示心算選出最終邊長 x！' }
                 ] : qPhase === 0 ? [
                   { target: 'lv17-formula', shape: 'pill', pad: 6, tap: false, placement: 'bottom', desc: '看上方餘弦定理公式！點選兩條鄰邊時，後面的 2·a·b 會自動同步填入！' },
-                  { target: 'lv17-board', shape: 'rect', pad: 6, tap: true, placement: 'top', desc: '直接點擊三角形上的「兩條鄰邊」與「夾角」，這一關前兩階段完全不用計算！' }
+                  { target: 'lv17-board', shape: 'rect', pad: 6, tap: false, placement: 'bottom', desc: '直接點擊三角形上的「兩條鄰邊」與「夾角」，這一關前兩階段完全不用計算！' }
                 ] : qPhase === 1 ? [
                   { target: 'lv17-formula', shape: 'pill', pad: 6, tap: false, placement: 'bottom', desc: '進階變形！注意干擾角，以及反求 cos θ 時「減號後面永遠放 θ 的對邊」喔！' }
                 ] : [
-                  { target: 'lv17-board', shape: 'rect', pad: 6, tap: true, placement: 'top', desc: '最終階段：先點擊三角形填完餘弦公式，再用下方提示心算選出邊長 x！' }
+                  { target: 'lv17-board', shape: 'rect', pad: 6, tap: false, placement: 'bottom', desc: '最終階段：先點擊三角形填完餘弦公式，再用下方提示心算選出邊長 x！' }
                 ]}
               />
             </div>
