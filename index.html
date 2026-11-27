@@ -16632,17 +16632,31 @@
         if (!gameOver) setTimeout(() => setFeedbackAnim(''), 360);
       };
 
-      // ===== P0 物理旋轉光臂拖曳處理（放大版幾何座標，15° 吸附，範圍 15°~165°） =====
+      // ===== P0 物理旋轉光臂拖曳處理（放大版幾何座標，15° 吸附，範圍 15°~165°；使用 getScreenCTM 精準換算並支援整張畫板拖曳防手機捲動） =====
       const P0_OX = 148, P0_OY = 182, P0_BASE = 140, P0_ARM = 122;
       const updateArmFromClient = (clientX, clientY) => {
         const svg = svgRef.current;
         if (!svg) return;
-        const rect = svg.getBoundingClientRect();
-        const sx = ((clientX - rect.left) / rect.width) * 320;
-        const sy = ((clientY - rect.top) / rect.height) * 218;
+        let sx, sy;
+        const ctm = svg.getScreenCTM ? svg.getScreenCTM() : null;
+        if (ctm) {
+          const pt = svg.createSVGPoint();
+          pt.x = clientX;
+          pt.y = clientY;
+          const svgPt = pt.matrixTransform(ctm.inverse());
+          sx = svgPt.x;
+          sy = svgPt.y;
+        } else {
+          const rect = svg.getBoundingClientRect();
+          const scale = Math.min(rect.width / 320, rect.height / 218);
+          const offX = (rect.width - 320 * scale) / 2;
+          const offY = (rect.height - 218 * scale) / 2;
+          sx = (clientX - rect.left - offX) / scale;
+          sy = (clientY - rect.top - offY) / scale;
+        }
         const dx = sx - P0_OX;
         const dy = P0_OY - sy;
-        let deg = Math.atan2(Math.max(10, dy), dx) * (180 / Math.PI);
+        let deg = Math.atan2(Math.max(8, dy), dx) * (180 / Math.PI);
         deg = Math.max(15, Math.min(165, Math.round(deg / 15) * 15));
         setArmDeg(prev => {
           if (prev !== deg) audio.sfxTick();
@@ -16655,14 +16669,20 @@
         e.preventDefault();
         e.stopPropagation();
         if (showGuide) dismissGuide();
+        if (e.currentTarget.setPointerCapture) {
+          try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+        }
         updateArmFromClient(e.clientX, e.clientY);
-        const onMove = (ev) => updateArmFromClient(ev.clientX, ev.clientY);
+        const onMove = (ev) => {
+          if (ev.cancelable) ev.preventDefault();
+          updateArmFromClient(ev.clientX, ev.clientY);
+        };
         const onUp = () => {
           window.removeEventListener('pointermove', onMove);
           window.removeEventListener('pointerup', onUp);
           window.removeEventListener('pointercancel', onUp);
         };
-        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointermove', onMove, { passive: false });
         window.addEventListener('pointerup', onUp);
         window.addEventListener('pointercancel', onUp);
       };
@@ -16960,7 +16980,14 @@
                   <HintBanner tip={conceptTip} />
 
                   {isDragPhase ? (
-                    <svg ref={svgRef} data-coach="lv15-board" viewBox="0 0 320 218" className="w-full h-full max-w-[430px] object-contain select-none">
+                    <svg
+                      ref={svgRef}
+                      data-coach="lv15-board"
+                      viewBox="0 0 320 218"
+                      onPointerDown={handleArmPointerDown}
+                      style={{ touchAction: 'none' }}
+                      className={`w-full h-full max-w-[430px] object-contain select-none touch-none ${isSolved ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
+                    >
                       {/* 15° 半圓量角雷達虛線弧 */}
                       <path
                         d={`M ${P0_OX + P0_ARM} ${P0_OY} A ${P0_ARM} ${P0_ARM} 0 0 0 ${P0_OX - P0_ARM} ${P0_OY}`}
@@ -17045,15 +17072,15 @@
                         })()}
                       </g>
 
-                      {/* 可拖曳金色拉柄 */}
+                      {/* 可拖曳金色拉柄（加大觸控感應圈，且整張畫板皆可直接點拖） */}
                       <g
-                        onPointerDown={handleArmPointerDown}
-                        style={{ touchAction: 'none' }}
-                        className={isSolved ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}
+                        className="pointer-events-none"
                       >
-                        <circle cx={p0Ax} cy={p0Ay} r="26" fill="transparent" />
-                        <circle cx={p0Ax} cy={p0Ay} r="13" fill="#f59e0b" stroke="#ffffff" strokeWidth="2.8" className={isSolved ? '' : 'animate-pulse'} />
-                        <text x={p0Ax} y={p0Ay + 1} fill="#ffffff" fontSize="11.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">
+                        {!isSolved && (
+                          <circle cx={p0Ax} cy={p0Ay} r="22" fill="rgba(245,158,11,0.18)" stroke="rgba(245,158,11,0.45)" strokeWidth="1.5" />
+                        )}
+                        <circle cx={p0Ax} cy={p0Ay} r="15" fill="#f59e0b" stroke="#ffffff" strokeWidth="2.8" className={isSolved ? '' : 'animate-pulse'} />
+                        <text x={p0Ax} y={p0Ay + 1} fill="#ffffff" fontSize="12" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">
                           {question.b}
                         </text>
                       </g>
