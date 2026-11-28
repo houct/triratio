@@ -1829,13 +1829,21 @@
         };
 
         const raf = requestAnimationFrame(measure);
+        let orientTimer = null;
+        const handleOrient = () => {
+          clearTimeout(orientTimer);
+          orientTimer = setTimeout(measure, 180);
+        };
         const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
         if (ro && containerRef.current) ro.observe(containerRef.current);
         window.addEventListener('resize', measure);
+        window.addEventListener('orientationchange', handleOrient);
         return () => {
           cancelAnimationFrame(raf);
+          clearTimeout(orientTimer);
           if (ro) ro.disconnect();
           window.removeEventListener('resize', measure);
+          window.removeEventListener('orientationchange', handleOrient);
         };
       }, [active, ready, stepIdx, steps, containerRef]);
 
@@ -8752,9 +8760,9 @@
                     const wLy = Math.max(14, Math.min(166, 90 - 68 * Math.sin(wLabelRad)));
                     return (
                       <div className="absolute inset-0 z-30 flex items-center justify-center p-3 bg-slate-950/65 backdrop-blur-sm">
-                        <div className="bg-slate-950/95 border-2 border-red-400/85 rounded-3xl px-4 py-3.5 shadow-2xl flex flex-col items-center gap-2 animate-jelly w-full max-w-[340px] text-center">
+                        <div className="bg-slate-950/95 border-2 border-red-400/85 rounded-3xl px-4 py-3.5 shadow-2xl flex flex-col items-center gap-2 animate-jelly w-full max-w-[340px] sm:max-w-[420px] text-center">
                           <div className="text-xs font-black text-red-300">終邊沒有重疊！</div>
-                          <svg viewBox="0 0 180 180" className="w-[200px] h-[200px] sm:w-[220px] sm:h-[220px] shrink-0">
+                          <svg viewBox="0 0 180 180" className="w-[200px] h-[200px] sm:w-[268px] sm:h-[268px] shrink-0">
                             <line x1="16" y1="90" x2="164" y2="90" stroke="rgba(148,163,184,0.35)" strokeWidth="1.4" />
                             <line x1="90" y1="16" x2="90" y2="164" stroke="rgba(148,163,184,0.35)" strokeWidth="1.4" />
                             <circle cx="90" cy="90" r="50" fill="none" stroke="rgba(148,163,184,0.35)" strokeWidth="1.5" strokeDasharray="4 3" />
@@ -11717,11 +11725,11 @@
 
                       {/* Layer 3（最上層・Step 3 浮上來）：左右正負聖壇與完整題卡，底下透出 Layer 1 亮象限 + Layer 2 定義 */}
                       {subStep === 2 && (
-                        <div className="absolute inset-0 z-40 px-1.5 pt-16 pb-2 grid grid-cols-[78px_1fr_78px] sm:grid-cols-[96px_1fr_96px] items-center gap-2">
+                        <div className="absolute inset-0 z-40 px-1.5 pt-16 pb-2 grid grid-cols-[78px_1fr_78px] sm:grid-cols-[112px_1fr_112px] items-center gap-2">
                           <button
                             data-coach="lv11-neg"
                             onClick={() => submitSignStep('neg')}
-                            className={`h-full max-h-[210px] rounded-2xl border-2 backdrop-blur-sm flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
+                            className={`h-full max-h-[210px] sm:max-h-[260px] rounded-2xl border-2 backdrop-blur-sm flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
                               wrongTargetKey === 'neg'
                                 ? 'bg-red-500/85 border-red-200 text-white btn-wrong-flash'
                                 : hoverTarget === 'neg' || solvedStamp?.ans === 'neg'
@@ -11746,7 +11754,7 @@
                                 transition: isDragging ? 'none' : flyOutTarget ? 'transform 0.2s ease-out, opacity 0.2s ease-out' : 'transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)',
                                 opacity: flyOutTarget ? 0 : 1
                               }}
-                              className={`relative z-10 w-full max-w-[224px] min-h-[126px] rounded-3xl bg-white border-4 px-3 py-3.5 shadow-2xl flex flex-col items-center justify-center gap-1 text-center cursor-grab active:cursor-grabbing touch-none ${
+                              className={`relative z-10 w-full max-w-[224px] sm:max-w-[260px] min-h-[126px] sm:min-h-[144px] rounded-3xl bg-white border-4 px-3 py-3.5 shadow-2xl flex flex-col items-center justify-center gap-1 text-center cursor-grab active:cursor-grabbing touch-none ${
                                 isFever ? 'border-amber-400 shadow-[0_0_28px_rgba(251,191,36,0.55)]' : 'border-emerald-400'
                               }`}
                             >
@@ -11760,7 +11768,7 @@
                           <button
                             data-coach="lv11-pos"
                             onClick={() => submitSignStep('pos')}
-                            className={`h-full max-h-[210px] rounded-2xl border-2 backdrop-blur-sm flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
+                            className={`h-full max-h-[210px] sm:max-h-[260px] rounded-2xl border-2 backdrop-blur-sm flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
                               wrongTargetKey === 'pos'
                                 ? 'bg-red-500/85 border-red-200 text-white btn-wrong-flash'
                                 : hoverTarget === 'pos' || solvedStamp?.ans === 'pos'
@@ -12530,7 +12538,7 @@
                     const xFootLblY = cy + (ty <= cy ? 14 : -12);
 
                     return (
-                      <svg viewBox="0 0 316 258" className="w-full h-full max-w-[440px] object-contain select-none">
+                      <svg viewBox="0 0 316 258" className="w-full h-full object-contain select-none">
                         <defs>
                           <marker id="lv12SweepArrowPos" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto">
                             <path d="M 0 0 L 10 5 L 0 10 z" fill="#6366f1" />
@@ -16821,7 +16829,7 @@
                       viewBox="0 0 320 218"
                       onPointerDown={handleArmPointerDown}
                       style={{ touchAction: 'none' }}
-                      className={`w-full h-full max-w-[430px] object-contain select-none touch-none ${isSolved ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
+                      className={`w-full h-full object-contain select-none touch-none ${isSolved ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
                     >
                       {/* 15° 半圓量角雷達虛線弧 */}
                       <path
@@ -16938,7 +16946,7 @@
                       </g>
                     </svg>
                   ) : (
-                    <svg data-coach="lv15-board" viewBox="0 0 320 218" className="w-full h-full max-w-[430px] object-contain select-none">
+                    <svg data-coach="lv15-board" viewBox="0 0 320 218" className="w-full h-full object-contain select-none">
                       {/* Layer 1：三角形純填色（不含邊框） */}
                       <polygon
                         points={question.pts.map(p => p.join(',')).join(' ')}
@@ -17928,7 +17936,7 @@
                         viewBox={`0 0 ${P0_VW} ${P0_VH}`}
                         onPointerDown={handleCirclePointerDown}
                         style={{ touchAction: 'none' }}
-                        className={`w-full h-full max-w-[460px] object-contain select-none touch-none ${isSolved ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
+                        className={`w-full h-full object-contain select-none touch-none ${isSolved ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
                       >
                         {/* Layer 1：外接圓與兩條直徑目標引導線 */}
                         <circle cx={P0_CX} cy={P0_CY} r={P0_R} fill="rgba(56,189,248,0.06)" stroke="#38bdf8" strokeWidth="2.2" strokeDasharray="5 4" />
@@ -18084,7 +18092,7 @@
                     }
 
                     return (
-                      <svg data-coach="lv16-board" viewBox={`${minX.toFixed(1)} ${minY.toFixed(1)} ${vbW.toFixed(1)} ${vbH.toFixed(1)}`} className="w-full h-full max-w-[450px] object-contain select-none">
+                      <svg data-coach="lv16-board" viewBox={`${minX.toFixed(1)} ${minY.toFixed(1)} ${vbW.toFixed(1)} ${vbH.toFixed(1)}`} className="w-full h-full object-contain select-none">
                         {/* Layer 1（最底層）：真實精確外接圓 ＋ 圓心 O ＋ 半徑 R / 完整淡金虛線 Thales 直角三角形與直徑 2R */}
                         {cc && (
                           <g className="pointer-events-none">
@@ -19011,7 +19019,7 @@
                       viewBox={`0 0 ${P0_VW} ${P0_VH}`}
                       onPointerDown={handleCosArmPointerDown}
                       style={{ touchAction: 'none' }}
-                      className={`w-full h-full max-w-[450px] object-contain select-none touch-none ${solvedAns ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
+                      className={`w-full h-full object-contain select-none touch-none ${solvedAns ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
                     >
                       {/* Layer 1：半圓量角雷達弧 ＋ 90° 畢氏基準參考虛線 */}
                       <path
@@ -19186,7 +19194,7 @@
                     });
 
                     return (
-                      <svg viewBox={`${minX.toFixed(1)} ${minY.toFixed(1)} ${vbW.toFixed(1)} ${vbH.toFixed(1)}`} className="w-full h-full max-w-[450px] object-contain select-none">
+                      <svg viewBox={`${minX.toFixed(1)} ${minY.toFixed(1)} ${vbW.toFixed(1)} ${vbH.toFixed(1)}`} className="w-full h-full object-contain select-none">
                         {/* Layer 1：三角形淡色填充 ＋ 角度扇形與弧線 */}
                         <polygon
                           points={`${p0[0]},${p0[1]} ${p1[0]},${p1[1]} ${p2[0]},${p2[1]}`}
@@ -26155,9 +26163,15 @@
           camera.updateProjectionMatrix();
           renderer.setSize(nw, nh);
         };
+        let orientTimer = null;
+        const handleOrient = () => {
+          clearTimeout(orientTimer);
+          orientTimer = setTimeout(handleResize, 180);
+        };
         const resizeObs = new ResizeObserver(handleResize);
         resizeObs.observe(container);
         window.addEventListener('resize', handleResize);
+        window.addEventListener('orientationchange', handleOrient);
 
         const seaFogColors = [new THREE.Color(0x091926), new THREE.Color(0x0b1126), new THREE.Color(0x160d2b)];
         const seaSkyColors = [new THREE.Color(0xbae6fd), new THREE.Color(0xc7d2fe), new THREE.Color(0xe9d5ff)];
@@ -27496,7 +27510,9 @@
           fireworkTimeouts.forEach(clearTimeout);
           if (rafId) cancelAnimationFrame(rafId);
           resizeObs.disconnect();
+          clearTimeout(orientTimer);
           window.removeEventListener('resize', handleResize);
+          window.removeEventListener('orientationchange', handleOrient);
           renderer.domElement.removeEventListener('pointermove', onPointerMove);
           renderer.domElement.removeEventListener('pointerdown', onPointerDown);
           renderer.domElement.removeEventListener('pointerup', onPointerUp);
@@ -27794,17 +27810,19 @@
               >
                 {/* 氣泡在手指下方，食指指尖精準壓在 Lv.1 銘牌 01 正下方 */}
                 <div className="relative">
-                  <div className="pointer-events-auto absolute top-[34px] left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur-md text-white border border-amber-400/80 rounded-full px-3 py-1 shadow-xl flex items-center gap-2 whitespace-nowrap animate-jelly">
-                    <span className="text-[11px] font-black text-amber-100">
-                      {gameMode === 'free' ? '點擊 Lv.1 或任一台柱開始練習' : '點擊 Lv.1 台柱，開始第一場試煉'}
-                    </span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); dismissMapGuide(); }}
-                      className="w-4 h-4 rounded-full bg-white/15 hover:bg-rose-500/60 text-[9px] font-black text-slate-200 flex items-center justify-center"
-                      aria-label="關閉引導"
-                    >
-                      ✕
-                    </button>
+                  <div className="pointer-events-auto absolute top-[34px] left-1/2 -translate-x-1/2">
+                    <div className="bg-slate-900/90 backdrop-blur-md text-white border border-amber-400/80 rounded-full px-3 py-1 shadow-xl flex items-center gap-2 whitespace-nowrap animate-jelly">
+                      <span className="text-[11px] font-black text-amber-100">
+                        {gameMode === 'free' ? '點擊 Lv.1 或任一台柱開始練習' : '點擊 Lv.1 台柱，開始第一場試煉'}
+                      </span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); dismissMapGuide(); }}
+                        className="w-4 h-4 rounded-full bg-white/15 hover:bg-rose-500/60 text-[9px] font-black text-slate-200 flex items-center justify-center"
+                        aria-label="關閉引導"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                   <div className="-translate-x-[16px] -translate-y-[8px] relative flex items-center justify-center">
                     <span className="absolute -top-1 left-[9px] w-7 h-7 rounded-full border-2 border-amber-400 animate-ping opacity-80" />
@@ -28230,7 +28248,7 @@
               </div>
             </div>
           ) : focusedNodeId === 19 ? (
-            <div className="absolute bottom-0 pb-safe left-0 right-0 sm:bottom-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[min(92vw,480px)] z-30 rounded-t-3xl sm:rounded-2xl overflow-hidden animate-jelly text-amber-50 bg-gradient-to-b from-[#172040] via-[#0f172e] to-[#080d1d] border-t-2 sm:border-2 border-amber-400/75 shadow-[0_-12px_36px_rgba(15,23,42,0.75)]">
+            <div className="absolute bottom-0 pb-safe inset-x-0 sm:bottom-3 sm:mx-auto sm:w-[min(92%,480px)] z-30 rounded-t-3xl sm:rounded-2xl overflow-hidden animate-jelly text-amber-50 bg-gradient-to-b from-[#172040] via-[#0f172e] to-[#080d1d] border-t-2 sm:border-2 border-amber-400/75 shadow-[0_-12px_36px_rgba(15,23,42,0.75)]">
               <div className="h-1.5 w-full bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400" />
               <div className="relative p-3.5">
                 <div className="flex items-start justify-between gap-2 mb-3">
@@ -28298,7 +28316,7 @@
               </div>
             </div>
           ) : focusedShrineObj ? (
-            <div className={`absolute bottom-0 pb-safe left-0 right-0 sm:bottom-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[min(92vw,480px)] z-30 rounded-t-3xl sm:rounded-2xl overflow-hidden animate-jelly text-amber-950 bg-gradient-to-b from-[#f6ebd2] via-[#efe0bc] to-[#e4ce9c] border-t-2 sm:border-2 border-amber-800/75 shadow-[inset_0_0_28px_rgba(120,53,15,0.2),0_-12px_36px_rgba(15,23,42,0.45)] ${shrineTheme.spine}`}>
+            <div className={`absolute bottom-0 pb-safe inset-x-0 sm:bottom-3 sm:mx-auto sm:w-[min(92%,480px)] z-30 rounded-t-3xl sm:rounded-2xl overflow-hidden animate-jelly text-amber-950 bg-gradient-to-b from-[#f6ebd2] via-[#efe0bc] to-[#e4ce9c] border-t-2 sm:border-2 border-amber-800/75 shadow-[inset_0_0_28px_rgba(120,53,15,0.2),0_-12px_36px_rgba(15,23,42,0.45)] ${shrineTheme.spine}`}>
               <div className="h-2 w-full bg-gradient-to-r from-amber-900 via-amber-700 to-amber-900" />
               <div className="relative p-3.5 overflow-hidden">
                 <div className="pointer-events-none select-none absolute -right-1 top-1 text-6xl opacity-10">{shrineTheme.watermark}</div>
@@ -28352,7 +28370,7 @@
               </div>
             </div>
           ) : (
-            <div className={`absolute bottom-0 pb-safe left-0 right-0 sm:bottom-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[min(92vw,480px)] z-30 rounded-t-3xl sm:rounded-2xl overflow-visible animate-jelly text-slate-800 ${drawerTheme.shell}`}>
+            <div className={`absolute bottom-0 pb-safe inset-x-0 sm:bottom-3 sm:mx-auto sm:w-[min(92%,480px)] z-30 rounded-t-3xl sm:rounded-2xl overflow-visible animate-jelly text-slate-800 ${drawerTheme.shell}`}>
               <div className={`h-2 w-full rounded-t-3xl sm:rounded-t-2xl bg-gradient-to-r ${drawerTheme.topBar}`} />
               <div className={`relative overflow-hidden ${drawerTheme.headerWrap}`}>
                 <div className="pointer-events-none select-none absolute -right-1 top-1 text-6xl opacity-10">{drawerTheme.watermark}</div>
@@ -30055,7 +30073,7 @@
             ? 'max-w-none pb-0 px-0'
             : currentStage === 'title'
             ? 'max-w-none pb-0 sm:pb-safe px-0 sm:px-4'
-            : 'sm:max-w-[min(94vw,680px,calc(100dvh*0.72))] mx-auto pb-safe px-0 sm:px-3 bg-sky-400/15 sm:shadow-2xl'
+            : 'sm:max-w-[min(94%,680px,calc(100dvh*0.72))] mx-auto pb-safe px-0 sm:px-3 bg-sky-400/15 sm:shadow-2xl'
         }`}>
           
           {/* 頂部 Header（主畫面與電影拼圖過場時隱藏） */}
@@ -30163,7 +30181,7 @@
               : 'my-0 sm:my-2'
           }`}>
             {lockedNotice && (
-              <div className="absolute top-3 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:max-w-[360px] z-50 bg-slate-950/95 text-amber-300 border-2 border-amber-400 px-3.5 py-2 rounded-2xl shadow-2xl text-xs font-black flex items-center justify-center text-center gap-1.5 leading-snug animate-jelly pointer-events-none">
+              <div className="absolute top-3 inset-x-3 sm:mx-auto sm:w-fit sm:max-w-[360px] z-50 bg-slate-950/95 text-amber-300 border-2 border-amber-400 px-3.5 py-2 rounded-2xl shadow-2xl text-xs font-black flex items-center justify-center text-center gap-1.5 leading-snug animate-jelly pointer-events-none">
                 <span className="shrink-0">✦</span><span>{lockedNotice}</span>
               </div>
             )}
