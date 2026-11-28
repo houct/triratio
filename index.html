@@ -4790,7 +4790,6 @@
       const [wrongBtnKey, setWrongBtnKey] = useState(null);
       const [wrongHintActive, setWrongHintActive] = useState(false);
       const [conceptTip, setConceptTip] = useState(null);
-      const [funcDragState, setFuncDragState] = useState(null);
       const { showGuide, guideMode, openGuide, dismissGuide } = useLevelGuide(currentStars, hasSeenGuide, onMarkGuideSeen);
 
       const containerRef = useRef(null);
@@ -4860,71 +4859,9 @@
           pad: 8,
           shape: 'rect',
           tap: false,
-          desc: '依分子與分母對應邊的關係，點選下方 sin、cos 或 tan 填入（亦支援拖曳）'
+          desc: '依分子與分母對應邊的關係，點選下方 sin、cos 或 tan 填入！'
         }
       ]), []);
-
-      const findFuncSlotHit = (clientX, clientY) => {
-        const el = funcSlotRef.current;
-        if (!el) return false;
-        const r = el.getBoundingClientRect();
-        return clientX >= r.left - 22 && clientX <= r.right + 22 && clientY >= r.top - 18 && clientY <= r.bottom + 18;
-      };
-
-      const handleFuncBtnDown = (e, funcId) => {
-        if (gameState !== 'playing' || !question || solvedFunc || wrongBtnKey || (!isRelaxMode && lives <= 0)) return;
-        e.preventDefault();
-        audio.init();
-        const touchOffsetY = e.pointerType === 'touch' ? 46 : 0;
-        setFuncDragState({
-          funcId,
-          startX: e.clientX,
-          startY: e.clientY,
-          clientX: e.clientX,
-          clientY: e.clientY,
-          touchOffsetY,
-          moved: false,
-          overSlot: findFuncSlotHit(e.clientX, e.clientY - touchOffsetY)
-        });
-      };
-
-      useEffect(() => {
-        if (!funcDragState) return;
-        const onMove = (e) => {
-          const offsetY = e.pointerType === 'touch' ? 46 : funcDragState.touchOffsetY || 0;
-          const dist = Math.hypot(e.clientX - funcDragState.startX, e.clientY - funcDragState.startY);
-          const moved = funcDragState.moved || dist >= 8;
-          setFuncDragState(prev => prev ? {
-            ...prev,
-            clientX: e.clientX,
-            clientY: e.clientY,
-            touchOffsetY: offsetY,
-            moved,
-            overSlot: findFuncSlotHit(e.clientX, e.clientY - offsetY)
-          } : null);
-        };
-        const onUp = (e) => {
-          const cur = funcDragState;
-          setFuncDragState(null);
-          if (!cur) return;
-          if (!cur.moved) {
-            handleSelectFunc(cur.funcId);
-          } else {
-            const offsetY = e.pointerType === 'touch' ? 46 : cur.touchOffsetY || 0;
-            if (findFuncSlotHit(e.clientX, e.clientY - offsetY)) {
-              handleSelectFunc(cur.funcId);
-            }
-          }
-        };
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
-        window.addEventListener('pointercancel', onUp);
-        return () => {
-          window.removeEventListener('pointermove', onMove);
-          window.removeEventListener('pointerup', onUp);
-          window.removeEventListener('pointercancel', onUp);
-        };
-      }, [funcDragState, question, solvedFunc, wrongBtnKey, lives, isRelaxMode]);
 
       const handleSelectFunc = (funcId) => {
         if (gameState !== 'playing' || !question || solvedFunc || wrongBtnKey || (!isRelaxMode && lives <= 0)) return;
@@ -5004,8 +4941,6 @@
                       className={`min-w-[60px] h-[30px] px-2.5 rounded-full border-2 inline-flex items-center justify-center transition-all ${
                         solvedFunc
                           ? 'bg-emerald-500 border-emerald-300 text-white shadow-sm'
-                          : funcDragState?.moved && funcDragState?.overSlot
-                          ? 'bg-amber-300/45 border-amber-200 scale-110 shadow-[0_0_12px_rgba(251,191,36,0.75)]'
                           : 'border-amber-300 bg-amber-400/30 text-amber-100 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]'
                       }`}
                     >
@@ -5079,8 +5014,9 @@
                   {['sin', 'cos', 'tan'].map((fnId) => (
                     <button
                       key={fnId}
-                      onPointerDown={(e) => handleFuncBtnDown(e, fnId)}
-                      className={`py-3 bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-serif font-black text-xl rounded-xl shadow active:scale-95 transition-all flex items-center justify-center touch-none select-none cursor-grab active:cursor-grabbing hover:brightness-105 ${solvedFunc === fnId ? 'ring-4 ring-emerald-300' : ''} ${wrongBtnKey === fnId ? 'btn-wrong-flash' : ''} ${funcDragState?.funcId === fnId && funcDragState.moved ? 'opacity-45 scale-95' : ''}`}
+                      type="button"
+                      onClick={() => { audio.init(); handleSelectFunc(fnId); }}
+                      className={`py-3 bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-serif font-black text-xl rounded-xl shadow active:scale-95 transition-all flex items-center justify-center select-none cursor-pointer hover:brightness-105 ${solvedFunc === fnId ? 'ring-4 ring-emerald-300' : ''} ${wrongBtnKey === fnId ? 'btn-wrong-flash' : ''}`}
                     >
                       {fnId}
                     </button>
@@ -5117,22 +5053,6 @@
               onBackToMap={onBackToMap}
             />
           )}
-
-          {typeof document !== 'undefined' && ReactDOM.createPortal(
-            <>
-              {funcDragState && funcDragState.moved && (
-                <div
-                  className={`fixed z-[150] pointer-events-none -translate-x-1/2 -translate-y-1/2 px-4 py-1.5 rounded-xl border-2 font-serif font-black text-xl shadow-2xl ${
-                    funcDragState.overSlot ? 'bg-emerald-400 border-emerald-200 text-emerald-950 scale-110' : 'bg-amber-400 border-white text-amber-950'
-                  }`}
-                  style={{ left: funcDragState.clientX, top: funcDragState.clientY - (funcDragState.touchOffsetY || 0) }}
-                >
-                  {funcDragState.funcId}
-                </div>
-              )}
-            </>,
-            document.body
-          )}
         </div>
       );
     };
@@ -5156,7 +5076,6 @@
       const [wrongBtnKey, setWrongBtnKey] = useState(null);
       const [wrongHintActive, setWrongHintActive] = useState(false);
       const [conceptTip, setConceptTip] = useState(null);
-      const [optDragState, setOptDragState] = useState(null);
       const { showGuide, guideMode, openGuide, dismissGuide } = useLevelGuide(currentStars, hasSeenGuide, onMarkGuideSeen);
 
       const containerRef = useRef(null);
@@ -5188,7 +5107,6 @@
         setWrongBtnKey(null);
         setWrongHintActive(false);
         setConceptTip(null);
-        setOptDragState(null);
       };
 
       const startGame = () => {
@@ -5198,7 +5116,6 @@
         questionMissedRef.current = false;
         setFeedbackAnim('');
         setSolvedVal(null);
-        setOptDragState(null);
         setWrongBtnKey(null); setWrongHintActive(false); setConceptTip(null);
         const initProg = startSession();
         nextQuestion(initProg);
@@ -5228,70 +5145,6 @@
           desc: '點選下方正確的邊長數值填入（亦支援拖曳至三角形 ? 圓圈）'
         }
       ]), []);
-
-      const findUnknownCircleDrop = (clientX, clientY) => {
-        const el = unknownCircleRef.current;
-        if (!el) return false;
-        const r = el.getBoundingClientRect();
-        const cx = r.left + r.width / 2;
-        const cy = r.top + r.height / 2;
-        return Math.hypot(clientX - cx, clientY - cy) <= 58;
-      };
-
-      const handleOptBtnDown = (e, opt) => {
-        if (gameState !== 'playing' || !question || solvedVal || wrongBtnKey || (!isRelaxMode && lives <= 0)) return;
-        e.preventDefault();
-        audio.init();
-        const touchOffsetY = e.pointerType === 'touch' ? 46 : 0;
-        setOptDragState({
-          opt,
-          startX: e.clientX,
-          startY: e.clientY,
-          clientX: e.clientX,
-          clientY: e.clientY,
-          touchOffsetY,
-          moved: false,
-          overTarget: findUnknownCircleDrop(e.clientX, e.clientY - touchOffsetY)
-        });
-      };
-
-      useEffect(() => {
-        if (!optDragState) return;
-        const onMove = (e) => {
-          const offsetY = e.pointerType === 'touch' ? 46 : optDragState.touchOffsetY || 0;
-          const dist = Math.hypot(e.clientX - optDragState.startX, e.clientY - optDragState.startY);
-          const moved = optDragState.moved || dist >= 8;
-          setOptDragState(prev => prev ? {
-            ...prev,
-            clientX: e.clientX,
-            clientY: e.clientY,
-            touchOffsetY: offsetY,
-            moved,
-            overTarget: findUnknownCircleDrop(e.clientX, e.clientY - offsetY)
-          } : null);
-        };
-        const onUp = (e) => {
-          const cur = optDragState;
-          setOptDragState(null);
-          if (!cur) return;
-          if (!cur.moved) {
-            handleSelectOption(cur.opt);
-          } else {
-            const offsetY = e.pointerType === 'touch' ? 46 : cur.touchOffsetY || 0;
-            if (findUnknownCircleDrop(e.clientX, e.clientY - offsetY)) {
-              handleSelectOption(cur.opt);
-            }
-          }
-        };
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
-        window.addEventListener('pointercancel', onUp);
-        return () => {
-          window.removeEventListener('pointermove', onMove);
-          window.removeEventListener('pointerup', onUp);
-          window.removeEventListener('pointercancel', onUp);
-        };
-      }, [optDragState, question, solvedVal, wrongBtnKey, lives, isRelaxMode]);
 
       const handleSelectOption = (opt) => {
         if (gameState !== 'playing' || !question || solvedVal || wrongBtnKey || (!isRelaxMode && lives <= 0)) return;
@@ -5419,20 +5272,19 @@
                           />
                           {(isTarget || isKnown) && (() => {
                             const isTargetActive = isTarget && !solvedVal;
-                            const isHoveredTarget = isTargetActive && Boolean(optDragState?.moved && optDragState?.overTarget);
-                            const cFill = isHoveredTarget ? '#d1fae5' : isTargetActive ? '#fef3c7' : circleFill;
-                            const cStroke = isHoveredTarget ? '#059669' : isTargetActive ? '#d97706' : strokeCol;
-                            const cText = isHoveredTarget ? '#047857' : isTargetActive ? '#b45309' : textCol;
+                            const cFill = isTargetActive ? '#fef3c7' : circleFill;
+                            const cStroke = isTargetActive ? '#d97706' : strokeCol;
+                            const cText = isTargetActive ? '#b45309' : textCol;
                             return (
                             <g
                               ref={isTarget ? unknownCircleRef : undefined}
                               data-coach={isTarget ? 'lv3-unknown' : undefined}
-                              className={isTargetActive && !isHoveredTarget ? 'animate-light-breath' : ''}
+                              className={isTargetActive ? 'animate-light-breath' : ''}
                             >
                               <circle
                                 cx={edge.midPt.x}
                                 cy={edge.midPt.y}
-                                r={isHoveredTarget ? '27' : '23'}
+                                r="23"
                                 fill={cFill}
                                 stroke={cStroke}
                                 strokeWidth="3.5"
@@ -5471,8 +5323,9 @@
                     {question.sideOptions.map((opt, idx) => (
                       <button
                         key={idx}
-                        onPointerDown={(e) => handleOptBtnDown(e, opt)}
-                        className={`h-full bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-black text-xl rounded-xl shadow active:scale-95 transition-all flex items-center justify-center font-serif tracking-wider touch-none select-none cursor-grab active:cursor-grabbing hover:brightness-105 ${solvedVal === opt ? 'ring-4 ring-emerald-300' : ''} ${wrongBtnKey === opt ? 'btn-wrong-flash' : ''} ${optDragState?.opt === opt && optDragState.moved ? 'opacity-45 scale-95' : ''}`}
+                        type="button"
+                        onClick={() => { audio.init(); handleSelectOption(opt); }}
+                        className={`h-full bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-black text-xl rounded-xl shadow active:scale-95 transition-all flex items-center justify-center font-serif tracking-wider select-none cursor-pointer hover:brightness-105 ${solvedVal === opt ? 'ring-4 ring-emerald-300' : ''} ${wrongBtnKey === opt ? 'btn-wrong-flash' : ''}`}
                       >
                         {opt}
                       </button>
@@ -5509,22 +5362,6 @@
               onRestart={startGame}
               onBackToMap={onBackToMap}
             />
-          )}
-
-          {typeof document !== 'undefined' && ReactDOM.createPortal(
-            <>
-              {optDragState && optDragState.moved && (
-                <div
-                  className={`fixed z-[150] pointer-events-none -translate-x-1/2 -translate-y-1/2 px-3.5 py-1.5 rounded-xl border-2 font-serif font-black text-lg shadow-2xl ${
-                    optDragState.overTarget ? 'bg-emerald-400 border-emerald-200 text-emerald-950 scale-110' : 'bg-amber-400 border-white text-amber-950'
-                  }`}
-                  style={{ left: optDragState.clientX, top: optDragState.clientY - (optDragState.touchOffsetY || 0) }}
-                >
-                  {optDragState.opt}
-                </div>
-              )}
-            </>,
-            document.body
           )}
         </div>
       );
@@ -6801,14 +6638,10 @@
 
       const [question, setQuestion] = useState(null);
       const [placedTokens, setPlacedTokens] = useState({ num: false, den: false });
-      const [autoFlyItems, setAutoFlyItems] = useState(null);
       const edgesReady = placedTokens.num && placedTokens.den;
       const isAutoFlying = Boolean(question && question.phase > 0 && !edgesReady);
       const [selectedTokenKey, setSelectedTokenKey] = useState('num');
-      const [dragState, setDragState] = useState(null);
       const [missingEdgeFilled, setMissingEdgeFilled] = useState(false);
-      const [assignDragState, setAssignDragState] = useState(null);
-      const [ratioEdgeDrag, setRatioEdgeDrag] = useState(null);
       const [targetSlots, setTargetSlots] = useState({ num: null, den: null });
       const [activeTargetSlot, setActiveTargetSlot] = useState('num');
       const [wrongSlotKey, setWrongSlotKey] = useState(null);
@@ -6865,80 +6698,25 @@
         clearAutoFlyTimers();
       }, []);
 
-      // Phase 1 / Phase 2 開場自動飛入定位：將已知分子、分母圓幣依序飛向三角形對應邊
+      // Phase 1 / Phase 2 開場自動定位：頂部已知分數穩穩不動，三角形對應兩邊依序柔和亮起並原地彈入數字
       useEffect(() => {
         clearAutoFlyTimers();
-        if (gameState !== 'playing' || !question || question.phase === 0) {
-          setAutoFlyItems(null);
-          return;
-        }
+        if (gameState !== 'playing' || !question || question.phase === 0) return;
         let cancelled = false;
-        let raf1 = 0;
-        let raf2 = 0;
-        raf1 = requestAnimationFrame(() => {
-          raf2 = requestAnimationFrame(() => {
-            if (cancelled) return;
-            const boxEl = cardBoxRef.current;
-            const svgEl = svgRef.current;
-            if (!boxEl || !svgEl) {
-              setPlacedTokens({ num: true, den: true });
-              setActiveTargetSlot('num');
-              setAutoFlyItems(null);
-              return;
-            }
-            const boxRect = boxEl.getBoundingClientRect();
-            const svgRect = svgEl.getBoundingClientRect();
-            const size = Math.min(svgRect.width, svgRect.height);
-            if (!size) {
-              setPlacedTokens({ num: true, den: true });
-              setActiveTargetSlot('num');
-              setAutoFlyItems(null);
-              return;
-            }
-            const svgLeft = svgRect.left + (svgRect.width - size) / 2;
-            const svgTop = svgRect.top + (svgRect.height - size) / 2;
-
-            const items = question.knownTokens.map((tk) => {
-              const tkEl = tokenRefs.current[tk.key];
-              const tkRect = tkEl ? tkEl.getBoundingClientRect() : null;
-              const edge = question.edges.find(ed => ed.role === tk.targetRole);
-              const fromX = tkRect ? (tkRect.left + tkRect.width / 2 - boxRect.left) : boxRect.width * 0.3;
-              const fromY = tkRect ? (tkRect.top + tkRect.height / 2 - boxRect.top) : 56;
-              const toX = edge ? (svgLeft + (edge.pt.x / 500) * size - boxRect.left) : boxRect.width * 0.5;
-              const toY = edge ? (svgTop + (edge.pt.y / 500) * size - boxRect.top) : boxRect.height * 0.5;
-              return { key: tk.key, val: tk.val, fromX, fromY, toX, toY, launched: false, landed: false };
-            });
-
-            setAutoFlyItems(items);
-
-            const t1 = setTimeout(() => {
-              if (cancelled) return;
-              setAutoFlyItems(prev => prev ? prev.map(it => it.key === 'num' ? { ...it, launched: true } : it) : null);
-            }, 140);
-            const t2 = setTimeout(() => {
-              if (cancelled) return;
-              setAutoFlyItems(prev => prev ? prev.map(it => it.key === 'den' ? { ...it, launched: true } : it) : null);
-            }, 440);
-            const t3 = setTimeout(() => {
-              if (cancelled) return;
-              audio.sfxSelect();
-              setPlacedTokens(prev => ({ ...prev, num: true }));
-              setAutoFlyItems(prev => prev ? prev.map(it => it.key === 'num' ? { ...it, landed: true } : it) : null);
-            }, 740);
-            const t4 = setTimeout(() => {
-              if (cancelled) return;
-              audio.sfxSelect();
-              setPlacedTokens({ num: true, den: true });
-              setActiveTargetSlot('num');
-              setAutoFlyItems(null);
-            }, 1040);
-            autoFlyTimersRef.current = [t1, t2, t3, t4];
-          });
-        });
+        const t1 = setTimeout(() => {
+          if (cancelled) return;
+          audio.sfxSelect();
+          setPlacedTokens(prev => ({ ...prev, num: true }));
+        }, 180);
+        const t2 = setTimeout(() => {
+          if (cancelled) return;
+          audio.sfxSelect();
+          setPlacedTokens({ num: true, den: true });
+          setActiveTargetSlot('num');
+        }, 460);
+        autoFlyTimersRef.current = [t1, t2];
         return () => {
           cancelled = true;
-          cancelAnimationFrame(raf1);
-          cancelAnimationFrame(raf2);
           clearAutoFlyTimers();
         };
       }, [gameState, question]);
@@ -6952,12 +6730,8 @@
         questionMissedRef.current = false;
         setQuestion(q);
         setPlacedTokens({ num: false, den: false });
-        setAutoFlyItems(null);
         setSelectedTokenKey(phase === 0 ? 'num' : null);
-        setDragState(null);
         setMissingEdgeFilled(false);
-        setAssignDragState(null);
-        setRatioEdgeDrag(null);
         setTargetSlots({ num: null, den: null });
         setActiveTargetSlot('num');
         setWrongSlotKey(null);
@@ -6984,16 +6758,16 @@
       const lv6CoachSteps = useMemo(() => {
         if (guideMode === 'manual') {
           return [
-            { desc: '第一階段先點擊上方分子、分母圓幣放到對應邊（亦支援拖曳）；第二、三階段會自動飛入定位。' },
-            { desc: '第二、三階段需先點選下方數字填入未知第三邊「?」（亦支援拖曳）。' },
-            { desc: '三邊就緒後，直接點擊三角形上的邊長填入右上「求」的分子與分母（亦支援拖曳）！' }
+            { desc: '第一階段先點選上方分子、分母圓幣，再點擊三角形對應邊放置；第二、三階段會自動標邊定位。' },
+            { desc: '第二、三階段需先點選下方數字填入未知第三邊「?」。' },
+            { desc: '三邊就緒後，直接點擊三角形上的邊長填入右上「求」的分子與分母！' }
           ];
         }
         if (!edgesReady) {
           return [
             {
               tap: true,
-              desc: '分子已亮起！請直接點擊三角形對應邊放置（亦支援拖曳）',
+              desc: '分子已亮起！請直接點擊三角形對應邊放置！',
               targets: [
                 { target: 'lv6-coin', anchorX: 0.5, anchorY: 0.5, pad: 10, shape: 'circle' },
                 { target: 'lv6-tri', anchorX: 0.5, anchorY: 0.5, pad: 36, minW: 230, minH: 200, shape: 'ellipse' }
@@ -7103,66 +6877,6 @@
         }
       };
 
-      const handleTokenPointerDown = (e, tokenKey) => {
-        if (gameState !== 'playing' || !question || question.phase > 0 || placedTokens[tokenKey] || solvedOpt || (!isRelaxMode && lives <= 0)) return;
-        if (e.currentTarget.setPointerCapture) {
-          try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
-        }
-        dragStartRef.current = { x: e.clientX, y: e.clientY, tokenKey };
-        const box = cardBoxRef.current?.getBoundingClientRect();
-        if (box) {
-          const svgPt = clientToSvgPt(e.clientX, e.clientY);
-          setDragState({
-            tokenKey,
-            px: e.clientX - box.left,
-            py: e.clientY - box.top,
-            hoverRole: findHoverRole(svgPt)
-          });
-        }
-      };
-
-      const handleTokenPointerMove = (e) => {
-        if (!dragStartRef.current || !dragState) return;
-        const box = cardBoxRef.current?.getBoundingClientRect();
-        if (!box) return;
-        const svgPt = clientToSvgPt(e.clientX, e.clientY);
-        setDragState(prev => prev ? {
-          ...prev,
-          px: e.clientX - box.left,
-          py: e.clientY - box.top,
-          hoverRole: findHoverRole(svgPt)
-        } : null);
-      };
-
-      const handleTokenPointerUp = (e) => {
-        if (e.currentTarget.releasePointerCapture) {
-          try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
-        }
-        const start = dragStartRef.current;
-        dragStartRef.current = null;
-        if (!start) { setDragState(null); return; }
-        const movedDist = Math.hypot(e.clientX - start.x, e.clientY - start.y);
-        const svgPt = clientToSvgPt(e.clientX, e.clientY);
-        const dropRole = findHoverRole(svgPt);
-        setDragState(null);
-
-        if (movedDist >= 10 && dropRole) {
-          attemptPlaceToken(start.tokenKey, dropRole);
-        } else if (movedDist < 10) {
-          audio.sfxClick();
-          setSelectedTokenKey(prev => prev === start.tokenKey ? null : start.tokenKey);
-        }
-      };
-
-      const findMissingEdgeDrop = (clientX, clientY) => {
-        const el = assignEdgeRef.current;
-        if (!el) return false;
-        const r = el.getBoundingClientRect();
-        const cx = r.left + r.width / 2;
-        const cy = r.top + r.height / 2;
-        return Math.hypot(clientX - cx, clientY - cy) <= 58;
-      };
-
       const attemptFillMissingEdge = (val) => {
         if (gameState !== 'playing' || !question || !needFillMissing || solvedOpt || (!isRelaxMode && lives <= 0)) return;
         const missingEdge = question.edges.find(ed => ed.isMissing);
@@ -7186,62 +6900,6 @@
           setTimeout(() => { setFeedbackAnim(''); setWrongEdgeRole(null); }, 380);
         }
       };
-
-      const handleAssignChipDown = (e, val) => {
-        if (gameState !== 'playing' || !question || !needFillMissing || solvedOpt || (!isRelaxMode && lives <= 0)) return;
-        if (showGuide) dismissGuide();
-        e.preventDefault();
-        audio.init();
-        const touchOffsetY = e.pointerType === 'touch' ? 46 : 0;
-        setAssignDragState({
-          val,
-          startX: e.clientX,
-          startY: e.clientY,
-          clientX: e.clientX,
-          clientY: e.clientY,
-          touchOffsetY,
-          moved: false,
-          overMissing: findMissingEdgeDrop(e.clientX, e.clientY - touchOffsetY)
-        });
-      };
-
-      useEffect(() => {
-        if (!assignDragState) return;
-        const onMove = (e) => {
-          const offsetY = e.pointerType === 'touch' ? 46 : assignDragState.touchOffsetY || 0;
-          const dist = Math.hypot(e.clientX - assignDragState.startX, e.clientY - assignDragState.startY);
-          const moved = assignDragState.moved || dist >= 8;
-          setAssignDragState(prev => prev ? {
-            ...prev,
-            clientX: e.clientX,
-            clientY: e.clientY,
-            touchOffsetY: offsetY,
-            moved,
-            overMissing: findMissingEdgeDrop(e.clientX, e.clientY - offsetY)
-          } : null);
-        };
-        const onUp = (e) => {
-          const cur = assignDragState;
-          setAssignDragState(null);
-          if (!cur) return;
-          if (!cur.moved) {
-            attemptFillMissingEdge(cur.val);
-          } else {
-            const offsetY = e.pointerType === 'touch' ? 46 : cur.touchOffsetY || 0;
-            if (findMissingEdgeDrop(e.clientX, e.clientY - offsetY)) {
-              attemptFillMissingEdge(cur.val);
-            }
-          }
-        };
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
-        window.addEventListener('pointercancel', onUp);
-        return () => {
-          window.removeEventListener('pointermove', onMove);
-          window.removeEventListener('pointerup', onUp);
-          window.removeEventListener('pointercancel', onUp);
-        };
-      }, [assignDragState, question, needFillMissing, solvedOpt, lives, isRelaxMode]);
 
       const attemptFillTargetSlot = (slotKey, val) => {
         if (gameState !== 'playing' || !question || !ratioReady || solvedOpt || (!isRelaxMode && lives <= 0)) return;
@@ -7302,75 +6960,6 @@
         }
       };
 
-      const findRatioTargetSlot = (clientX, clientY) => {
-        const hitRect = (el) => {
-          if (!el) return false;
-          const r = el.getBoundingClientRect();
-          return clientX >= r.left - 18 && clientX <= r.right + 18 && clientY >= r.top - 14 && clientY <= r.bottom + 14;
-        };
-        if (targetSlots.num === null && hitRect(targetNumRef.current)) return 'num';
-        if (targetSlots.den === null && hitRect(targetDenRef.current)) return 'den';
-        if (hitRect(targetNumRef.current)) return 'num';
-        if (hitRect(targetDenRef.current)) return 'den';
-        return null;
-      };
-
-      const handleRatioEdgePointerDown = (e, edge) => {
-        if (gameState !== 'playing' || !question || !ratioReady || solvedOpt || (!isRelaxMode && lives <= 0)) return;
-        e.preventDefault();
-        e.stopPropagation();
-        audio.init();
-        const touchOffsetY = e.pointerType === 'touch' ? 46 : 0;
-        setRatioEdgeDrag({
-          role: edge.role,
-          val: edge.val,
-          startX: e.clientX,
-          startY: e.clientY,
-          clientX: e.clientX,
-          clientY: e.clientY,
-          touchOffsetY,
-          moved: false,
-          hoverSlot: findRatioTargetSlot(e.clientX, e.clientY - touchOffsetY)
-        });
-      };
-
-      useEffect(() => {
-        if (!ratioEdgeDrag) return;
-        const onMove = (e) => {
-          const offsetY = e.pointerType === 'touch' ? 46 : ratioEdgeDrag.touchOffsetY || 0;
-          const dist = Math.hypot(e.clientX - ratioEdgeDrag.startX, e.clientY - ratioEdgeDrag.startY);
-          const moved = ratioEdgeDrag.moved || dist >= 8;
-          setRatioEdgeDrag(prev => prev ? {
-            ...prev,
-            clientX: e.clientX,
-            clientY: e.clientY,
-            touchOffsetY: offsetY,
-            moved,
-            hoverSlot: findRatioTargetSlot(e.clientX, e.clientY - offsetY)
-          } : null);
-        };
-        const onUp = (e) => {
-          const cur = ratioEdgeDrag;
-          setRatioEdgeDrag(null);
-          if (!cur) return;
-          if (!cur.moved) {
-            handleEdgeTap(cur.role);
-          } else {
-            const offsetY = e.pointerType === 'touch' ? 46 : cur.touchOffsetY || 0;
-            const slot = findRatioTargetSlot(e.clientX, e.clientY - offsetY);
-            if (slot) attemptFillTargetSlot(slot, cur.val);
-          }
-        };
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
-        window.addEventListener('pointercancel', onUp);
-        return () => {
-          window.removeEventListener('pointermove', onMove);
-          window.removeEventListener('pointerup', onUp);
-          window.removeEventListener('pointercancel', onUp);
-        };
-      }, [ratioEdgeDrag, question, ratioReady, solvedOpt, targetSlots, activeTargetSlot, lives, isRelaxMode]);
-
       const handleEdgeTap = (role) => {
         if (!question) return;
         if (solvedOpt) {
@@ -7383,7 +6972,7 @@
         }
         if (needFillMissing) {
           audio.sfxClick();
-          setConceptTip({ text: '請先從下方點選或拖曳數字填入「?」未知邊！', id: Date.now() });
+          setConceptTip({ text: '請先點選下方數字填入「?」未知邊！', id: Date.now() });
           return;
         }
         const edge = question.edges.find(ed => ed.role === role);
@@ -7438,25 +7027,16 @@
                       {question.knownTokens.map((tk, tIdx) => {
                         const isPlaced = placedTokens[tk.key];
                         const isSel = selectedTokenKey === tk.key;
-                        const flyItem = autoFlyItems?.find(it => it.key === tk.key);
-                        const isFlyingNow = Boolean(flyItem && flyItem.launched && !flyItem.landed);
                         return (
                           <React.Fragment key={tk.key}>
                             {tIdx === 1 && <div className="w-10 h-0.5 bg-white/80 my-1" />}
-                            {isPlaced ? (
+                            {isPlaced || question.phase > 0 ? (
                               <span
                                 ref={(el) => { tokenRefs.current[tk.key] = el; }}
-                                className="min-w-[36px] h-[26px] px-2 rounded-full bg-emerald-400/25 border border-emerald-300/70 text-emerald-100 text-sm font-black inline-flex items-center justify-center transition-colors"
-                              >
-                                {tk.val}
-                              </span>
-                            ) : question.phase > 0 ? (
-                              <span
-                                ref={(el) => { tokenRefs.current[tk.key] = el; }}
-                                className={`min-w-[38px] h-[28px] px-2.5 rounded-full text-base font-black inline-flex items-center justify-center transition-all ${
-                                  isFlyingNow
-                                    ? 'border-2 border-dashed border-amber-200/60 bg-amber-300/15 text-transparent'
-                                    : 'bg-gradient-to-b from-amber-300 to-amber-500 border-2 border-white/80 text-amber-950 shadow-md'
+                                className={`min-w-[36px] h-[26px] px-2 rounded-full text-sm font-black inline-flex items-center justify-center transition-colors ${
+                                  isPlaced
+                                    ? 'bg-emerald-400/25 border border-emerald-300/70 text-emerald-100'
+                                    : 'bg-amber-300/25 border border-amber-200/70 text-amber-100'
                                 }`}
                               >
                                 {tk.val}
@@ -7466,11 +7046,12 @@
                                 ref={(el) => { tokenRefs.current[tk.key] = el; }}
                                 type="button"
                                 data-coach={(!placedTokens.num && tk.key === 'num') || (placedTokens.num && !placedTokens.den && tk.key === 'den') ? 'lv6-coin' : undefined}
-                                onPointerDown={(e) => handleTokenPointerDown(e, tk.key)}
-                                onPointerMove={handleTokenPointerMove}
-                                onPointerUp={handleTokenPointerUp}
-                                onPointerCancel={handleTokenPointerUp}
-                                className={`min-w-[38px] h-[28px] px-2.5 rounded-full bg-gradient-to-b from-amber-300 to-amber-500 border-2 text-amber-950 text-base font-black shadow-md touch-none cursor-grab active:cursor-grabbing inline-flex items-center justify-center transition-all ${
+                                onClick={() => {
+                                  if (gameState !== 'playing' || !question || placedTokens[tk.key] || solvedOpt || (!isRelaxMode && lives <= 0)) return;
+                                  audio.sfxClick();
+                                  setSelectedTokenKey(prev => prev === tk.key ? null : tk.key);
+                                }}
+                                className={`min-w-[38px] h-[28px] px-2.5 rounded-full bg-gradient-to-b from-amber-300 to-amber-500 border-2 text-amber-950 text-base font-black shadow-md cursor-pointer inline-flex items-center justify-center transition-all ${
                                   isSel ? 'border-amber-100 ring-2 ring-amber-200 animate-pulse shadow-[0_0_12px_rgba(251,191,36,0.8)]' : 'border-white/75 opacity-80 hover:opacity-100 hover:scale-105'
                                 }`}
                               >
@@ -7493,11 +7074,10 @@
                         const val = targetSlots[slot.key];
                         const isFilled = val !== null;
                         const isFocused = ratioReady && activeTargetSlot === slot.key && !isFilled;
-                        const isHovered = ratioEdgeDrag?.moved && ratioEdgeDrag?.hoverSlot === slot.key;
                         const isWrong = wrongSlotKey === slot.key;
                         return (
                           <React.Fragment key={slot.key}>
-                            {sIdx === 1 && <div className={`w-10 h-0.5 my-1 transition-colors ${solvedOpt ? 'bg-emerald-200' : 'bg-white/80'}`} />}
+                            {sIdx === 1 && <div className={`w-11 h-0.5 my-1 transition-colors ${solvedOpt ? 'bg-emerald-200' : 'bg-white/80'}`} />}
                             <button
                               ref={slot.refObj}
                               type="button"
@@ -7506,20 +7086,18 @@
                                 audio.sfxClick();
                                 setActiveTargetSlot(slot.key);
                               }}
-                              className={`min-w-[38px] h-[28px] px-2 rounded-full border-2 text-base font-black inline-flex items-center justify-center transition-all ${
+                              className={`min-w-[44px] h-[28px] px-2 rounded-full border-2 font-black inline-flex items-center justify-center transition-all ${
                                 isFilled
-                                  ? 'bg-emerald-400 border-emerald-200 text-emerald-950 shadow-sm'
+                                  ? 'bg-emerald-400 border-emerald-200 text-emerald-950 text-base shadow-sm'
                                   : isWrong
-                                  ? 'bg-rose-500/80 border-rose-200 text-white animate-shake'
-                                  : isHovered
-                                  ? 'bg-amber-300/45 border-amber-200 scale-110 shadow-[0_0_12px_rgba(251,191,36,0.75)]'
+                                  ? 'bg-rose-500/80 border-rose-200 text-white text-xs font-sans animate-shake'
                                   : isFocused
-                                  ? 'border-amber-300 bg-amber-400/30 text-amber-100 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]'
-                                  : 'border-dashed border-white/40 bg-white/5'
+                                  ? 'border-amber-300 bg-amber-400/30 text-amber-100 text-[11px] font-sans animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]'
+                                  : 'border-dashed border-white/40 bg-white/5 text-white/55 text-[11px] font-sans'
                               }`}
                               aria-label={slot.key === 'num' ? '分子槽' : '分母槽'}
                             >
-                              {isFilled ? val : ''}
+                              {isFilled ? val : (slot.key === 'num' ? '分子' : '分母')}
                             </button>
                           </React.Fragment>
                         );
@@ -7536,7 +7114,7 @@
                   {!edgesReady && phase === 0 && (
                     <div className="pointer-events-none absolute top-2 inset-x-0 flex justify-center z-10">
                       <span className="text-[11px] font-black text-teal-800 bg-teal-50/95 border border-teal-200 px-3 py-0.5 rounded-full shadow-sm">
-                        {selectedTokenKey ? `點擊三角形對應邊放入${selectedTokenKey === 'num' ? '分子' : '分母'}（也可拖曳）` : '點擊或拖曳上方數字到三角形對應邊'}
+                        {selectedTokenKey ? `點擊三角形對應邊放入${selectedTokenKey === 'num' ? '分子' : '分母'}` : '先點選上方數字，再點三角形對應邊'}
                       </span>
                     </div>
                   )}
@@ -7549,13 +7127,10 @@
                     {question.edges.map((e, i) => {
                       const matchingToken = question.knownTokens.find(tk => tk.targetRole === e.role);
                       const isPlaced = matchingToken ? placedTokens[matchingToken.key] : false;
-                      const isHovered = dragState?.hoverRole === e.role;
                       const isWrongEdge = wrongEdgeRole === e.role;
                       const showSolvedMissing = e.isMissing && (Boolean(solvedOpt) || missingEdgeFilled || (edgesReady && phase === 0));
                       const strokeCol = isWrongEdge
                         ? '#ef4444'
-                        : isHovered
-                        ? '#f59e0b'
                         : isPlaced || showSolvedMissing
                         ? '#059669'
                         : e.isMissing
@@ -7564,11 +7139,10 @@
                       return (
                         <g
                           key={i}
-                          className={(!edgesReady && selectedTokenKey) || ratioReady ? (ratioReady && !solvedOpt ? 'cursor-grab active:cursor-grabbing touch-none' : 'cursor-pointer') : ''}
-                          onPointerDown={(ev) => { if (ratioReady && !solvedOpt) handleRatioEdgePointerDown(ev, e); }}
-                          onClick={(ev) => { ev.stopPropagation(); if (!ratioReady || solvedOpt) handleEdgeTap(e.role); }}
+                          className={(!edgesReady && selectedTokenKey) || (ratioReady && !solvedOpt) ? 'cursor-pointer' : ''}
+                          onClick={(ev) => { ev.stopPropagation(); handleEdgeTap(e.role); }}
                         >
-                          <line x1={e.p1.x} y1={e.p1.y} x2={e.p2.x} y2={e.p2.y} stroke={strokeCol} strokeWidth={isHovered ? '16' : '12'} strokeLinecap="round" />
+                          <line x1={e.p1.x} y1={e.p1.y} x2={e.p2.x} y2={e.p2.y} stroke={strokeCol} strokeWidth="12" strokeLinecap="round" />
                           <line x1={e.p1.x} y1={e.p1.y} x2={e.p2.x} y2={e.p2.y} stroke="transparent" strokeWidth="44" strokeLinecap="round" />
                         </g>
                       );
@@ -7580,11 +7154,9 @@
                     {question.edges.map((e, i) => {
                       const matchingToken = question.knownTokens.find(tk => tk.targetRole === e.role);
                       const isPlaced = matchingToken ? placedTokens[matchingToken.key] : false;
-                      const isHovered = dragState?.hoverRole === e.role;
                       const isWrongEdge = wrongEdgeRole === e.role;
                       const showMissingVal = e.isMissing && (Boolean(solvedOpt) || missingEdgeFilled || (edgesReady && phase === 0));
                       const isMissingTarget = e.isMissing && needFillMissing;
-                      const isOverMissing = isMissingTarget && Boolean(assignDragState?.overMissing);
                       const showPythHint = isMissingTarget && phase === 1;
                       const radicandText = showPythHint ? question.pythHint.replace(/^√\(/, '').replace(/\)$/, '').replace(/([+-])/g, ' $1 ') : '';
                       const hintHalfW = radicandText ? Math.max(58, Math.round(radicandText.length * 5.6 + 22)) : 58;
@@ -7598,16 +7170,14 @@
 
                       const fillCol = isWrongEdge
                         ? '#fef2f2'
-                        : (isHovered || isMissingTarget)
-                        ? (isOverMissing ? '#d1fae5' : '#fef3c7')
+                        : isMissingTarget
+                        ? '#fef3c7'
                         : (isPlaced || showMissingVal)
                         ? '#ecfdf5'
                         : '#ffffff';
                       const strokeCol = isWrongEdge
                         ? '#ef4444'
-                        : isOverMissing
-                        ? '#059669'
-                        : (isHovered || isMissingTarget)
+                        : isMissingTarget
                         ? '#d97706'
                         : (isPlaced || showMissingVal)
                         ? '#059669'
@@ -7618,14 +7188,13 @@
                         <g
                           key={i}
                           ref={isMissingTarget ? assignEdgeRef : undefined}
-                          className={(!edgesReady && selectedTokenKey) || ratioReady ? (ratioReady && !solvedOpt ? 'cursor-grab active:cursor-grabbing touch-none' : 'cursor-pointer') : 'pointer-events-none'}
-                          onPointerDown={(ev) => { if (ratioReady && !solvedOpt) handleRatioEdgePointerDown(ev, e); }}
-                          onClick={(ev) => { ev.stopPropagation(); if (!ratioReady || solvedOpt) handleEdgeTap(e.role); }}
+                          className={(!edgesReady && selectedTokenKey) || (ratioReady && !solvedOpt) ? 'cursor-pointer' : 'pointer-events-none'}
+                          onClick={(ev) => { ev.stopPropagation(); handleEdgeTap(e.role); }}
                         >
                           <circle
                             cx={e.pt.x}
                             cy={e.pt.y}
-                            r={isHovered || isOverMissing ? '27' : '23'}
+                            r="23"
                             fill={fillCol}
                             stroke={strokeCol}
                             strokeWidth="3.5"
@@ -7669,10 +7238,8 @@
                         <button
                           key={numVal}
                           type="button"
-                          onPointerDown={(e) => handleAssignChipDown(e, numVal)}
-                          className={`flex-1 min-w-0 py-2 rounded-xl bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-serif font-black text-base sm:text-lg shadow active:scale-95 touch-none select-none cursor-grab active:cursor-grabbing flex items-center justify-center transition-transform ${
-                            assignDragState?.val === numVal && assignDragState.moved ? 'opacity-45 scale-95' : 'hover:brightness-105'
-                          }`}
+                          onClick={() => { audio.init(); attemptFillMissingEdge(numVal); }}
+                          className="flex-1 min-w-0 py-2 rounded-xl bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-serif font-black text-base sm:text-lg shadow active:scale-95 select-none cursor-pointer flex items-center justify-center transition-transform hover:brightness-105"
                         >
                           {numVal}
                         </button>
@@ -7680,42 +7247,6 @@
                     </div>
                   )}
                 </div>
-
-                {/* Phase 1/2 開場自動飛入定位圓幣 */}
-                {autoFlyItems && autoFlyItems.map((it) => {
-                  if (it.landed) return null;
-                  const dx = it.launched ? (it.toX - it.fromX) : 0;
-                  const dy = it.launched ? (it.toY - it.fromY) : 0;
-                  return (
-                    <div
-                      key={it.key}
-                      style={{
-                        left: `${it.fromX}px`,
-                        top: `${it.fromY}px`,
-                        transform: `translate(-50%, -50%) translate3d(${dx}px, ${dy}px, 0) scale(${it.launched ? 1.06 : 0.92})`,
-                        opacity: it.launched ? 1 : 0,
-                        transition: 'transform 600ms cubic-bezier(0.22, 1, 0.36, 1), opacity 120ms ease-out'
-                      }}
-                      className="pointer-events-none absolute z-40 w-11 h-11 rounded-full bg-gradient-to-b from-amber-300 to-amber-500 border-2 border-white text-amber-950 font-serif font-black text-lg shadow-[0_8px_20px_rgba(245,158,11,0.55)] flex items-center justify-center will-change-transform"
-                    >
-                      {it.val}
-                    </div>
-                  );
-                })}
-
-                {/* Step 1 跟手浮動拖曳圓幣 */}
-                {dragState && (() => {
-                  const dragVal = question.knownTokens.find(t => t.key === dragState.tokenKey)?.val;
-                  if (dragVal === undefined || dragVal === null) return null;
-                  return (
-                    <div
-                      style={{ left: `${dragState.px}px`, top: `${dragState.py}px` }}
-                      className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 z-40 w-12 h-12 rounded-full bg-gradient-to-b from-amber-300 to-amber-500 border-2 border-white text-amber-950 font-serif font-black text-xl shadow-2xl flex items-center justify-center scale-110"
-                    >
-                      {dragVal}
-                    </div>
-                  );
-                })()}
               </div>
               <CoachOverlay
                 containerRef={containerRef}
@@ -7725,32 +7256,6 @@
                 onDismiss={dismissGuide}
               />
             </div>
-          )}
-
-          {typeof document !== 'undefined' && ReactDOM.createPortal(
-            <>
-              {assignDragState && assignDragState.moved && (
-                <div
-                  className={`fixed z-[150] pointer-events-none -translate-x-1/2 -translate-y-1/2 px-3.5 py-1.5 rounded-xl border-2 font-serif font-black text-lg shadow-2xl ${
-                    assignDragState.overMissing ? 'bg-emerald-400 border-emerald-200 text-emerald-950 scale-110' : 'bg-amber-400 border-white text-amber-950'
-                  }`}
-                  style={{ left: assignDragState.clientX, top: assignDragState.clientY - (assignDragState.touchOffsetY || 0) }}
-                >
-                  {assignDragState.val}
-                </div>
-              )}
-              {ratioEdgeDrag && ratioEdgeDrag.moved && (
-                <div
-                  className={`fixed z-[150] pointer-events-none -translate-x-1/2 -translate-y-1/2 px-3.5 py-1.5 rounded-xl border-2 font-serif font-black text-lg shadow-2xl ${
-                    ratioEdgeDrag.hoverSlot ? 'bg-emerald-400 border-emerald-200 text-emerald-950 scale-110' : 'bg-amber-400 border-white text-amber-950'
-                  }`}
-                  style={{ left: ratioEdgeDrag.clientX, top: ratioEdgeDrag.clientY - (ratioEdgeDrag.touchOffsetY || 0) }}
-                >
-                  {ratioEdgeDrag.val}
-                </div>
-              )}
-            </>,
-            document.body
           )}
 
           {gameState === 'ended' && (
@@ -9195,8 +8700,6 @@
       const [curP, setCurP] = useState({ x: 0, y: 0 });
       const [isDraggingP, setIsDraggingP] = useState(false);
       const [dragCoordChip, setDragCoordChip] = useState(null); // { clientX, clientY, overGrid }
-      const [dragRChip, setDragRChip] = useState(null); // { opt, startX, startY, clientX, clientY, moved, overDrop }
-      const [dragRatioKey, setDragRatioKey] = useState(null); // { key, startX, startY, clientX, clientY, moved, hoverSlot }
       const [selectedNumerator, setSelectedNumerator] = useState(null);
       const [selectedDenominator, setSelectedDenominator] = useState(null);
       const [feedbackAnim, setFeedbackAnim] = useState('');
@@ -9311,8 +8814,6 @@
         setCurP({ x: 0, y: 0 });
         setIsDraggingP(false);
         setDragCoordChip(null);
-        setDragRChip(null);
-        setDragRatioKey(null);
         setRSnapFlash(false);
         setSelectedNumerator(null);
         setSelectedDenominator(null);
@@ -9327,7 +8828,7 @@
         setFeedbackAnim('');
         setSelectedNumerator(null); setSelectedDenominator(null);
         setIsLockedSuccess(false); setWrongBtnKey(null); setConceptTip(null);
-        setDragCoordChip(null); setDragRChip(null); setDragRatioKey(null);
+        setDragCoordChip(null);
         setRSnapFlash(false);
         const initProg = startSession();
         nextQuestion(initProg);
@@ -9564,123 +9065,13 @@
         };
       }, [dragCoordChip, question, stage, isLockedSuccess]);
 
-      // Phase 1/2：拖曳動徑 r 膠囊貼到動徑 r = ? 定點（亦支援點擊）
-      const isOverRDrop = (clientX, clientY) => {
-        const el = rDropRef.current;
-        if (!el) return false;
-        const r = el.getBoundingClientRect();
-        const cx = r.left + r.width / 2;
-        const cy = r.top + r.height / 2;
-        return Math.hypot(clientX - cx, clientY - cy) <= 68;
-      };
-
-      const handleRChipDown = (e, opt) => {
-        if (gameState !== 'playing' || !question || stage !== 'pickR' || isLockedSuccess || (!isRelaxMode && lives <= 0)) return;
-        e.preventDefault();
-        audio.init();
-        setDragRChip({
-          opt,
-          startX: e.clientX,
-          startY: e.clientY,
-          clientX: e.clientX,
-          clientY: e.clientY,
-          moved: false,
-          overDrop: isOverRDrop(e.clientX, e.clientY)
-        });
-      };
-
-      useEffect(() => {
-        if (!dragRChip) return;
-        const onMove = (e) => {
-          const dist = Math.hypot(e.clientX - dragRChip.startX, e.clientY - dragRChip.startY);
-          const moved = dragRChip.moved || dist >= 8;
-          setDragRChip(prev => prev ? {
-            ...prev,
-            clientX: e.clientX,
-            clientY: e.clientY,
-            moved,
-            overDrop: isOverRDrop(e.clientX, e.clientY)
-          } : null);
-        };
-        const onUp = (e) => {
-          const cur = dragRChip;
-          setDragRChip(null);
-          if (!cur) return;
-          if (!cur.moved || isOverRDrop(e.clientX, e.clientY)) {
-            handlePickR(cur.opt);
-          }
-        };
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
-        window.addEventListener('pointercancel', onUp);
-        return () => {
-          window.removeEventListener('pointermove', onMove);
-          window.removeEventListener('pointerup', onUp);
-          window.removeEventListener('pointercancel', onUp);
-        };
-      }, [dragRChip, question, stage, isLockedSuccess]);
-
-      // 第 2 步（ratio）：支援從圖上 x / y / r 標籤拖曳放進分子／分母框，亦支援點擊快填
-      const findRatioSlot = (clientX, clientY) => {
-        const hit = (el) => {
-          if (!el) return false;
-          const r = el.getBoundingClientRect();
-          return clientX >= r.left - 18 && clientX <= r.right + 18 && clientY >= r.top - 14 && clientY <= r.bottom + 14;
-        };
-        if (hit(numSlotRef.current)) return 'num';
-        if (hit(denSlotRef.current)) return 'den';
-        return null;
-      };
-
+      // 第 2 步（ratio）：純點擊圖上 x / y / r 標籤填入上方分子／分母框
       const handleTagPointerDown = (e, key) => {
         if (gameState !== 'playing' || !question || stage !== 'ratio' || isLockedSuccess || (!isRelaxMode && lives <= 0)) return;
-        e.preventDefault();
         e.stopPropagation();
         audio.init();
-        setDragRatioKey({
-          key,
-          startX: e.clientX,
-          startY: e.clientY,
-          clientX: e.clientX,
-          clientY: e.clientY,
-          moved: false,
-          hoverSlot: findRatioSlot(e.clientX, e.clientY)
-        });
+        handleInputKey(key);
       };
-
-      useEffect(() => {
-        if (!dragRatioKey) return;
-        const onMove = (e) => {
-          const dist = Math.hypot(e.clientX - dragRatioKey.startX, e.clientY - dragRatioKey.startY);
-          const moved = dragRatioKey.moved || dist >= 8;
-          setDragRatioKey(prev => prev ? {
-            ...prev,
-            clientX: e.clientX,
-            clientY: e.clientY,
-            moved,
-            hoverSlot: findRatioSlot(e.clientX, e.clientY)
-          } : null);
-        };
-        const onUp = (e) => {
-          const cur = dragRatioKey;
-          setDragRatioKey(null);
-          if (!cur) return;
-          if (!cur.moved) {
-            handleInputKey(cur.key);
-          } else {
-            const slot = findRatioSlot(e.clientX, e.clientY);
-            if (slot) handleDropRatioSlot(cur.key, slot);
-          }
-        };
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
-        window.addEventListener('pointercancel', onUp);
-        return () => {
-          window.removeEventListener('pointermove', onMove);
-          window.removeEventListener('pointerup', onUp);
-          window.removeEventListener('pointercancel', onUp);
-        };
-      }, [dragRatioKey, question, stage, isLockedSuccess, selectedNumerator, selectedDenominator, pickOrder]);
 
       const getDisplayVal = (key) => !question ? '' : key === 'x' ? question.xVal : key === 'y' ? question.yVal : question.rVal;
       const isLv7NumTurn = (pickOrder === 'num' && !selectedNumerator) || (pickOrder === 'den' && selectedDenominator && !selectedNumerator);
@@ -9815,9 +9206,7 @@
                           ref={numSlotRef}
                           onClick={() => { if (selectedNumerator && !isLockedSuccess) { audio.sfxClick(); setSelectedNumerator(null); } }}
                           className={`min-w-[58px] px-2 h-6 rounded-lg border-2 flex items-center justify-center font-bold text-xs transition-all ${
-                            dragRatioKey?.hoverSlot === 'num'
-                              ? 'border-emerald-300 bg-emerald-400/50 text-white scale-110 shadow-[0_0_12px_rgba(52,211,153,0.8)]'
-                              : selectedNumerator
+                            selectedNumerator
                               ? 'bg-emerald-400 border-emerald-200 text-emerald-950 font-black cursor-pointer active:scale-95'
                               : isLv7NumTurn
                               ? 'border-amber-300 bg-amber-400/30 text-amber-100 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]'
@@ -9831,9 +9220,7 @@
                           ref={denSlotRef}
                           onClick={() => { if (selectedDenominator && !isLockedSuccess) { audio.sfxClick(); setSelectedDenominator(null); } }}
                           className={`min-w-[58px] px-2 h-6 rounded-lg border-2 flex items-center justify-center font-bold text-xs transition-all ${
-                            dragRatioKey?.hoverSlot === 'den'
-                              ? 'border-amber-300 bg-amber-400/50 text-white scale-110 shadow-[0_0_12px_rgba(251,191,36,0.8)]'
-                              : selectedDenominator
+                            selectedDenominator
                               ? 'bg-amber-400 border-amber-200 text-amber-950 font-black cursor-pointer active:scale-95'
                               : isLv7DenTurn
                               ? 'border-amber-300 bg-amber-400/30 text-amber-100 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]'
@@ -9935,16 +9322,16 @@
                           ref={rDropRef}
                           data-coach="lv10-r-drop"
                           transform={`translate(${(GRID_ORIGIN + svgP.x) / 2}, ${(GRID_ORIGIN + svgP.y) / 2})`}
-                          className={`animate-lv10-fade ${stage === 'ratio' ? 'cursor-grab active:cursor-grabbing' : ''} ${rSnapFlash ? 'animate-pulse' : ''}`}
+                          className={`animate-lv10-fade ${stage === 'ratio' ? 'cursor-pointer' : ''} ${rSnapFlash ? 'animate-pulse' : ''}`}
                           style={{ animationDelay: '160ms' }}
                           onPointerDown={(e) => handleTagPointerDown(e, 'r')}
                         >
                           <rect
                             x={isPureSym ? '-20' : '-34'} y="-14" width={isPureSym ? '40' : '68'} height="28" rx="10"
-                            fill={stage === 'pickR' ? (dragRChip?.overDrop ? '#fef3c7' : '#fffbeb') : (isSuccessKey('r') || rSnapFlash ? '#10b981' : 'white')}
-                            stroke={stage === 'pickR' ? (dragRChip?.overDrop ? '#10b981' : '#f59e0b') : (isSuccessKey('r') || rSnapFlash ? '#059669' : '#f59e0b')}
-                            strokeWidth={stage === 'pickR' ? (dragRChip?.overDrop ? '4' : '3') : (isSuccessKey('r') || rSnapFlash ? '3.5' : '2.5')}
-                            strokeDasharray={stage === 'pickR' && !dragRChip?.overDrop ? '5 3' : undefined}
+                            fill={stage === 'pickR' ? '#fffbeb' : (isSuccessKey('r') || rSnapFlash ? '#10b981' : 'white')}
+                            stroke={stage === 'pickR' ? '#f59e0b' : (isSuccessKey('r') || rSnapFlash ? '#059669' : '#f59e0b')}
+                            strokeWidth={stage === 'pickR' ? '3' : (isSuccessKey('r') || rSnapFlash ? '3.5' : '2.5')}
+                            strokeDasharray={stage === 'pickR' ? '5 3' : undefined}
                           />
                           {isPureSym && stage !== 'pickR' ? (
                             <text x="0" y="1" fill={isSuccessKey('r') ? '#ffffff' : '#b45309'} fontSize="16" fontWeight="900" fontFamily="serif" fontStyle="italic" textAnchor="middle" dominantBaseline="middle">r</text>
@@ -10018,8 +9405,8 @@
                         <button
                           key={opt.label}
                           type="button"
-                          onPointerDown={(e) => handleRChipDown(e, opt)}
-                          className={`py-2 bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-mono font-black rounded-xl shadow active:scale-95 text-sm sm:text-base flex items-center justify-center touch-none select-none cursor-grab active:cursor-grabbing transition-all hover:brightness-105 ${wrongBtnKey === opt.label ? 'btn-wrong-flash' : ''} ${dragRChip?.opt.label === opt.label ? 'opacity-45 scale-95' : ''}`}
+                          onClick={() => { audio.init(); handlePickR(opt); }}
+                          className={`py-2 bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-mono font-black rounded-xl shadow active:scale-95 text-sm sm:text-base flex items-center justify-center select-none cursor-pointer transition-all hover:brightness-105 ${wrongBtnKey === opt.label ? 'btn-wrong-flash' : ''}`}
                         >
                           <span className="inline-flex items-center gap-0.5">r = <SqrtText text={opt.label} /></span>
                         </button>
@@ -10031,7 +9418,7 @@
             </div>
           )}
 
-          {/* 跟隨指標的浮動拖曳膠囊（使用 Portal 掛載於 body，避免外層 animate-jelly transform 造成 fixed 座標偏移） */}
+          {/* P0 拖曳 P(x, y) 坐標點浮動膠囊 */}
           {typeof document !== 'undefined' && ReactDOM.createPortal(
             <>
               {dragCoordChip && question && (
@@ -10040,30 +9427,6 @@
                   style={{ left: dragCoordChip.clientX, top: dragCoordChip.clientY - (dragCoordChip.touchOffsetY || 0) }}
                 >
                   P({question.xVal}, {question.yVal})
-                </div>
-              )}
-              {dragRChip && dragRChip.moved && (
-                <div
-                  className={`fixed z-[150] pointer-events-none -translate-x-1/2 -translate-y-1/2 px-3 py-1.5 rounded-2xl border-2 font-mono font-black text-sm shadow-2xl ${dragRChip.overDrop ? 'bg-emerald-400 border-emerald-200 text-emerald-950 scale-110' : 'bg-amber-400 border-amber-200 text-amber-950'}`}
-                  style={{ left: dragRChip.clientX, top: dragRChip.clientY }}
-                >
-                  <span className="inline-flex items-center gap-0.5">r = <SqrtText text={dragRChip.opt.label} /></span>
-                </div>
-              )}
-              {dragRatioKey && dragRatioKey.moved && question && (
-                <div
-                  className={`fixed z-[150] pointer-events-none -translate-x-1/2 -translate-y-1/2 px-3 py-1 rounded-xl border-2 font-mono font-black text-sm shadow-2xl ${
-                    dragRatioKey.hoverSlot
-                      ? 'bg-emerald-400 border-emerald-200 text-emerald-950 scale-110'
-                      : dragRatioKey.key === 'x'
-                      ? 'bg-blue-600 border-blue-200 text-white'
-                      : dragRatioKey.key === 'y'
-                      ? 'bg-red-600 border-rose-200 text-white'
-                      : 'bg-amber-400 border-amber-200 text-amber-950'
-                  }`}
-                  style={{ left: dragRatioKey.clientX, top: dragRatioKey.clientY }}
-                >
-                  <span className="inline-flex items-center gap-0.5">{isPureSym ? dragRatioKey.key : <>{dragRatioKey.key} = <SqrtText text={String(getDisplayVal(dragRatioKey.key))} /></>}</span>
                 </div>
               )}
             </>,
@@ -10099,11 +9462,11 @@
             steps={guideMode === 'manual' ? (
               question?.phase === 0 ? [
                 { text: '拖曳題目上的 (x, y) 坐標膠囊（或直接在網格上）至對應整數格點放開。' },
-                { text: '依三角比定義（sin=y/r、cos=x/r、tan=y/x）依序點擊圖上的 x、y、r 標籤填入上方分子與分母格（亦可拖曳）。' }
+                { text: '依三角比定義（sin=y/r、cos=x/r、tan=y/x）依序點擊圖上的 x、y、r 標籤填入上方分子與分母格。' }
               ] : [
                 { text: '第二、三階段藍點 P(x, y) 會自動射出定位至目標格點。' },
-                { text: '依 r = √(x² + y²) 點選下方正確的 r 膠囊填入動徑 r = ?（亦可拖曳貼上）。' },
-                { text: '依三角比定義（sin=y/r、cos=x/r、tan=y/x）依序點擊圖上的 x、y、r 標籤填入上方分子與分母格（亦可拖曳）。' }
+                { text: '依 r = √(x² + y²) 點選下方正確的 r 膠囊填入動徑 r = ?。' },
+                { text: '依三角比定義（sin=y/r、cos=x/r、tan=y/x）依序點擊圖上的 x、y、r 標籤填入上方分子與分母格。' }
               ]
             ) : stage === 'pickR' ? [
               {
@@ -10113,7 +9476,7 @@
                 ],
                 target: 'lv10-r-opts',
                 tap: false,
-                text: '依 r = √(x² + y²) 請點選下方正確的 r 膠囊填入動徑 r = ?（亦可拖曳貼上）！',
+                text: '依 r = √(x² + y²) 請點選下方正確的 r 膠囊填入動徑 r = ?！',
                 shape: 'pill',
                 pad: 8
               }
@@ -10134,7 +9497,7 @@
                 target: 'lv10-demo-tag',
                 tap: false,
                 placement: 'bottom',
-                text: '請依序點擊圖上的 x、y 或 r 標籤填入上方「分子 / 分母」框（亦可直接拖曳）！',
+                text: '請依序點擊圖上的 x、y 或 r 標籤填入上方「分子 / 分母」框！',
                 shape: 'pill',
                 pad: 10
               }
@@ -10181,16 +9544,14 @@
       const [currentAngle, setCurrentAngle] = useState(0);
       const [isDragging, setIsDragging] = useState(false);
 
-      // Step 2 (assign): 7 膠囊個別對應 x, y, r（支援預設 x→y→r 自動推進＋自行點框切換＋拖曳）
+      // Step 2 (assign): 點選膠囊填入 x, y, r（支援預設 x→y→r 自動推進＋自行點框切換）
       const [assignedVals, setAssignedVals] = useState({ x: null, y: null, r: null });
       const [activeAssignSlot, setActiveAssignSlot] = useState('x');
       const [wrongSlotKey, setWrongSlotKey] = useState(null);
-      const [dragAssignChip, setDragAssignChip] = useState(null);
 
-      // Step 3 (define): 從圖上拖曳／點擊 x, y, r 進分子／分母框
+      // Step 3 (define): 點擊圖上 x, y, r 填入分子／分母框
       const [selectedNumerator, setSelectedNumerator] = useState(null);
       const [selectedDenominator, setSelectedDenominator] = useState(null);
-      const [dragRatioKey, setDragRatioKey] = useState(null);
 
       const [isLockedSuccess, setIsLockedSuccess] = useState(false);
       const [feedbackAnim, setFeedbackAnim] = useState('');
@@ -10337,10 +9698,8 @@
         const firstEmpty = preferredAssignOrderRef.current.find(k => !initialAssigned[k]) || 'x';
         setActiveAssignSlot(firstEmpty);
         setWrongSlotKey(null);
-        setDragAssignChip(null);
         setSelectedNumerator(null);
         setSelectedDenominator(null);
-        setDragRatioKey(null);
         setIsLockedSuccess(false);
         pendingNextRef.current = null;
         setConceptTip(null);
@@ -10500,64 +9859,16 @@
         return cands[0].d < Infinity ? cands[0].slot : null;
       };
 
-      const handleAssignChipDown = (e, val) => {
+      const handleAssignChipClick = (val) => {
         if (gameState !== 'playing' || stage !== 'assign' || !question || (!isRelaxMode && lives <= 0)) return;
         if (showGuide) dismissGuide(false);
-        e.preventDefault();
         audio.init();
-        const touchOffsetY = e.pointerType === 'touch' ? 46 : 0;
-        setDragAssignChip({
-          val,
-          startX: e.clientX,
-          startY: e.clientY,
-          clientX: e.clientX,
-          clientY: e.clientY,
-          touchOffsetY,
-          moved: false,
-          hoverSlot: findAssignSlot(e.clientX, e.clientY - touchOffsetY)
-        });
+        if (activeAssignSlot && !assignedVals[activeAssignSlot]) {
+          attemptAssignSlot(activeAssignSlot, val);
+        }
       };
 
-      useEffect(() => {
-        if (!dragAssignChip) return;
-        const onMove = (e) => {
-          const offsetY = e.pointerType === 'touch' ? 46 : dragAssignChip.touchOffsetY || 0;
-          const dist = Math.hypot(e.clientX - dragAssignChip.startX, e.clientY - dragAssignChip.startY);
-          const moved = dragAssignChip.moved || dist >= 8;
-          setDragAssignChip(prev => prev ? {
-            ...prev,
-            clientX: e.clientX,
-            clientY: e.clientY,
-            touchOffsetY: offsetY,
-            moved,
-            hoverSlot: findAssignSlot(e.clientX, e.clientY - offsetY)
-          } : null);
-        };
-        const onUp = (e) => {
-          const cur = dragAssignChip;
-          setDragAssignChip(null);
-          if (!cur) return;
-          if (!cur.moved) {
-            if (activeAssignSlot && !assignedVals[activeAssignSlot]) {
-              attemptAssignSlot(activeAssignSlot, cur.val);
-            }
-          } else {
-            const offsetY = e.pointerType === 'touch' ? 46 : cur.touchOffsetY || 0;
-            const slot = findAssignSlot(e.clientX, e.clientY - offsetY);
-            if (slot) attemptAssignSlot(slot, cur.val);
-          }
-        };
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
-        window.addEventListener('pointercancel', onUp);
-        return () => {
-          window.removeEventListener('pointermove', onMove);
-          window.removeEventListener('pointerup', onUp);
-          window.removeEventListener('pointercancel', onUp);
-        };
-      }, [dragAssignChip, question, stage, assignedVals, activeAssignSlot]);
-
-      // ==================== Step 3: 圖上拖曳／點擊 x, y, r 填定義 ====================
+      // ==================== Step 3: 圖上點擊 x, y, r 填定義 ====================
       const triggerSuccess = () => {
         if (showGuide) dismissGuide(false);
         justSolvedAtRef.current = Date.now();
@@ -10627,17 +9938,6 @@
         }
       };
 
-      const findRatioSlot = (clientX, clientY) => {
-        const hit = (el) => {
-          if (!el) return false;
-          const r = el.getBoundingClientRect();
-          return clientX >= r.left - 18 && clientX <= r.right + 18 && clientY >= r.top - 14 && clientY <= r.bottom + 14;
-        };
-        if (hit(numSlotRef.current)) return 'num';
-        if (hit(denSlotRef.current)) return 'den';
-        return null;
-      };
-
       const handleTagPointerDown = (e, key) => {
         if (stage === 'assign') {
           if (showGuide) dismissGuide(false);
@@ -10649,54 +9949,10 @@
           return;
         }
         if (gameState !== 'playing' || stage !== 'define' || !question || isLockedSuccess || (!isRelaxMode && lives <= 0)) return;
-        if (showGuide) dismissGuide(false);
-        e.preventDefault();
         e.stopPropagation();
         audio.init();
-        setDragRatioKey({
-          key,
-          startX: e.clientX,
-          startY: e.clientY,
-          clientX: e.clientX,
-          clientY: e.clientY,
-          moved: false,
-          hoverSlot: findRatioSlot(e.clientX, e.clientY)
-        });
+        handleInputKey(key);
       };
-
-      useEffect(() => {
-        if (!dragRatioKey) return;
-        const onMove = (e) => {
-          const dist = Math.hypot(e.clientX - dragRatioKey.startX, e.clientY - dragRatioKey.startY);
-          const moved = dragRatioKey.moved || dist >= 8;
-          setDragRatioKey(prev => prev ? {
-            ...prev,
-            clientX: e.clientX,
-            clientY: e.clientY,
-            moved,
-            hoverSlot: findRatioSlot(e.clientX, e.clientY)
-          } : null);
-        };
-        const onUp = (e) => {
-          const cur = dragRatioKey;
-          setDragRatioKey(null);
-          if (!cur) return;
-          if (!cur.moved) {
-            handleInputKey(cur.key);
-          } else {
-            const slot = findRatioSlot(e.clientX, e.clientY);
-            if (slot) handleDropRatioSlot(cur.key, slot);
-          }
-        };
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
-        window.addEventListener('pointercancel', onUp);
-        return () => {
-          window.removeEventListener('pointermove', onMove);
-          window.removeEventListener('pointerup', onUp);
-          window.removeEventListener('pointercancel', onUp);
-        };
-      }, [dragRatioKey, question, stage, isLockedSuccess, selectedNumerator, selectedDenominator, pickOrder]);
 
       const getDisplayVal = (key) => !question ? '' : key === 'x' ? question.xStr : key === 'y' ? question.yStr : question.rStr;
       const isSuccessKey = (k) => Boolean(isLockedSuccess && question && (question.correctNumeratorKey === k || question.correctDenominatorKey === k));
@@ -10776,9 +10032,7 @@
                             ref={numSlotRef}
                             onClick={() => { if (selectedNumerator && !isLockedSuccess) { audio.sfxClick(); setSelectedNumerator(null); } }}
                             className={`min-w-[56px] px-2 h-6 rounded-lg border-2 flex items-center justify-center font-bold text-xs transition-all ${
-                              dragRatioKey?.hoverSlot === 'num'
-                                ? 'border-emerald-300 bg-emerald-400/50 text-white scale-110 shadow-[0_0_12px_rgba(52,211,153,0.8)]'
-                                : selectedNumerator
+                              selectedNumerator
                                 ? 'bg-emerald-400 border-emerald-200 text-emerald-950 font-black cursor-pointer active:scale-95'
                                 : isLv8NumTurn
                                 ? 'border-amber-300 bg-amber-400/30 text-amber-100 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]'
@@ -10792,9 +10046,7 @@
                             ref={denSlotRef}
                             onClick={() => { if (selectedDenominator && !isLockedSuccess) { audio.sfxClick(); setSelectedDenominator(null); } }}
                             className={`min-w-[56px] px-2 h-6 rounded-lg border-2 flex items-center justify-center font-bold text-xs transition-all ${
-                              dragRatioKey?.hoverSlot === 'den'
-                                ? 'border-amber-300 bg-amber-400/50 text-white scale-110 shadow-[0_0_12px_rgba(251,191,36,0.8)]'
-                                : selectedDenominator
+                              selectedDenominator
                                 ? 'bg-amber-400 border-amber-200 text-amber-950 font-black cursor-pointer active:scale-95'
                                 : isLv8DenTurn
                                 ? 'border-amber-300 bg-amber-400/30 text-amber-100 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]'
@@ -10966,13 +10218,13 @@
                         <line
                           x1={origin.x} y1={origin.y} x2={question.ptP.x} y2={question.ptP.y}
                           stroke={isSuccessKey('r') ? '#10b981' : '#f59e0b'} strokeWidth={isSuccessKey('r') ? '8.5' : '7.5'} strokeLinecap="round"
-                          className={`animate-lv10-ray ${stage === 'define' ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                          className={`animate-lv10-ray ${stage === 'define' ? 'cursor-pointer' : ''}`}
                           onPointerDown={(e) => handleTagPointerDown(e, 'r')}
                         />
 
                         {(() => {
                           const rVal = stage === 'assign' ? assignedVals.r : question.rStr;
-                          const isActive = stage === 'assign' && !rVal && (activeAssignSlot === 'r' || dragAssignChip?.hoverSlot === 'r');
+                          const isActive = stage === 'assign' && !rVal && activeAssignSlot === 'r';
                           const isWrong = wrongSlotKey === 'r';
                           const fg = isSuccessKey('r') ? '#ffffff' : '#b45309';
                           return (
@@ -10980,7 +10232,7 @@
                               ref={assignRRef}
                               data-coach={stage === 'assign' ? 'lv11-assign-r' : undefined}
                               transform={`translate(${(origin.x + question.ptP.x) / 2}, ${(origin.y + question.ptP.y) / 2})`}
-                              className={`animate-lv10-fade ${stage === 'define' ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                              className="animate-lv10-fade cursor-pointer"
                               onPointerDown={(e) => handleTagPointerDown(e, 'r')}
                             >
                               <rect x="-50" y="-24" width="100" height="48" fill="transparent" />
@@ -11001,7 +10253,7 @@
 
                         {(() => {
                           const xVal = stage === 'assign' ? assignedVals.x : question.xStr;
-                          const isActive = stage === 'assign' && !xVal && (activeAssignSlot === 'x' || dragAssignChip?.hoverSlot === 'x');
+                          const isActive = stage === 'assign' && !xVal && activeAssignSlot === 'x';
                           const isWrong = wrongSlotKey === 'x';
                           const fg = isSuccessKey('x') ? '#ffffff' : '#1d4ed8';
                           const xPos = question.xNum === 0 ? origin.x + 50 : question.ptFootX.x;
@@ -11011,7 +10263,7 @@
                               ref={assignXRef}
                               data-coach={stage === 'assign' ? 'lv11-assign-x' : 'lv11-demo-tag'}
                               transform={`translate(${xPos}, ${yPos})`}
-                              className={`animate-lv10-fade ${stage === 'define' ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                              className="animate-lv10-fade cursor-pointer"
                               onPointerDown={(e) => handleTagPointerDown(e, 'x')}
                             >
                               <rect x="-50" y="-24" width="100" height="48" fill="transparent" />
@@ -11032,7 +10284,7 @@
 
                         {(() => {
                           const yVal = stage === 'assign' ? assignedVals.y : question.yStr;
-                          const isActive = stage === 'assign' && !yVal && (activeAssignSlot === 'y' || dragAssignChip?.hoverSlot === 'y');
+                          const isActive = stage === 'assign' && !yVal && activeAssignSlot === 'y';
                           const isWrong = wrongSlotKey === 'y';
                           const fg = isSuccessKey('y') ? '#ffffff' : '#b91c1c';
                           const xPos = origin.x + (question.xNum >= 0 ? -50 : 50);
@@ -11076,10 +10328,8 @@
                         <button
                           key={val}
                           type="button"
-                          onPointerDown={(e) => handleAssignChipDown(e, val)}
-                          className={`flex-1 min-w-0 py-2 rounded-xl bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-serif font-black text-sm sm:text-base shadow active:scale-95 touch-none select-none cursor-grab active:cursor-grabbing flex items-center justify-center transition-transform ${
-                            dragAssignChip?.val === val && dragAssignChip.moved ? 'opacity-45 scale-95' : 'hover:brightness-105'
-                          }`}
+                          onClick={() => handleAssignChipClick(val)}
+                          className="flex-1 min-w-0 py-2 rounded-xl bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-serif font-black text-sm sm:text-base shadow active:scale-95 select-none cursor-pointer flex items-center justify-center transition-transform hover:brightness-105"
                         >
                           <SqrtText text={val} />
                         </button>
@@ -11089,38 +10339,6 @@
                 </div>
               </div>
             </div>
-          )}
-
-          {typeof document !== 'undefined' && ReactDOM.createPortal(
-            <>
-              {dragAssignChip && dragAssignChip.moved && (
-                <div
-                  className={`fixed z-[150] pointer-events-none -translate-x-1/2 -translate-y-1/2 px-3 py-1.5 rounded-xl border-2 font-serif font-black text-base shadow-2xl ${
-                    dragAssignChip.hoverSlot ? 'bg-emerald-400 border-emerald-200 text-emerald-950 scale-110' : 'bg-amber-400 border-white text-amber-950'
-                  }`}
-                  style={{ left: dragAssignChip.clientX, top: dragAssignChip.clientY - (dragAssignChip.touchOffsetY || 0) }}
-                >
-                  <SqrtText text={dragAssignChip.val} />
-                </div>
-              )}
-              {dragRatioKey && dragRatioKey.moved && question && (
-                <div
-                  className={`fixed z-[150] pointer-events-none -translate-x-1/2 -translate-y-1/2 px-3 py-1 rounded-xl border-2 font-mono font-black text-sm shadow-2xl ${
-                    dragRatioKey.hoverSlot
-                      ? 'bg-emerald-400 border-emerald-200 text-emerald-950 scale-110'
-                      : dragRatioKey.key === 'x'
-                      ? 'bg-blue-600 border-blue-200 text-white'
-                      : dragRatioKey.key === 'y'
-                      ? 'bg-red-600 border-rose-200 text-white'
-                      : 'bg-amber-400 border-amber-200 text-amber-950'
-                  }`}
-                  style={{ left: dragRatioKey.clientX, top: dragRatioKey.clientY }}
-                >
-                  <span className="inline-flex items-center gap-0.5">{dragRatioKey.key} = <SqrtText text={getDisplayVal(dragRatioKey.key)} /></span>
-                </div>
-              )}
-            </>,
-            document.body
           )}
 
           {gameState === 'ended' && (
@@ -11156,8 +10374,8 @@
                 { text: '將圖上的 x、y、r 標籤拖進（或點擊填入）上方分子與分母格求比值。' }
               ] : [
                 { text: '第二、三階段終邊會自動旋轉定位，並已帶入動徑 r。' },
-                { text: '從下方 5 顆數字膠囊點選填入 x、y（亦可拖曳，軸上點留意 0 與 ±1）。' },
-                { text: '依序點擊圖上的 x、y、r 標籤填入上方分子與分母格求比值（亦可拖曳）。' }
+                { text: '從下方 5 顆數字膠囊點選填入 x、y（軸上點留意 0 與 ±1）。' },
+                { text: '依序點擊圖上的 x、y、r 標籤填入上方分子與分母格求比值。' }
               ]
             ) : stage === 'assign' ? [
               {
@@ -11190,7 +10408,7 @@
                 target: 'lv11-demo-tag',
                 tap: false,
                 placement: 'bottom',
-                text: '請依序點擊圖上的 x、y 或 r 標籤填入上方「分子 / 分母」框（亦可直接拖曳）！',
+                text: '請依序點擊圖上的 x、y 或 r 標籤填入上方「分子 / 分母」框！',
                 shape: 'pill',
                 pad: 10
               }
@@ -16832,7 +16050,6 @@
       const [pickedEdges, setPickedEdges] = useState([]); // [edgeObj, edgeObj]
       const [pickedAngle, setPickedAngle] = useState(null);
       const [pickedAns, setPickedAns] = useState(null);
-      const [dragChip, setDragChip] = useState(null); // P1/P2 拖曳邊／角進頂部公式槽
       const [isSolved, setIsSolved] = useState(false);
       const [conceptTip, setConceptTip] = useState(null);
       const [feedbackAnim, setFeedbackAnim] = useState('');
@@ -16887,7 +16104,6 @@
         setPickedEdges([]);
         setPickedAngle(null);
         setPickedAns(null);
-        setDragChip(null);
         setIsSolved(false);
         setConceptTip(null);
         pendingNextRef.current = null;
@@ -17044,50 +16260,14 @@
         }
       };
 
-      const handleBoardItemPointerDown = (e, itemType, itemObj) => {
+      const handleBoardItemClick = (e, itemType, itemObj) => {
         if (gameState !== 'playing' || !question || isSolved || (!isRelaxMode && lives <= 0)) return;
         if (itemType === 'edge' && pickedEdges.some(ed => ed.idx === itemObj.idx)) return;
         if (itemType === 'angle' && pickedAngle?.v === itemObj.v) return;
-        e.preventDefault();
         e.stopPropagation();
         if (showGuide) dismissGuide();
-        const isTouch = e.pointerType === 'touch';
-        const startX = e.clientX;
-        const startY = e.clientY;
-        const label = itemType === 'edge' ? itemObj.label : itemObj.deg;
-        setDragChip({ itemType, itemObj, label, x: startX, y: startY, isDragging: false, isTouch, overBar: false });
-
-        const isOverFormula = (cx, cy) => {
-          const el = formulaBarRef.current;
-          if (!el) return false;
-          const r = el.getBoundingClientRect();
-          return cx >= r.left - 12 && cx <= r.right + 12 && cy >= r.top - 12 && cy <= r.bottom + 24;
-        };
-
-        const onMove = (ev) => {
-          const moved = Math.hypot(ev.clientX - startX, ev.clientY - startY) >= 8;
-          const vy = isTouch ? ev.clientY - 46 : ev.clientY;
-          const over = moved && (isOverFormula(ev.clientX, ev.clientY) || isOverFormula(ev.clientX, vy));
-          setDragChip(prev => prev ? { ...prev, x: ev.clientX, y: ev.clientY, isDragging: prev.isDragging || moved, overBar: over } : null);
-        };
-
-        const onUp = (ev) => {
-          window.removeEventListener('pointermove', onMove);
-          window.removeEventListener('pointerup', onUp);
-          window.removeEventListener('pointercancel', onUp);
-          const moved = Math.hypot(ev.clientX - startX, ev.clientY - startY) >= 8;
-          const vy = isTouch ? ev.clientY - 46 : ev.clientY;
-          const hitBar = isOverFormula(ev.clientX, ev.clientY) || isOverFormula(ev.clientX, vy);
-          setDragChip(null);
-          if (!moved || hitBar) {
-            if (itemType === 'edge') tryPickEdge(itemObj);
-            else tryPickAngle(itemObj);
-          }
-        };
-
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
-        window.addEventListener('pointercancel', onUp);
+        if (itemType === 'edge') tryPickEdge(itemObj);
+        else tryPickAngle(itemObj);
       };
 
       const handlePickCalcOpt = (opt) => {
@@ -17201,21 +16381,19 @@
                           ? '拖曳光臂，調出「面積最大」的夾角！'
                           : `拖曳光臂，調出與 ${question.refDeg}°「形狀不同但面積相等」的角！`)
                       : qPhase === 1
-                      ? '點選或拖曳圖上的「兩邊一夾角」，完成面積公式！'
-                      : '先完成面積公式列式，再心算選出面積！'}
+                      ? '點選圖上的「兩邊一夾角」，完成面積公式！'
+                      : '先點選圖上「兩邊一夾角」完成列式，再心算選出面積！'}
                   </div>
                   <span className="w-6 h-6 inline-flex items-center justify-center shrink-0">
                     <SuccessBadge show={isSolved} />
                   </span>
                 </div>
 
-                {/* 繪圖區頂部：滿寬大字體公式填空區（空間大、字體清晰、拖曳距離縮短一半） */}
+                {/* 繪圖區頂部：滿寬大字體公式填空區 */}
                 <div
                   ref={formulaBarRef}
                   data-coach="lv15-prompt"
-                  className={`bg-emerald-50/90 border-b border-emerald-200/90 px-2.5 py-2 shrink-0 flex items-center justify-center transition-all ${
-                    dragChip?.overBar ? 'bg-amber-100/90 ring-2 ring-inset ring-amber-400' : ''
-                  }`}
+                  className="bg-emerald-50/90 border-b border-emerald-200/90 px-2.5 py-2 shrink-0 flex items-center justify-center transition-all"
                 >
                   {isDragPhase ? (
                     <div className="flex items-center justify-center flex-wrap gap-1.5 font-serif font-black text-base sm:text-lg text-emerald-950">
@@ -17321,37 +16499,40 @@
                         );
                       })()}
 
-                      {/* 即時翡翠面積填色三角形 */}
+                      {/* Layer 2：即時翡翠面積填色 ＋ 夾角扇形（位於三角形邊線下方） */}
                       <polygon
                         points={`${P0_OX},${P0_OY} ${P0_OX + P0_BASE},${P0_OY} ${p0Ax},${p0Ay}`}
                         fill={isSolved ? 'rgba(16,185,129,0.34)' : `rgba(16,185,129,${(0.10 + 0.20 * Math.sin(p0Rad)).toFixed(2)})`}
-                        stroke="#0f766e" strokeWidth="2.4" strokeLinejoin="round"
+                        stroke="none"
                       />
-
-                      {/* 夾角扇形與即時度數 */}
                       <path
                         d={`M ${P0_OX} ${P0_OY} L ${P0_OX + 28} ${P0_OY} A 28 28 0 0 0 ${P0_OX + 28 * Math.cos(p0Rad)} ${P0_OY - 28 * Math.sin(p0Rad)} Z`}
                         fill="rgba(16,185,129,0.28)" stroke="#059669" strokeWidth="1.8"
                       />
+
+                      {/* Layer 3：三角形邊線 ＋ 固定底邊 a ＋ 可旋轉翡翠光臂 b ＋ 頂點收口 */}
+                      <polygon
+                        points={`${P0_OX},${P0_OY} ${P0_OX + P0_BASE},${P0_OY} ${p0Ax},${p0Ay}`}
+                        fill="none"
+                        stroke="#0f766e" strokeWidth="2.4" strokeLinejoin="round"
+                      />
+                      <line x1={P0_OX} y1={P0_OY} x2={P0_OX + P0_BASE} y2={P0_OY} stroke="#1e293b" strokeWidth="4" strokeLinecap="round" />
+                      <line x1={P0_OX} y1={P0_OY} x2={p0Ax} y2={p0Ay} stroke="#059669" strokeWidth="4.2" strokeLinecap="round" />
+                      <circle data-coach="lv15-p0-pivot" cx={P0_OX} cy={P0_OY} r="5" fill="#0f172a" stroke="#ffffff" strokeWidth="2" />
+                      <circle cx={P0_OX + P0_BASE} cy={P0_OY} r="4.5" fill="#ffffff" stroke="#1e293b" strokeWidth="2" />
+
+                      {/* Layer 4（最頂層）：夾角度數、底邊 a 膠囊、即時垂線高 h、邊長 b 膠囊與金色握把 */}
                       <text
                         x={P0_OX + 44 * Math.cos(p0Rad / 2)}
                         y={P0_OY - 44 * Math.sin(p0Rad / 2) + 4}
-                        fill="#065f46" fontSize="12" fontWeight="900" textAnchor="middle" className="font-mono"
+                        fill="#065f46" fontSize="12" fontWeight="900" textAnchor="middle" className="font-mono pointer-events-none"
                       >
                         {armDeg}°
                       </text>
-
-                      {/* 固定底邊 a */}
-                      <line x1={P0_OX} y1={P0_OY} x2={P0_OX + P0_BASE} y2={P0_OY} stroke="#1e293b" strokeWidth="4" strokeLinecap="round" />
                       <rect x={P0_OX + P0_BASE / 2 - 17} y={P0_OY + 7} width="34" height="21" rx="10.5" fill="#ffffff" stroke="#475569" strokeWidth="1.8" />
                       <text x={P0_OX + P0_BASE / 2} y={P0_OY + 18.5} fill="#0f172a" fontSize="12.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">
                         {question.a}
                       </text>
-
-                      {/* 可旋轉翡翠光臂 b */}
-                      <line x1={P0_OX} y1={P0_OY} x2={p0Ax} y2={p0Ay} stroke="#059669" strokeWidth="4.2" strokeLinecap="round" />
-                      <circle data-coach="lv15-p0-pivot" cx={P0_OX} cy={P0_OY} r="5" fill="#0f172a" stroke="#ffffff" strokeWidth="2" />
-                      <circle cx={P0_OX + P0_BASE} cy={P0_OY} r="4.5" fill="#ffffff" stroke="#1e293b" strokeWidth="2" />
 
                       {/* 即時垂線高 h（側移至垂線旁空位，絕不壓在 90° 光臂上） */}
                       <g className="pointer-events-none">
@@ -17403,69 +16584,51 @@
                     </svg>
                   ) : (
                     <svg data-coach="lv15-board" viewBox="0 0 320 218" className="w-full h-full max-w-[430px] object-contain select-none">
-                      {/* 三角形本體（放大版，答對亮起翡翠填色） */}
+                      {/* Layer 1：三角形純填色（不含邊框） */}
                       <polygon
                         points={question.pts.map(p => p.join(',')).join(' ')}
                         fill={isSolved ? 'rgba(16,185,129,0.26)' : 'rgba(16,185,129,0.08)'}
-                        stroke="#334155"
-                        strokeWidth="2.8"
-                        strokeLinejoin="round"
+                        stroke="none"
                         className="transition-all duration-300"
                       />
 
-                      {/* 角度弧線與精簡緊湊膠囊（答對自動隱藏干擾角，消除雜訊） */}
+                      {/* Layer 2：角度扇形（位於三角形邊線下方，絕不壓蓋邊框） */}
                       {question.angles.map((ang) => {
                         if (isSolved && !ang.ok) return null;
                         const ac = getAngleCoords(question.pts, ang.v);
                         const isPicked = pickedAngle?.v === ang.v;
                         const isHighlight = isPicked || (isSolved && ang.ok);
-                        const isBeingDragged = dragChip?.isDragging && dragChip.itemType === 'angle' && dragChip.itemObj.v === ang.v;
                         return (
-                          <g
-                            key={`ang-${ang.v}`}
-                            onPointerDown={(e) => handleBoardItemPointerDown(e, 'angle', ang)}
-                            style={{ touchAction: 'none' }}
-                            className={isSolved || isPicked ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}
-                          >
-                            <path
-                              d={ac.arcPath}
-                              fill={isHighlight ? 'rgba(16,185,129,0.34)' : 'rgba(251,191,36,0.22)'}
-                              stroke={isHighlight ? '#059669' : '#f59e0b'}
-                              strokeWidth={isHighlight ? '2.4' : '1.6'}
-                            />
-                            <g transform={`translate(${ac.lx}, ${ac.ly})`} opacity={isBeingDragged ? 0.35 : 1}>
-                              <rect
-                                x="-19" y="-10" width="38" height="20" rx="10"
-                                fill={isHighlight ? '#059669' : slotAngleActive ? '#fef3c7' : '#ffffff'}
-                                stroke={isHighlight ? '#047857' : slotAngleActive ? '#f59e0b' : '#cbd5e1'}
-                                strokeWidth={slotAngleActive ? '2.2' : '1.6'}
-                              />
-                              <text
-                                x="0" y="0.5"
-                                fill={isHighlight ? '#ffffff' : '#92400e'}
-                                fontSize="11.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono"
-                              >
-                                {ang.deg}
-                              </text>
-                            </g>
-                          </g>
+                          <path
+                            key={`ang-sec-${ang.v}`}
+                            d={ac.arcPath}
+                            onClick={(e) => handleBoardItemClick(e, 'angle', ang)}
+                            className={isSolved || isPicked ? 'cursor-default' : 'cursor-pointer'}
+                            fill={isHighlight ? 'rgba(16,185,129,0.34)' : 'rgba(251,191,36,0.22)'}
+                            stroke={isHighlight ? '#059669' : '#f59e0b'}
+                            strokeWidth={isHighlight ? '2.2' : '1.6'}
+                          />
                         );
                       })}
 
-                      {/* 已選邊線高亮與邊長膠囊（答對自動隱藏干擾邊） */}
+                      {/* Layer 3：三角形邊線 ＋ 已選高亮粗邊 ＋ 透明粗觸控區 ＋ 頂點收口 */}
+                      <polygon
+                        points={question.pts.map(p => p.join(',')).join(' ')}
+                        fill="none"
+                        stroke="#334155"
+                        strokeWidth="2.8"
+                        strokeLinejoin="round"
+                      />
                       {question.edges.map((edge) => {
                         if (isSolved && !edge.ok) return null;
                         const ec = getEdgeCoords(question.pts, edge.idx);
                         const isPicked = pickedEdges.some(e => e.idx === edge.idx);
                         const isHighlight = isPicked || (isSolved && edge.ok);
-                        const wantEdge = slotEdge1Active || slotEdge2Active;
-                        const isBeingDragged = dragChip?.isDragging && dragChip.itemType === 'edge' && dragChip.itemObj.idx === edge.idx;
                         return (
                           <g
-                            key={`edge-${edge.idx}`}
-                            onPointerDown={(e) => handleBoardItemPointerDown(e, 'edge', edge)}
-                            style={{ touchAction: 'none' }}
-                            className={isSolved || isPicked ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}
+                            key={`edge-line-${edge.idx}`}
+                            onClick={(e) => handleBoardItemClick(e, 'edge', edge)}
+                            className={isSolved || isPicked ? 'cursor-default' : 'cursor-pointer'}
                           >
                             {isHighlight && (
                               <line
@@ -17477,21 +16640,69 @@
                               x1={ec.p1[0]} y1={ec.p1[1]} x2={ec.p2[0]} y2={ec.p2[1]}
                               stroke="transparent" strokeWidth="18"
                             />
-                            <g transform={`translate(${ec.lx}, ${ec.ly})`} opacity={isBeingDragged ? 0.35 : 1}>
-                              <rect
-                                x="-18" y="-12" width="36" height="24" rx="12"
-                                fill={isHighlight ? '#059669' : wantEdge ? '#fffbeb' : '#ffffff'}
-                                stroke={isHighlight ? '#047857' : wantEdge ? '#f59e0b' : '#64748b'}
-                                strokeWidth={wantEdge ? '2.2' : '1.8'}
-                              />
-                              <text
-                                x="0" y="1"
-                                fill={isHighlight ? '#ffffff' : '#0f172a'}
-                                fontSize="13.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono"
-                              >
-                                {edge.label}
-                              </text>
-                            </g>
+                          </g>
+                        );
+                      })}
+                      {question.pts.map((pt, idx) => (
+                        <circle key={`vdot-${idx}`} cx={pt[0]} cy={pt[1]} r="3.4" fill="#ffffff" stroke="#334155" strokeWidth="1.8" className="pointer-events-none" />
+                      ))}
+
+                      {/* Layer 4（最頂層）：角度膠囊 ＋ 邊長膠囊（答對自動隱藏干擾項） */}
+                      {question.angles.map((ang) => {
+                        if (isSolved && !ang.ok) return null;
+                        const ac = getAngleCoords(question.pts, ang.v);
+                        const isPicked = pickedAngle?.v === ang.v;
+                        const isHighlight = isPicked || (isSolved && ang.ok);
+                        return (
+                          <g
+                            key={`ang-pill-${ang.v}`}
+                            transform={`translate(${ac.lx}, ${ac.ly})`}
+                            onClick={(e) => handleBoardItemClick(e, 'angle', ang)}
+                            className={isSolved || isPicked ? 'cursor-default' : 'cursor-pointer'}
+                          >
+                            <rect
+                              x="-19" y="-10" width="38" height="20" rx="10"
+                              fill={isHighlight ? '#059669' : slotAngleActive ? '#fef3c7' : '#ffffff'}
+                              stroke={isHighlight ? '#047857' : slotAngleActive ? '#f59e0b' : '#cbd5e1'}
+                              strokeWidth={slotAngleActive ? '2.2' : '1.6'}
+                            />
+                            <text
+                              x="0" y="0.5"
+                              fill={isHighlight ? '#ffffff' : '#92400e'}
+                              fontSize="11.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono"
+                            >
+                              {ang.deg}
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      {question.edges.map((edge) => {
+                        if (isSolved && !edge.ok) return null;
+                        const ec = getEdgeCoords(question.pts, edge.idx);
+                        const isPicked = pickedEdges.some(e => e.idx === edge.idx);
+                        const isHighlight = isPicked || (isSolved && edge.ok);
+                        const wantEdge = slotEdge1Active || slotEdge2Active;
+                        return (
+                          <g
+                            key={`edge-pill-${edge.idx}`}
+                            transform={`translate(${ec.lx}, ${ec.ly})`}
+                            onClick={(e) => handleBoardItemClick(e, 'edge', edge)}
+                            className={isSolved || isPicked ? 'cursor-default' : 'cursor-pointer'}
+                          >
+                            <rect
+                              x="-18" y="-12" width="36" height="24" rx="12"
+                              fill={isHighlight ? '#059669' : wantEdge ? '#fffbeb' : '#ffffff'}
+                              stroke={isHighlight ? '#047857' : wantEdge ? '#f59e0b' : '#64748b'}
+                              strokeWidth={wantEdge ? '2.2' : '1.8'}
+                            />
+                            <text
+                              x="0" y="1"
+                              fill={isHighlight ? '#ffffff' : '#0f172a'}
+                              fontSize="13.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono"
+                            >
+                              {edge.label}
+                            </text>
                           </g>
                         );
                       })}
@@ -17542,7 +16753,7 @@
                   <div data-coach="lv15-opts" className="bg-slate-900 border-t-2 border-slate-800 px-2.5 py-2.5 shrink-0">
                     {!needCalc ? (
                       <div className="h-[46px] flex items-center justify-center text-xs font-bold text-slate-400">
-                        請點選或拖曳圖上「兩條夾邊與夾角」完成公式（順序不限）
+                        請點選圖上「兩條夾邊與夾角」完成公式（順序不限）
                       </div>
                     ) : (
                       <div className="grid grid-cols-4 gap-2">
@@ -17566,19 +16777,6 @@
                   </div>
                 )}
               </div>
-
-              {/* P1/P2 Portal 浮動拖曳膠囊（觸控自動上移 46px 防指腹遮擋） */}
-              {dragChip?.isDragging && ReactDOM.createPortal(
-                <div
-                  className="fixed z-[9999] pointer-events-none -translate-x-1/2 -translate-y-1/2"
-                  style={{ left: dragChip.x, top: dragChip.isTouch ? dragChip.y - 46 : dragChip.y }}
-                >
-                  <div className="px-3.5 py-1 rounded-full bg-gradient-to-b from-amber-300 to-amber-500 border-2 border-amber-700 text-amber-950 font-mono font-black text-base shadow-xl scale-110">
-                    {dragChip.label}
-                  </div>
-                </div>,
-                document.body
-              )}
 
               <CoachOverlay
                 containerRef={containerRef}
@@ -18452,27 +17650,43 @@
                     const vbH = Math.max(150, maxY - minY);
                     const s = Math.max(0.85, Math.min(1.22, vbW / 260)); // 確保每題肉眼字體與膠囊大小一致
 
-                    // 2R 幾何邏輯：作答中半徑 R 指向最空曠圓弧且標籤放外緣 0.76R；答對後由已知對邊端點過圓心畫出完整淡金虛線 Thales 直角三角形與直徑 2R
+                    const angleGeos = question.angles.map(ang => ({ ang, ac: getAngleCoords(question.pts, ang.v) }));
+                    const edgeGeos = question.edges.map(edge => ({ edge, ec: getEdgeCoords(question.pts, edge.idx) }));
+
+                    // 2R 幾何邏輯：作答中半徑 R 避開所有邊長／角度標籤與頂點（最大化最小淨空距離）；答對後畫出完整 Thales 直角三角形與直徑 2R
                     let radEnd = null, radLbl = null, thalesD1 = null, thalesD2 = null, thalesP2 = null, thalesRightSq = null, diamLbl = null;
                     if (cc) {
-                      const vAngs = question.pts.map(p => Math.atan2(p[1] - cc.cy, p[0] - cc.cx));
-                      let bestA = -Math.PI / 6;
-                      let bestMinSep = -1;
-                      for (let k = 0; k < 24; k++) {
-                        const cand = -Math.PI + (k * Math.PI) / 12;
-                        const minSep = Math.min(...vAngs.map(va => {
-                          let d = Math.abs(cand - va);
-                          if (d > Math.PI) d = 2 * Math.PI - d;
-                          return d;
-                        }));
-                        if (minSep > bestMinSep) { bestMinSep = minSep; bestA = cand; }
+                      const obstacles = [
+                        ...edgeGeos.map(({ ec }) => ({ x: ec.lx, y: ec.ly, r: 30 * s })),
+                        ...angleGeos.map(({ ac }) => ({ x: ac.lx, y: ac.ly, r: 24 * s })),
+                        ...question.pts.map(p => ({ x: p[0], y: p[1], r: 16 * s }))
+                      ];
+                      let bestScore = -1e9;
+                      let bestCand = null;
+                      for (let k = 0; k < 36; k++) {
+                        const cand = -Math.PI + (k * Math.PI) / 18;
+                        const ex = cc.cx + cc.r * Math.cos(cand);
+                        const ey = cc.cy + cc.r * Math.sin(cand);
+                        const rNx = -Math.sin(cand), rNy = Math.cos(cand);
+                        // 讓半徑端點本身也盡量遠離邊長標籤與頂點
+                        const endClear = Math.min(...obstacles.map(ob => Math.hypot(ex - ob.x, ey - ob.y) - ob.r * 0.5));
+                        for (const frac of [0.58, 0.72]) {
+                          for (const side of [1, -1]) {
+                            const lx = cc.cx + cc.r * frac * Math.cos(cand) + rNx * (11 * s) * side;
+                            const ly = cc.cy + cc.r * frac * Math.sin(cand) + rNy * (11 * s) * side;
+                            const lblClear = Math.min(...obstacles.map(ob => Math.hypot(lx - ob.x, ly - ob.y) - ob.r));
+                            const score = lblClear * 2.2 + Math.min(endClear, 28 * s) * 0.5;
+                            if (score > bestScore) {
+                              bestScore = score;
+                              bestCand = { end: [ex, ey], lbl: { x: lx, y: ly } };
+                            }
+                          }
+                        }
                       }
-                      radEnd = [cc.cx + cc.r * Math.cos(bestA), cc.cy + cc.r * Math.sin(bestA)];
-                      const rNx = -Math.sin(bestA), rNy = Math.cos(bestA);
-                      radLbl = {
-                        x: cc.cx + cc.r * 0.76 * Math.cos(bestA) + rNx * (10 * s),
-                        y: cc.cy + cc.r * 0.76 * Math.sin(bestA) + rNy * (10 * s)
-                      };
+                      if (bestCand) {
+                        radEnd = bestCand.end;
+                        radLbl = bestCand.lbl;
+                      }
 
                       // 答對後：以正解對邊的一端點過圓心 O 畫出完整 Thales 直角三角形（呼應 P0 證明！）
                       const solvedEdge = pickedEdge || question.edges.find(e => e.ok);
@@ -18483,10 +17697,16 @@
                         thalesD2 = [2 * cc.cx - sec.p1[0], 2 * cc.cy - sec.p1[1]];
                         const dAng = Math.atan2(thalesD2[1] - cc.cy, thalesD2[0] - cc.cx);
                         const dNx = -Math.sin(dAng), dNy = Math.cos(dAng);
-                        diamLbl = {
-                          x: cc.cx + cc.r * 0.68 * Math.cos(dAng) + dNx * (12 * s),
-                          y: cc.cy + cc.r * 0.68 * Math.sin(dAng) + dNy * (12 * s)
-                        };
+                        let bestDiamScore = -1e9;
+                        for (const side of [1, -1]) {
+                          const lx = cc.cx + cc.r * 0.66 * Math.cos(dAng) + dNx * (13 * s) * side;
+                          const ly = cc.cy + cc.r * 0.66 * Math.sin(dAng) + dNy * (13 * s) * side;
+                          const clear = Math.min(...obstacles.map(ob => Math.hypot(lx - ob.x, ly - ob.y) - ob.r));
+                          if (clear > bestDiamScore) {
+                            bestDiamScore = clear;
+                            diamLbl = { x: lx, y: ly };
+                          }
+                        }
                         // 在 thalesP2 畫出 Thales 直角符號 ┐
                         const u1x = thalesD1[0] - thalesP2[0], u1y = thalesD1[1] - thalesP2[1];
                         const l1 = Math.hypot(u1x, u1y) || 1;
@@ -18499,9 +17719,6 @@
                         thalesRightSq = `M ${q1[0]} ${q1[1]} L ${q2[0]} ${q2[1]} L ${q3[0]} ${q3[1]}`;
                       }
                     }
-
-                    const angleGeos = question.angles.map(ang => ({ ang, ac: getAngleCoords(question.pts, ang.v) }));
-                    const edgeGeos = question.edges.map(edge => ({ edge, ec: getEdgeCoords(question.pts, edge.idx) }));
 
                     return (
                       <svg data-coach="lv16-board" viewBox={`${minX.toFixed(1)} ${minY.toFixed(1)} ${vbW.toFixed(1)} ${vbH.toFixed(1)}`} className="w-full h-full max-w-[450px] object-contain select-none">
