@@ -649,6 +649,52 @@
       return <span className={`inline-flex items-center ${wrapCls} gap-0 ${className}`}>{parts}</span>;
     };
 
+    // ==================== 共用定義鏈格式化（不有理化、自動約分與移負號、過渡步驟清晰顯示） ====================
+    const formatRatioChain = (funcName, defStr, rawNum, rawDen) => {
+      const parseTerm = (v) => {
+        const s = String(v ?? '').trim();
+        const neg = s.startsWith('-');
+        const body = neg ? s.slice(1) : s;
+        const m = body.match(/^(\d*)(√.+)?$/);
+        if (!m) return { neg, coeff: 1, rad: body, raw: s };
+        const rad = m[2] || '';
+        const coeff = m[1] ? Number(m[1]) : (rad ? 1 : 0);
+        return { neg, coeff, rad, raw: s };
+      };
+      const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
+      const n = parseTerm(rawNum);
+      const d = parseTerm(rawDen);
+
+      let simplified;
+      if (n.coeff === 0) {
+        simplified = '0';
+      } else {
+        const resNeg = n.neg !== d.neg;
+        const g = gcd(n.coeff, d.coeff || 1);
+        const nc = n.coeff / g;
+        const dc = (d.coeff || 1) / g;
+        let nRad = n.rad;
+        let dRad = d.rad;
+        if (nRad && nRad === dRad) {
+          nRad = '';
+          dRad = '';
+        }
+        const nPart = nc === 1 && nRad ? nRad : `${nc}${nRad}`;
+        const dPart = dc === 1 && dRad ? dRad : `${dc}${dRad}`;
+        simplified = dPart === '1'
+          ? `${resNeg ? '-' : ''}${nPart}`
+          : `${resNeg ? '-' : ''}${nPart}/${dPart}`;
+      }
+
+      const rawNumDisp = (n.neg && d.neg) ? `(${n.raw})` : n.raw;
+      const rawDenDisp = d.neg ? `(${d.raw})` : d.raw;
+      const rawStr = `${rawNumDisp}/${rawDenDisp}`;
+
+      return rawStr === simplified
+        ? `${funcName} = ${defStr} = ${simplified}`
+        : `${funcName} = ${defStr} = ${rawStr} = ${simplified}`;
+    };
+
     // ==================== 共用直式分數渲染元件 ====================
     const FracText = ({ value, size = 'md', barClass = 'bg-current', className = '' }) => {
       const str = String(value ?? '');
@@ -6726,7 +6772,10 @@
       extraCandidates.slice(0, 2).forEach(n => baseNums.add(n));
       const numOptions = Array.from(baseNums).sort((a, b) => a - b);
 
-      const tip = `三邊 (對=${t.opp}, 鄰=${t.adj}, 斜=${t.hyp}) ⇒ ${targetSpecs[0].func} θ = ${targetSpecs[0].val}，${targetSpecs[1].func} θ = ${targetSpecs[1].val}`;
+      const roleZh = { opp: '對', adj: '鄰', hyp: '斜' };
+      const tip = targetSpecs
+        .map(sp => formatRatioChain(sp.func, `${roleZh[sp.numRole]}/${roleZh[sp.denRole]}`, sp.num, sp.den))
+        .join('｜');
       return { key, phase, givenFunc, givenVal, targetFunc, targetSpecs, ansVal, ansNum, ansDen, numOptions, pts: { P1, P2, P3 }, rightAngleSquare, arcPath, thetaPt, edges, knownTokens, missingRole, pythHint, flip, tip };
     };
 
@@ -8809,7 +8858,7 @@
     // ==================== 第 8 關組件：動徑星標 ====================
     const Level6VectorCompassMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap, hasSeenGuide = false, onMarkGuideSeen }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
-      const starsThreshold = [3, 6, 9];
+      const starsThreshold = [2, 4, 6];
       const maxLives = 3;
       const healTarget = 3;
       const {
@@ -8894,7 +8943,7 @@
         let cancelled = false;
         const tx = question.xVal;
         const ty = question.yVal;
-        const duration = 720;
+        const duration = 480;
         let startTs = 0;
 
         const step = (ts) => {
@@ -8911,13 +8960,13 @@
             autoLocateTimerRef.current = setTimeout(() => {
               if (cancelled) return;
               setStage('pickR');
-            }, 240);
+            }, 140);
           }
         };
 
         autoLocateTimerRef.current = setTimeout(() => {
           if (!cancelled) autoLocateRafRef.current = requestAnimationFrame(step);
-        }, 160);
+        }, 110);
 
         return () => {
           cancelled = true;
@@ -8982,8 +9031,13 @@
         setFeedbackAnim('animate-correct');
         const { completed, nextProgress } = recordCorrect({ wasMissed: questionMissedRef.current, delayEndMs: null });
         const summaryPairs = (question?.targetSpecs || [])
-          .map(sp => `${sp.func} θ = ${getSimplifiedForSpec(sp)}`)
-          .join('，');
+          .map(sp => formatRatioChain(
+            sp.func,
+            `${sp.numKey}/${sp.denKey}`,
+            getDisplayVal(sp.numKey),
+            getDisplayVal(sp.denKey)
+          ))
+          .join('｜');
         setConceptTip({
           tone: 'success',
           canSkip: true,
@@ -9995,14 +10049,11 @@
           setStage('assign');
           setTimeout(() => setFeedbackAnim(''), 280);
         } else {
-          audio.sfxError();
-          const gameOver = applyPenalty(460);
+          audio.sfxClick();
           setConceptTip({
-            text: `目標 ${question.targetAngle}° 在${question.locationLabel}（目前停在 ${currentAngle}°），調好後再輕點鎖定！`,
+            text: `請按住終邊旋轉至 ${question.targetAngle}°（${question.locationLabel}）！`,
             id: Date.now()
           });
-          setFeedbackAnim('animate-shake');
-          if (!gameOver) setTimeout(() => setFeedbackAnim(''), 340);
         }
       };
 
@@ -10075,8 +10126,13 @@
         setFeedbackAnim('animate-correct');
         const { completed, nextProgress } = recordCorrect({ wasMissed: false, delayEndMs: null });
         const summaryPairs = (question?.targetSpecs || [])
-          .map(sp => `${sp.func} ${question.targetAngle}° = ${sp.exactValText}`)
-          .join('，');
+          .map(sp => formatRatioChain(
+            sp.func,
+            `${sp.numKey}/${sp.denKey}`,
+            getDisplayVal(sp.numKey),
+            getDisplayVal(sp.denKey)
+          ))
+          .join('｜');
         setConceptTip({
           tone: 'success',
           canSkip: true,
