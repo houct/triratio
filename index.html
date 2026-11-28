@@ -4182,13 +4182,29 @@
           cos: '廣義角定義：cos(θ) = x / r（橫坐標 ÷ 動徑長）',
           tan: '廣義角定義：tan(θ) = y / x（縱坐標 ÷ 橫坐標）'
         };
+        const axisFuncs = ap.funcs.length <= 2
+          ? [...ap.funcs]
+          : (() => {
+              const other = ap.funcs.filter(f => f !== targetFunc);
+              const second = other[Math.floor(Math.random() * other.length)];
+              return ['sin', 'cos', 'tan'].filter(f => f === targetFunc || f === second);
+            })();
+        const targetSpecs = axisFuncs.map(f => ({
+          func: f,
+          numKey: f === 'cos' ? 'x' : 'y',
+          denKey: f === 'tan' ? 'x' : 'r',
+          tip: coordTipMap[f]
+        }));
         return {
           phase, quad: 0, isAxis: true,
           xVal: ap.xVal, yVal: ap.yVal, rVal: ap.rVal, rNum: ap.rNum, r2: ap.r2,
-          key: `axis,${ap.xVal},${ap.yVal},${targetFunc},${Date.now()}`,
-          targetFunc, correctNumeratorKey, correctDenominatorKey,
+          key: `axis,${ap.xVal},${ap.yVal},${axisFuncs.join('_')},${Date.now()}`,
+          targetFunc: targetSpecs[0].func,
+          correctNumeratorKey: targetSpecs[0].numKey,
+          correctDenominatorKey: targetSpecs[0].denKey,
+          targetSpecs,
           rOptions,
-          conceptTip: coordTipMap[targetFunc]
+          conceptTip: targetSpecs[0].tip
         };
       }
 
@@ -4316,12 +4332,24 @@
         cos: '廣義角定義：cos(θ) = x / r（橫坐標 ÷ 動徑長）',
         tan: '廣義角定義：tan(θ) = y / x（縱坐標 ÷ 橫坐標）'
       };
+      const otherFuncs = ['sin', 'cos', 'tan'].filter(f => f !== targetFunc);
+      const secondFunc = otherFuncs[Math.floor(Math.random() * otherFuncs.length)];
+      const chosenTwo = ['sin', 'cos', 'tan'].filter(f => f === targetFunc || f === secondFunc);
+      const targetSpecs = chosenTwo.map(f => ({
+        func: f,
+        numKey: f === 'cos' ? 'x' : 'y',
+        denKey: f === 'tan' ? 'x' : 'r',
+        tip: coordTipMap[f]
+      }));
 
       return {
         phase, quad: q, xVal, yVal, rVal: rLabel, rNum, r2, key,
-        targetFunc, correctNumeratorKey, correctDenominatorKey,
+        targetFunc: targetSpecs[0].func,
+        correctNumeratorKey: targetSpecs[0].numKey,
+        correctDenominatorKey: targetSpecs[0].denKey,
+        targetSpecs,
         rOptions,
-        conceptTip: coordTipMap[targetFunc]
+        conceptTip: targetSpecs[0].tip
       };
     };
 
@@ -4429,21 +4457,39 @@
       const dirY = yNum >= 0 ? -1 : 1;
       const rightAngleSquareX = `${ptFootX.x},${ptFootX.y} ${ptFootX.x + dirX * sqSize},${ptFootX.y} ${ptFootX.x + dirX * sqSize},${ptFootX.y + dirY * sqSize} ${ptFootX.x},${ptFootX.y + dirY * sqSize}`;
 
-      const correctNumeratorKey = targetFunc === 'cos' ? 'x' : 'y';
-      const correctDenominatorKey = targetFunc === 'tan' ? 'x' : 'r';
-      const exactValText = TEXT_MAP['val'][EVAL_MAP[targetFunc][String(principal)]];
+      const chosenTwo = allowedFuncs.length <= 2
+        ? [...allowedFuncs]
+        : (() => {
+            const others = allowedFuncs.filter(f => f !== targetFunc);
+            const second = others[Math.floor(Math.random() * others.length)];
+            return ['sin', 'cos', 'tan'].filter(f => f === targetFunc || f === second);
+          })();
+      const targetSpecs = chosenTwo.map(f => {
+        const numKey = f === 'cos' ? 'x' : 'y';
+        const denKey = f === 'tan' ? 'x' : 'r';
+        return {
+          func: f,
+          numKey,
+          denKey,
+          exactValText: TEXT_MAP['val'][EVAL_MAP[f][String(principal)]],
+          tip: `廣義角定義：${f}(θ) = ${numKey} / ${denKey}`
+        };
+      });
+      const correctNumeratorKey = targetSpecs[0].numKey;
+      const correctDenominatorKey = targetSpecs[0].denKey;
+      const exactValText = targetSpecs[0].exactValText;
 
       const assignTip = isAxis
         ? `觀察 ${principal}° 落在哪條坐標軸正負向，單位圓軸上點座標為 0 或 ±1，動徑 r = 1`
         : `先確認該象限的 x、y 正負號，再依 ${refAngle}° 直角三角形邊長比填入對應數值`;
 
       return {
-        phase, targetAngle, principal, isAxis, refAngle, targetFunc, locationLabel,
+        phase, targetAngle, principal, isAxis, refAngle, targetFunc: targetSpecs[0].func, locationLabel,
         xStr, yStr, rStr, xNum, yNum, rNum,
         ptP, ptFootX, ptFootY, rightAngleSquareX,
-        correctNumeratorKey, correctDenominatorKey, exactValText,
+        correctNumeratorKey, correctDenominatorKey, exactValText, targetSpecs,
         assignTip,
-        conceptTip: `廣義角定義：${targetFunc}(θ) = ${correctNumeratorKey} / ${correctDenominatorKey}`
+        conceptTip: targetSpecs[0].tip
       };
     };
 
@@ -6538,8 +6584,22 @@
         `${t.opp}/${t.adj}`;
 
       const givenVal = ratioStr(givenFunc);
-      const ansVal = ratioStr(targetFunc);
-      const [ansNum, ansDen] = ansVal.split('/').map(Number);
+      const targetSpecs = ['sin', 'cos', 'tan']
+        .filter(f => f !== givenFunc)
+        .map((f) => {
+          const val = ratioStr(f);
+          const [num, den] = val.split('/').map(Number);
+          return {
+            func: f,
+            val,
+            num,
+            den,
+            numRole: f === 'sin' ? 'opp' : f === 'cos' ? 'adj' : 'opp',
+            denRole: f === 'sin' ? 'hyp' : f === 'cos' ? 'hyp' : 'adj'
+          };
+        });
+      const ansVal = targetSpecs[0].val;
+      const [ansNum, ansDen] = [targetSpecs[0].num, targetSpecs[0].den];
 
       const scale = 300 / t.hyp;
       const w = t.adj * scale;
@@ -6621,8 +6681,8 @@
       extraCandidates.slice(0, 2).forEach(n => baseNums.add(n));
       const numOptions = Array.from(baseNums).sort((a, b) => a - b);
 
-      const tip = `三邊為 (對=${t.opp}, 鄰=${t.adj}, 斜=${t.hyp})，故 ${targetFunc} θ = ${ansVal}`;
-      return { key, phase, givenFunc, givenVal, targetFunc, ansVal, ansNum, ansDen, numOptions, pts: { P1, P2, P3 }, rightAngleSquare, arcPath, thetaPt, edges, knownTokens, missingRole, pythHint, flip, tip };
+      const tip = `三邊 (對=${t.opp}, 鄰=${t.adj}, 斜=${t.hyp}) ⇒ ${targetSpecs[0].func} θ = ${targetSpecs[0].val}，${targetSpecs[1].func} θ = ${targetSpecs[1].val}`;
+      return { key, phase, givenFunc, givenVal, targetFunc, targetSpecs, ansVal, ansNum, ansDen, numOptions, pts: { P1, P2, P3 }, rightAngleSquare, arcPath, thetaPt, edges, knownTokens, missingRole, pythHint, flip, tip };
     };
 
     const Level6PythagoreanTripleMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
@@ -6642,8 +6702,8 @@
       const isAutoFlying = Boolean(question && question.phase > 0 && !edgesReady);
       const [selectedTokenKey, setSelectedTokenKey] = useState('num');
       const [missingEdgeFilled, setMissingEdgeFilled] = useState(false);
-      const [targetSlots, setTargetSlots] = useState({ num: null, den: null });
-      const [activeTargetSlot, setActiveTargetSlot] = useState('num');
+      const [targetSlots, setTargetSlots] = useState([{ num: null, den: null }, { num: null, den: null }]);
+      const [activeTargetSlot, setActiveTargetSlot] = useState({ idx: 0, part: 'num' });
       const [wrongSlotKey, setWrongSlotKey] = useState(null);
       const [solvedOpt, setSolvedOpt] = useState(null);
       const [wrongEdgeRole, setWrongEdgeRole] = useState(null);
@@ -6712,7 +6772,7 @@
           if (cancelled) return;
           audio.sfxSelect();
           setPlacedTokens({ num: true, den: true });
-          setActiveTargetSlot('num');
+          setActiveTargetSlot({ idx: 0, part: 'num' });
         }, 460);
         autoFlyTimersRef.current = [t1, t2];
         return () => {
@@ -6732,8 +6792,8 @@
         setPlacedTokens({ num: false, den: false });
         setSelectedTokenKey(phase === 0 ? 'num' : null);
         setMissingEdgeFilled(false);
-        setTargetSlots({ num: null, den: null });
-        setActiveTargetSlot('num');
+        setTargetSlots([{ num: null, den: null }, { num: null, den: null }]);
+        setActiveTargetSlot({ idx: 0, part: 'num' });
         setWrongSlotKey(null);
         setSolvedOpt(null);
         setWrongEdgeRole(null);
@@ -6855,7 +6915,7 @@
           const nextAuto = !nextPlaced.num ? 'num' : !nextPlaced.den ? 'den' : null;
           setSelectedTokenKey(nextAuto);
           if (nextPlaced.num && nextPlaced.den) {
-            setActiveTargetSlot('num');
+            setActiveTargetSlot({ idx: 0, part: 'num' });
           }
           setWrongEdgeRole(null);
           setConceptTip(null);
@@ -6901,20 +6961,31 @@
         }
       };
 
-      const attemptFillTargetSlot = (slotKey, val) => {
+      const findFirstEmptySlot = (slotsArr) => {
+        for (let idx = 0; idx < slotsArr.length; idx++) {
+          if (slotsArr[idx].num === null) return { idx, part: 'num' };
+          if (slotsArr[idx].den === null) return { idx, part: 'den' };
+        }
+        return null;
+      };
+
+      const attemptFillTargetSlot = (slotRef, val) => {
         if (gameState !== 'playing' || !question || !ratioReady || solvedOpt || (!isRelaxMode && lives <= 0)) return;
-        if (targetSlots[slotKey] !== null) return;
-        const expected = slotKey === 'num' ? question.ansNum : question.ansDen;
+        const { idx, part } = slotRef;
+        const spec = question.targetSpecs?.[idx];
+        if (!spec || targetSlots[idx][part] !== null) return;
+        const expected = part === 'num' ? spec.num : spec.den;
         if (val === expected) {
           if (showGuide) dismissGuide();
-          const nextSlots = { ...targetSlots, [slotKey]: val };
+          const nextSlots = targetSlots.map((s, i) => i === idx ? { ...s, [part]: val } : s);
           setTargetSlots(nextSlots);
           setWrongSlotKey(null);
           setConceptTip(null);
-          if (nextSlots.num !== null && nextSlots.den !== null) {
+          const nextEmpty = findFirstEmptySlot(nextSlots);
+          if (!nextEmpty) {
             justSolvedAtRef.current = Date.now();
             audio.sfxBonus();
-            setSolvedOpt(question.ansVal);
+            setSolvedOpt(true);
             setFeedbackAnim('animate-correct');
             const { completed, nextProgress } = recordCorrect({ wasMissed: questionMissedRef.current, delayEndMs: null });
             setConceptTip({
@@ -6935,7 +7006,7 @@
             };
           } else {
             audio.sfxSelect();
-            setActiveTargetSlot(slotKey === 'num' ? 'den' : 'num');
+            setActiveTargetSlot(nextEmpty);
           }
         } else {
           audio.sfxError();
@@ -6943,14 +7014,10 @@
           questionMissedRef.current = true;
           const gameOver = alreadyMissed ? false : recordWrong({ delayEndMs: 520 }).gameOver;
           const roleNames = { opp: '對邊', adj: '鄰邊', hyp: '斜邊' };
-          const expectedRole = question.targetFunc === 'sin'
-            ? (slotKey === 'num' ? 'opp' : 'hyp')
-            : question.targetFunc === 'cos'
-            ? (slotKey === 'num' ? 'adj' : 'hyp')
-            : (slotKey === 'num' ? 'opp' : 'adj');
-          setWrongSlotKey(slotKey);
+          const expectedRole = part === 'num' ? spec.numRole : spec.denRole;
+          setWrongSlotKey(`${idx}-${part}`);
           setConceptTip({
-            text: `${question.targetFunc} θ 的${slotKey === 'num' ? '分子' : '分母'}應為「${roleNames[expectedRole]}」，再確認三角形邊長！`,
+            text: `${spec.func} θ 的${part === 'num' ? '分子' : '分母'}應為「${roleNames[expectedRole]}」，再確認三角形邊長！`,
             id: Date.now()
           });
           setFeedbackAnim('animate-shake');
@@ -6977,10 +7044,10 @@
         }
         const edge = question.edges.find(ed => ed.role === role);
         if (!edge) return;
-        const targetSlot = targetSlots[activeTargetSlot] === null
+        const curSlot = targetSlots[activeTargetSlot.idx]?.[activeTargetSlot.part] === null
           ? activeTargetSlot
-          : targetSlots.num === null ? 'num' : 'den';
-        attemptFillTargetSlot(targetSlot, edge.val);
+          : findFirstEmptySlot(targetSlots);
+        if (curSlot) attemptFillTargetSlot(curSlot, edge.val);
       };
 
       const phase = question?.phase ?? 0;
@@ -7019,8 +7086,8 @@
 
               <div ref={cardBoxRef} className={`relative flex-1 min-h-0 bg-white rounded-3xl border-3 border-teal-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${solvedOpt ? 'ring-4 ring-emerald-400/75' : ''}`}>
                 <StagePhaseStrip phase={phase} labels={['標邊定位 • 顯示第三邊', '自動標邊 • 畢氏算式鷹架', '自動標邊 • 翻轉純心算']} />
-                <div data-coach="lv6-clue" className="bg-gradient-to-r from-teal-700 to-emerald-800 min-h-[70px] py-1.5 px-3.5 flex items-center justify-between gap-2 text-white border-b-2 border-teal-950 shrink-0">
-                  <div className="flex items-center gap-2 font-serif font-black text-base sm:text-lg">
+                <div data-coach="lv6-clue" className="bg-gradient-to-r from-teal-700 to-emerald-800 min-h-[58px] py-1.5 px-3.5 flex items-center justify-between gap-2 text-white border-b-2 border-teal-950 shrink-0">
+                  <div className="flex-1 flex items-center justify-center gap-2.5 font-serif font-black text-base sm:text-lg">
                     <span className="text-[11px] font-sans bg-white/20 px-2 py-0.5 rounded-lg">已知</span>
                     <span>{question.givenFunc} θ =</span>
                     <div className="inline-flex flex-col items-center leading-none">
@@ -7033,7 +7100,7 @@
                             {isPlaced || question.phase > 0 ? (
                               <span
                                 ref={(el) => { tokenRefs.current[tk.key] = el; }}
-                                className={`min-w-[36px] h-[26px] px-2 rounded-full text-sm font-black inline-flex items-center justify-center transition-colors ${
+                                className={`min-w-[38px] h-[26px] px-2 rounded-full text-sm font-black inline-flex items-center justify-center transition-colors ${
                                   isPlaced
                                     ? 'bg-emerald-400/25 border border-emerald-300/70 text-emerald-100'
                                     : 'bg-amber-300/25 border border-amber-200/70 text-amber-100'
@@ -7051,7 +7118,7 @@
                                   audio.sfxClick();
                                   setSelectedTokenKey(prev => prev === tk.key ? null : tk.key);
                                 }}
-                                className={`min-w-[38px] h-[28px] px-2.5 rounded-full bg-gradient-to-b from-amber-300 to-amber-500 border-2 text-amber-950 text-base font-black shadow-md cursor-pointer inline-flex items-center justify-center transition-all ${
+                                className={`min-w-[42px] h-[28px] px-2.5 rounded-full bg-gradient-to-b from-amber-300 to-amber-500 border-2 text-amber-950 text-base font-black shadow-md cursor-pointer inline-flex items-center justify-center transition-all ${
                                   isSel ? 'border-amber-100 ring-2 ring-amber-200 animate-pulse shadow-[0_0_12px_rgba(251,191,36,0.8)]' : 'border-white/75 opacity-80 hover:opacity-100 hover:scale-105'
                                 }`}
                               >
@@ -7063,50 +7130,58 @@
                       })}
                     </div>
                   </div>
-                  <div data-coach="lv6-target-frac" className="flex items-center gap-1.5 font-serif font-black text-base sm:text-lg">
-                    <span className="text-[11px] font-sans bg-white/20 px-2 py-0.5 rounded-lg">求</span>
-                    <span>{question.targetFunc} θ =</span>
-                    <div className="inline-flex flex-col items-center leading-none">
-                      {[
-                        { key: 'num', refObj: targetNumRef },
-                        { key: 'den', refObj: targetDenRef }
-                      ].map((slot, sIdx) => {
-                        const val = targetSlots[slot.key];
-                        const isFilled = val !== null;
-                        const isFocused = ratioReady && activeTargetSlot === slot.key && !isFilled;
-                        const isWrong = wrongSlotKey === slot.key;
-                        return (
-                          <React.Fragment key={slot.key}>
-                            {sIdx === 1 && <div className={`w-11 h-0.5 my-1 transition-colors ${solvedOpt ? 'bg-emerald-200' : 'bg-white/80'}`} />}
-                            <button
-                              ref={slot.refObj}
-                              type="button"
-                              onClick={() => {
-                                if (!ratioReady || isFilled) return;
-                                audio.sfxClick();
-                                setActiveTargetSlot(slot.key);
-                              }}
-                              className={`min-w-[44px] h-[28px] px-2 rounded-full border-2 font-black inline-flex items-center justify-center transition-all ${
-                                isFilled
-                                  ? 'bg-emerald-400 border-emerald-200 text-emerald-950 text-base shadow-sm'
-                                  : isWrong
-                                  ? 'bg-rose-500/80 border-rose-200 text-white text-xs font-sans animate-shake'
-                                  : isFocused
-                                  ? 'border-amber-300 bg-amber-400/30 text-amber-100 text-[11px] font-sans animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]'
-                                  : 'border-dashed border-white/40 bg-white/5 text-white/55 text-[11px] font-sans'
-                              }`}
-                              aria-label={slot.key === 'num' ? '分子槽' : '分母槽'}
-                            >
-                              {isFilled ? val : (slot.key === 'num' ? '分子' : '分母')}
-                            </button>
-                          </React.Fragment>
-                        );
-                      })}
-                    </div>
-                    <span className="w-6 h-6 inline-flex items-center justify-center shrink-0">
-                      <SuccessBadge show={Boolean(solvedOpt)} />
-                    </span>
-                  </div>
+                  <span className="w-6 h-6 inline-flex items-center justify-center shrink-0">
+                    <SuccessBadge show={Boolean(solvedOpt)} />
+                  </span>
+                </div>
+
+                {/* 繪圖區頂部：滿寬大字體「知一求二」雙比值直式分數填空列（對齊 Lv.15~17 規格） */}
+                <div data-coach="lv6-target-frac" className="bg-teal-50/90 border-b border-teal-200/90 px-2.5 py-2 shrink-0 flex items-center justify-center gap-3 sm:gap-6">
+                  {question.targetSpecs.map((spec, idx) => {
+                    const slotPair = targetSlots[idx] || { num: null, den: null };
+                    const isPairDone = slotPair.num !== null && slotPair.den !== null;
+                    return (
+                      <React.Fragment key={spec.func}>
+                        {idx === 1 && <div className="w-px h-11 bg-teal-200 shrink-0" />}
+                        <div className={`flex items-center gap-1.5 font-serif font-black text-base sm:text-lg transition-opacity ${ratioReady || isPairDone ? 'opacity-100' : 'opacity-65'}`}>
+                          <span className={isPairDone ? 'text-emerald-700' : 'text-teal-900'}>{spec.func} θ =</span>
+                          <div className="inline-flex flex-col items-center leading-none">
+                            {['num', 'den'].map((part, pIdx) => {
+                              const val = slotPair[part];
+                              const isFilled = val !== null;
+                              const isFocused = ratioReady && !solvedOpt && activeTargetSlot.idx === idx && activeTargetSlot.part === part && !isFilled;
+                              const isWrong = wrongSlotKey === `${idx}-${part}`;
+                              return (
+                                <React.Fragment key={part}>
+                                  {pIdx === 1 && <div className={`w-12 h-[2px] my-1 transition-colors ${isPairDone ? 'bg-emerald-500' : 'bg-slate-500'}`} />}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (!ratioReady || isFilled || solvedOpt) return;
+                                      audio.sfxClick();
+                                      setActiveTargetSlot({ idx, part });
+                                    }}
+                                    className={`min-w-[48px] h-[28px] px-2 rounded-lg border-2 font-black inline-flex items-center justify-center transition-all ${
+                                      isFilled
+                                        ? 'border-emerald-500 bg-emerald-100 text-emerald-900 text-base shadow-sm'
+                                        : isWrong
+                                        ? 'border-rose-500 bg-rose-100 text-rose-800 text-xs font-sans animate-shake'
+                                        : isFocused
+                                        ? 'border-amber-400 bg-amber-100 text-amber-900 text-xs font-sans animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.55)]'
+                                        : 'border-dashed border-slate-300 bg-white text-slate-400 text-xs font-sans'
+                                    }`}
+                                    aria-label={`${spec.func} ${part === 'num' ? '分子槽' : '分母槽'}`}
+                                  >
+                                    {isFilled ? val : (part === 'num' ? '分子' : '分母')}
+                                  </button>
+                                </React.Fragment>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </React.Fragment>
+                    );
+                  })}
                 </div>
 
                 <div onClick={handleConfirmSkip} className="relative w-full flex-1 min-h-0 bg-white flex flex-col items-center justify-between overflow-hidden">
@@ -8700,8 +8775,12 @@
       const [curP, setCurP] = useState({ x: 0, y: 0 });
       const [isDraggingP, setIsDraggingP] = useState(false);
       const [dragCoordChip, setDragCoordChip] = useState(null); // { clientX, clientY, overGrid }
-      const [selectedNumerator, setSelectedNumerator] = useState(null);
-      const [selectedDenominator, setSelectedDenominator] = useState(null);
+      const [ratioSlots, setRatioSlots] = useState([
+        { num: null, den: null, solved: false },
+        { num: null, den: null, solved: false }
+      ]);
+      const [activeRatioSlot, setActiveRatioSlot] = useState({ idx: 0, part: 'num' });
+      const [wrongRatioIdx, setWrongRatioIdx] = useState(null);
       const [feedbackAnim, setFeedbackAnim] = useState('');
       const [floatingText, setFloatingText] = useState(null);
       const [isLockedSuccess, setIsLockedSuccess] = useState(false);
@@ -8815,8 +8894,12 @@
         setIsDraggingP(false);
         setDragCoordChip(null);
         setRSnapFlash(false);
-        setSelectedNumerator(null);
-        setSelectedDenominator(null);
+        setRatioSlots([
+          { num: null, den: null, solved: false },
+          { num: null, den: null, solved: false }
+        ]);
+        setActiveRatioSlot({ idx: 0, part: pickOrder === 'den' ? 'den' : 'num' });
+        setWrongRatioIdx(null);
         setWrongBtnKey(null);
         setConceptTip(null);
       };
@@ -8826,7 +8909,12 @@
         questionMissedRef.current = false;
         bagRef.current = { groupBag: [], funcBag: [], p0QuadBag: [], quadBag: [], lastGroup: null, lastFunc: null, lastQuad: null };
         setFeedbackAnim('');
-        setSelectedNumerator(null); setSelectedDenominator(null);
+        setRatioSlots([
+          { num: null, den: null, solved: false },
+          { num: null, den: null, solved: false }
+        ]);
+        setActiveRatioSlot({ idx: 0, part: order === 'den' ? 'den' : 'num' });
+        setWrongRatioIdx(null);
         setIsLockedSuccess(false); setWrongBtnKey(null); setConceptTip(null);
         setDragCoordChip(null);
         setRSnapFlash(false);
@@ -8894,52 +8982,75 @@
         }
       };
 
-      const evaluateRatioPair = (numKey, denKey) => {
-        if (numKey === question.correctNumeratorKey && denKey === question.correctDenominatorKey) {
-          triggerQuestionSuccess('定義正確!');
+      const findNextRatioSlot = (slotsArr, order = pickOrder) => {
+        const parts = order === 'den' ? ['den', 'num'] : ['num', 'den'];
+        for (let idx = 0; idx < slotsArr.length; idx++) {
+          if (slotsArr[idx].solved) continue;
+          for (const part of parts) {
+            if (!slotsArr[idx][part]) return { idx, part };
+          }
+        }
+        return null;
+      };
+
+      const evaluateRatioPair = (idx, numKey, denKey, draftSlots) => {
+        const spec = question.targetSpecs?.[idx];
+        if (!spec) return;
+        if (numKey === spec.numKey && denKey === spec.denKey) {
+          const solvedSlots = draftSlots.map((s, i) => i === idx ? { num: numKey, den: denKey, solved: true } : s);
+          setRatioSlots(solvedSlots);
+          setWrongRatioIdx(null);
+          setConceptTip(null);
+          if (solvedSlots.every(s => s.solved)) {
+            triggerQuestionSuccess('定義正確!');
+          } else {
+            audio.sfxBonus();
+            const nxt = findNextRatioSlot(solvedSlots);
+            if (nxt) setActiveRatioSlot(nxt);
+          }
         } else {
           audio.sfxError();
           const gameOver = applyQuestionPenalty(480);
           setWrongBtnKey(denKey);
-          setConceptTip({ text: question.conceptTip, id: Date.now() });
+          setWrongRatioIdx(idx);
+          setConceptTip({ text: spec.tip, id: Date.now() });
           setFeedbackAnim('animate-shake');
           if (!gameOver) {
-            setTimeout(() => { setFeedbackAnim(''); setSelectedNumerator(null); setSelectedDenominator(null); setWrongBtnKey(null); }, 400);
+            setTimeout(() => {
+              setFeedbackAnim('');
+              setWrongBtnKey(null);
+              setWrongRatioIdx(null);
+              setRatioSlots(prev => prev.map((s, i) => i === idx ? { num: null, den: null, solved: false } : s));
+              setActiveRatioSlot({ idx, part: pickOrder === 'den' ? 'den' : 'num' });
+            }, 400);
           }
-        }
-      };
-
-      const handleDropRatioSlot = (key, slot) => {
-        if (gameState !== 'playing' || !question || stage !== 'ratio' || isLockedSuccess || (!isRelaxMode && lives <= 0)) return;
-        if (showGuide) dismissGuide(false);
-        const nextNum = slot === 'num' ? key : selectedNumerator;
-        const nextDen = slot === 'den' ? key : selectedDenominator;
-        audio.sfxSelect();
-        setSelectedNumerator(nextNum);
-        setSelectedDenominator(nextDen);
-        if (nextNum && nextDen) {
-          evaluateRatioPair(nextNum, nextDen);
         }
       };
 
       const handleInputKey = (key) => {
         if (gameState !== 'playing' || !question || stage !== 'ratio' || isLockedSuccess || (!isRelaxMode && lives <= 0)) return;
         if (showGuide) dismissGuide(false);
-        const firstKey = pickOrder === 'num' ? selectedNumerator : selectedDenominator;
-        if (!firstKey) {
-          audio.sfxSelect();
-          if (pickOrder === 'num') setSelectedNumerator(key);
-          else setSelectedDenominator(key);
-        } else if (firstKey === key) {
+        const curTarget = (!ratioSlots[activeRatioSlot.idx]?.solved && !ratioSlots[activeRatioSlot.idx]?.[activeRatioSlot.part])
+          ? activeRatioSlot
+          : findNextRatioSlot(ratioSlots);
+        if (!curTarget) return;
+        const { idx, part } = curTarget;
+        const otherPart = part === 'num' ? 'den' : 'num';
+        const curPair = ratioSlots[idx];
+        if (curPair[otherPart] === key) {
           audio.sfxClick();
-          setSelectedNumerator(null);
-          setSelectedDenominator(null);
+          setRatioSlots(prev => prev.map((s, i) => i === idx ? { ...s, [otherPart]: null } : s));
+          setActiveRatioSlot({ idx, part: otherPart });
+          return;
+        }
+        const nextPair = { ...curPair, [part]: key };
+        const draftSlots = ratioSlots.map((s, i) => i === idx ? nextPair : s);
+        setRatioSlots(draftSlots);
+        if (nextPair.num && nextPair.den) {
+          evaluateRatioPair(idx, nextPair.num, nextPair.den, draftSlots);
         } else {
-          const numKey = pickOrder === 'num' ? firstKey : key;
-          const denKey = pickOrder === 'num' ? key : firstKey;
-          setSelectedNumerator(numKey);
-          setSelectedDenominator(denKey);
-          evaluateRatioPair(numKey, denKey);
+          audio.sfxSelect();
+          setActiveRatioSlot({ idx, part: otherPart });
         }
       };
 
@@ -9074,8 +9185,6 @@
       };
 
       const getDisplayVal = (key) => !question ? '' : key === 'x' ? question.xVal : key === 'y' ? question.yVal : question.rVal;
-      const isLv7NumTurn = (pickOrder === 'num' && !selectedNumerator) || (pickOrder === 'den' && selectedDenominator && !selectedNumerator);
-      const isLv7DenTurn = (pickOrder === 'den' && !selectedDenominator) || (pickOrder === 'num' && selectedNumerator && !selectedDenominator);
 
       const pLocked = stage !== 'drag';
       const activeCoord = stage === 'drag' ? curP : { x: question?.xVal ?? 0, y: question?.yVal ?? 0 };
@@ -9101,12 +9210,12 @@
           : { x: GRID_ORIGIN + (arcR + 14) * Math.cos(thetaRad / 2), y: GRID_ORIGIN - (arcR + 14) * Math.sin(thetaRad / 2) }
       ) : null;
       const isPureSym = Boolean(question && question.phase === 2 && !isLockedSuccess);
-      const isSuccessKey = (k) => Boolean(isLockedSuccess && question && (question.correctNumeratorKey === k || question.correctDenominatorKey === k));
-      const simplifiedVal = useMemo(() => {
-        if (!question) return null;
-        const { xVal, yVal, rVal, correctNumeratorKey, correctDenominatorKey } = question;
-        const num = correctNumeratorKey === 'x' ? xVal : yVal;
-        if (correctDenominatorKey === 'r') {
+      const isSuccessKey = (k) => Boolean(isLockedSuccess && question && (question.targetSpecs || []).some(sp => sp.numKey === k || sp.denKey === k));
+      const getSimplifiedForSpec = (spec) => {
+        if (!question || !spec) return null;
+        const { xVal, yVal, rVal } = question;
+        const num = spec.numKey === 'x' ? xVal : yVal;
+        if (spec.denKey === 'r') {
           if (num === 0) return '0';
           if (question.isAxis) return num > 0 ? '1' : '-1';
           if (Math.abs(xVal) === Math.abs(yVal) && rVal.includes('√2')) {
@@ -9114,7 +9223,6 @@
           }
           return `${num}/${rVal}`;
         }
-        // tan = y / x
         if (yVal === 0) return '0';
         const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
         const ay = Math.abs(yVal), ax = Math.abs(xVal);
@@ -9122,7 +9230,7 @@
         const neg = (yVal * xVal) < 0;
         const sn = ay / g, sd = ax / g;
         return sd === 1 ? `${neg ? '-' : ''}${sn}` : `${neg ? '-' : ''}${sn}/${sd}`;
-      }, [question]);
+      };
       const targetSvgP = question ? toSvgPt(question.xVal, question.yVal) : null;
       const showTargetRing = stage === 'drag' && question && question.phase === 0 && progress === 0;
       // P(x, y) 膠囊永遠朝遠離原點的外側偏移並夾在畫板邊界內
@@ -9167,81 +9275,111 @@
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${isLockedSuccess ? 'ring-4 ring-emerald-400/75' : ''}`}>
                 <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['拖點建構 P(x,y) → 填比值', '自動定位 P(x,y) → 填動徑 r → 比值', '自動定位＋純符號 x/y/r → 定義盲測']} />
-                <div data-coach="lv10-prompt" className="bg-gradient-to-r from-cyan-600 to-indigo-700 h-[66px] px-3.5 flex justify-between items-center text-white border-b-2 border-indigo-900 shrink-0">
-                  {stage === 'drag' && (
-                    isAutoLocating ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs sm:text-sm font-black bg-cyan-300/20 border border-cyan-200/50 text-cyan-100 px-2.5 py-0.5 rounded-xl whitespace-nowrap">✨ 自動定位</span>
-                        <span className="bg-slate-900/90 border-2 border-cyan-300 px-3 py-0.5 rounded-xl font-mono font-black text-sm text-cyan-200 shadow-sm">
-                          P({question.xVal}, {question.yVal})
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm sm:text-base font-black">拖曳坐標</span>
-                        <button
-                          type="button"
-                          data-coach="lv10-coord-chip"
-                          onPointerDown={handleCoordChipDown}
-                          className={`bg-slate-900/90 border-2 border-cyan-300 px-3 py-0.5 rounded-xl font-mono font-black text-sm text-cyan-200 shadow-[0_3px_10px_rgba(34,211,238,0.35)] cursor-grab active:cursor-grabbing active:scale-95 touch-none select-none transition-transform ${dragCoordChip ? 'opacity-45 scale-95' : 'hover:scale-105'}`}
-                        >
-                          ({question.xVal}, {question.yVal})
-                        </button>
-                        <span className="text-xs font-bold text-cyan-100/90 hidden sm:inline">進網格 → 求 {question.targetFunc}(θ)</span>
-                      </div>
-                    )
-                  )}
-                  {stage === 'pickR' && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm sm:text-base font-black">已知 P({question.xVal}, {question.yVal})，將</span>
-                      <span className="bg-amber-400 text-amber-950 px-2.5 py-0.5 rounded-xl font-mono font-black text-sm">r = ?</span>
-                      <span className="text-xs font-bold text-cyan-100/90 hidden sm:inline">拖到動徑上</span>
-                    </div>
-                  )}
-                  {stage === 'ratio' && (
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-base sm:text-xl font-serif font-black shrink-0">{question.targetFunc}(θ) =</span>
-                      <div data-coach="lv10-ratio-box" className="flex flex-col items-center shrink-0">
-                        <div
-                          ref={numSlotRef}
-                          onClick={() => { if (selectedNumerator && !isLockedSuccess) { audio.sfxClick(); setSelectedNumerator(null); } }}
-                          className={`min-w-[58px] px-2 h-6 rounded-lg border-2 flex items-center justify-center font-bold text-xs transition-all ${
-                            selectedNumerator
-                              ? 'bg-emerald-400 border-emerald-200 text-emerald-950 font-black cursor-pointer active:scale-95'
-                              : isLv7NumTurn
-                              ? 'border-amber-300 bg-amber-400/30 text-amber-100 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]'
-                              : 'border-dashed border-white/40 text-cyan-100/70 bg-white/5'
-                          }`}
-                        >
-                          <span>{selectedNumerator ? (isPureSym ? selectedNumerator : <SqrtText text={`${selectedNumerator} (${getDisplayVal(selectedNumerator)})`} />) : '分子'}</span>
+                <div data-coach="lv10-prompt" className="bg-gradient-to-r from-cyan-600 to-indigo-700 min-h-[50px] py-1.5 px-3 flex justify-between items-center gap-2 text-white border-b-2 border-indigo-900 shrink-0">
+                  <div className="flex-1 flex items-center gap-2 min-w-0">
+                    {stage === 'drag' && (
+                      isAutoLocating ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs sm:text-sm font-black bg-cyan-300/20 border border-cyan-200/50 text-cyan-100 px-2.5 py-0.5 rounded-xl whitespace-nowrap">✨ 自動定位</span>
+                          <span className="bg-slate-900/90 border-2 border-cyan-300 px-3 py-0.5 rounded-xl font-mono font-black text-sm text-cyan-200 shadow-sm">
+                            P({question.xVal}, {question.yVal})
+                          </span>
                         </div>
-                        <div className="w-full h-0.5 bg-white/70 my-0.5"></div>
-                        <div
-                          ref={denSlotRef}
-                          onClick={() => { if (selectedDenominator && !isLockedSuccess) { audio.sfxClick(); setSelectedDenominator(null); } }}
-                          className={`min-w-[58px] px-2 h-6 rounded-lg border-2 flex items-center justify-center font-bold text-xs transition-all ${
-                            selectedDenominator
-                              ? 'bg-amber-400 border-amber-200 text-amber-950 font-black cursor-pointer active:scale-95'
-                              : isLv7DenTurn
-                              ? 'border-amber-300 bg-amber-400/30 text-amber-100 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]'
-                              : 'border-dashed border-white/40 text-cyan-100/70 bg-white/5'
-                          }`}
-                        >
-                          <span>{selectedDenominator ? (isPureSym ? selectedDenominator : <SqrtText text={`${selectedDenominator} (${getDisplayVal(selectedDenominator)})`} />) : '分母'}</span>
+                      ) : (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs sm:text-sm font-black">拖曳坐標</span>
+                          <button
+                            type="button"
+                            data-coach="lv10-coord-chip"
+                            onPointerDown={handleCoordChipDown}
+                            className={`bg-slate-900/90 border-2 border-cyan-300 px-2.5 py-0.5 rounded-xl font-mono font-black text-sm text-cyan-200 shadow-[0_3px_10px_rgba(34,211,238,0.35)] cursor-grab active:cursor-grabbing active:scale-95 touch-none select-none transition-transform ${dragCoordChip ? 'opacity-45 scale-95' : 'hover:scale-105'}`}
+                          >
+                            ({question.xVal}, {question.yVal})
+                          </button>
+                          <span className="text-xs font-bold text-cyan-100/90">進網格</span>
                         </div>
+                      )
+                    )}
+                    {stage === 'pickR' && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs sm:text-sm font-black">已知 P({question.xVal}, {question.yVal})，點選下方</span>
+                        <span className="bg-amber-400 text-amber-950 px-2 py-0.5 rounded-lg font-mono font-black text-xs sm:text-sm">r = ?</span>
                       </div>
-                      {isLockedSuccess && simplifiedVal && (
-                        <div className="inline-flex items-center gap-1.5 text-amber-200 font-black animate-jelly shrink-0">
-                          <span className="text-base sm:text-lg">=</span>
-                          <FracText value={simplifiedVal} size="xs" barClass="bg-amber-200" className="text-amber-200" />
-                        </div>
-                      )}
+                    )}
+                    {stage === 'ratio' && (
+                      <div className="text-xs sm:text-sm font-black text-cyan-50 truncate">
+                        {isLockedSuccess
+                          ? `P(${question.xVal}, ${question.yVal}), r=${question.rVal} — 雙比值定義完成！`
+                          : `點擊圖上 x、y、r 標籤，完成下方兩組三角比！`}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[11px] font-black bg-white/20 px-2 py-0.5 rounded-lg border border-white/35 whitespace-nowrap">
+                      {question.quad === 0 ? '坐標軸上' : `第 ${['I', 'II', 'III', 'IV'][question.quad - 1]} 象限`}
+                    </span>
+                    <span className="w-6 h-6 inline-flex items-center justify-center shrink-0">
                       <SuccessBadge show={isLockedSuccess} />
-                    </div>
-                  )}
-                  <span className="text-xs font-black bg-white/20 px-2.5 py-1 rounded-xl border border-white/40 whitespace-nowrap">
-                    {question.quad === 0 ? '坐標軸上' : `第 ${['I', 'II', 'III', 'IV'][question.quad - 1]} 象限`}
-                  </span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* 繪圖區頂部：滿寬大字體雙比值公式填空列（對齊 Lv.15~17 規格） */}
+                <div data-coach="lv10-ratio-box" className="bg-cyan-50/90 border-b border-cyan-200/90 px-2 py-2 shrink-0 flex items-center justify-center gap-2.5 sm:gap-5">
+                  {(question.targetSpecs || []).map((spec, idx) => {
+                    const pair = ratioSlots[idx] || { num: null, den: null, solved: false };
+                    const isWrong = wrongRatioIdx === idx;
+                    const simpVal = isLockedSuccess ? getSimplifiedForSpec(spec) : null;
+                    return (
+                      <React.Fragment key={spec.func}>
+                        {idx === 1 && <div className="w-px h-11 bg-cyan-200 shrink-0" />}
+                        <div className={`flex items-center gap-1.5 font-serif font-black text-sm sm:text-base transition-opacity ${stage === 'ratio' || pair.solved ? 'opacity-100' : 'opacity-60'}`}>
+                          <span className={pair.solved ? 'text-emerald-700' : 'text-indigo-950'}>{spec.func} θ =</span>
+                          <div className="inline-flex flex-col items-center leading-none">
+                            {['num', 'den'].map((part, pIdx) => {
+                              const kVal = pair[part];
+                              const isFocused = stage === 'ratio' && !pair.solved && !isLockedSuccess && activeRatioSlot.idx === idx && activeRatioSlot.part === part && !kVal;
+                              return (
+                                <React.Fragment key={part}>
+                                  {pIdx === 1 && <div className={`w-full min-w-[54px] h-[2px] my-1 transition-colors ${pair.solved ? 'bg-emerald-500' : 'bg-slate-500'}`} />}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (stage !== 'ratio' || pair.solved || isLockedSuccess) return;
+                                      audio.sfxClick();
+                                      if (kVal) {
+                                        setRatioSlots(prev => prev.map((s, i) => i === idx ? { ...s, [part]: null } : s));
+                                      }
+                                      setActiveRatioSlot({ idx, part });
+                                    }}
+                                    className={`min-w-[54px] h-[26px] px-1.5 rounded-lg border-2 font-black inline-flex items-center justify-center text-xs transition-all ${
+                                      pair.solved
+                                        ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
+                                        : isWrong
+                                        ? 'border-rose-500 bg-rose-100 text-rose-800 animate-shake'
+                                        : kVal
+                                        ? 'border-cyan-500 bg-cyan-100 text-cyan-900'
+                                        : isFocused
+                                        ? 'border-amber-400 bg-amber-100 text-amber-900 font-sans animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.55)]'
+                                        : 'border-dashed border-slate-300 bg-white text-slate-400 font-sans'
+                                    }`}
+                                  >
+                                    {kVal ? (isPureSym ? kVal : <SqrtText text={`${kVal}(${getDisplayVal(kVal)})`} />) : (part === 'num' ? '分子' : '分母')}
+                                  </button>
+                                </React.Fragment>
+                              );
+                            })}
+                          </div>
+                          {simpVal && (
+                            <span className="text-emerald-700 font-black inline-flex items-center gap-0.5 text-xs sm:text-sm animate-jelly">
+                              <span>=</span>
+                              <FracText value={simpVal} size="xs" barClass="bg-emerald-700" />
+                            </span>
+                          )}
+                        </div>
+                      </React.Fragment>
+                    );
+                  })}
                 </div>
 
                 <div onClick={handleConfirmSkip} className="relative w-full flex-1 min-h-0 bg-white flex items-center justify-center overflow-hidden">
@@ -9549,9 +9687,13 @@
       const [activeAssignSlot, setActiveAssignSlot] = useState('x');
       const [wrongSlotKey, setWrongSlotKey] = useState(null);
 
-      // Step 3 (define): 點擊圖上 x, y, r 填入分子／分母框
-      const [selectedNumerator, setSelectedNumerator] = useState(null);
-      const [selectedDenominator, setSelectedDenominator] = useState(null);
+      // Step 3 (define): 點擊圖上 x, y, r 填入兩組分子／分母框
+      const [ratioSlots, setRatioSlots] = useState([
+        { num: null, den: null, solved: false },
+        { num: null, den: null, solved: false }
+      ]);
+      const [activeRatioSlot, setActiveRatioSlot] = useState({ idx: 0, part: 'num' });
+      const [wrongRatioIdx, setWrongRatioIdx] = useState(null);
 
       const [isLockedSuccess, setIsLockedSuccess] = useState(false);
       const [feedbackAnim, setFeedbackAnim] = useState('');
@@ -9698,8 +9840,12 @@
         const firstEmpty = preferredAssignOrderRef.current.find(k => !initialAssigned[k]) || 'x';
         setActiveAssignSlot(firstEmpty);
         setWrongSlotKey(null);
-        setSelectedNumerator(null);
-        setSelectedDenominator(null);
+        setRatioSlots([
+          { num: null, den: null, solved: false },
+          { num: null, den: null, solved: false }
+        ]);
+        setActiveRatioSlot({ idx: 0, part: pickOrder === 'den' ? 'den' : 'num' });
+        setWrongRatioIdx(null);
         setIsLockedSuccess(false);
         pendingNextRef.current = null;
         setConceptTip(null);
@@ -9709,8 +9855,12 @@
         setPickOrder(order);
         bagRef.current = { usedAngles: [], p0Quads: [], p1Axes: [], funcBag: [], lastAngle: undefined, lastP1Func: null };
         setFeedbackAnim('');
-        setSelectedNumerator(null);
-        setSelectedDenominator(null);
+        setRatioSlots([
+          { num: null, den: null, solved: false },
+          { num: null, den: null, solved: false }
+        ]);
+        setActiveRatioSlot({ idx: 0, part: order === 'den' ? 'den' : 'num' });
+        setWrongRatioIdx(null);
         setConceptTip(null);
         const initProg = startSession();
         nextQuestion(initProg);
@@ -9892,49 +10042,73 @@
         };
       };
 
-      const evaluateRatioPair = (numKey, denKey) => {
-        if (numKey === question.correctNumeratorKey && denKey === question.correctDenominatorKey) {
-          triggerSuccess();
+      const findNextRatioSlot = (slotsArr, order = pickOrder) => {
+        const parts = order === 'den' ? ['den', 'num'] : ['num', 'den'];
+        for (let idx = 0; idx < slotsArr.length; idx++) {
+          if (slotsArr[idx].solved) continue;
+          for (const part of parts) {
+            if (!slotsArr[idx][part]) return { idx, part };
+          }
+        }
+        return null;
+      };
+
+      const evaluateRatioPair = (idx, numKey, denKey, draftSlots) => {
+        const spec = question.targetSpecs?.[idx];
+        if (!spec) return;
+        if (numKey === spec.numKey && denKey === spec.denKey) {
+          const solvedSlots = draftSlots.map((s, i) => i === idx ? { num: numKey, den: denKey, solved: true } : s);
+          setRatioSlots(solvedSlots);
+          setWrongRatioIdx(null);
+          setConceptTip(null);
+          if (solvedSlots.every(s => s.solved)) {
+            triggerSuccess();
+          } else {
+            audio.sfxBonus();
+            const nxt = findNextRatioSlot(solvedSlots);
+            if (nxt) setActiveRatioSlot(nxt);
+          }
         } else {
           audio.sfxError();
           const gameOver = applyPenalty(480);
-          setConceptTip({ text: question.conceptTip, id: Date.now() });
+          setWrongRatioIdx(idx);
+          setConceptTip({ text: spec.tip, id: Date.now() });
           setFeedbackAnim('animate-shake');
           if (!gameOver) {
-            setTimeout(() => { setFeedbackAnim(''); setSelectedNumerator(null); setSelectedDenominator(null); }, 400);
+            setTimeout(() => {
+              setFeedbackAnim('');
+              setWrongRatioIdx(null);
+              setRatioSlots(prev => prev.map((s, i) => i === idx ? { num: null, den: null, solved: false } : s));
+              setActiveRatioSlot({ idx, part: pickOrder === 'den' ? 'den' : 'num' });
+            }, 400);
           }
         }
-      };
-
-      const handleDropRatioSlot = (key, slot) => {
-        if (gameState !== 'playing' || stage !== 'define' || !question || isLockedSuccess || (!isRelaxMode && lives <= 0)) return;
-        if (showGuide) dismissGuide(false);
-        const nextNum = slot === 'num' ? key : selectedNumerator;
-        const nextDen = slot === 'den' ? key : selectedDenominator;
-        audio.sfxSelect();
-        setSelectedNumerator(nextNum);
-        setSelectedDenominator(nextDen);
-        if (nextNum && nextDen) evaluateRatioPair(nextNum, nextDen);
       };
 
       const handleInputKey = (key) => {
         if (gameState !== 'playing' || stage !== 'define' || !question || isLockedSuccess || (!isRelaxMode && lives <= 0)) return;
         if (showGuide) dismissGuide(false);
-        const firstKey = pickOrder === 'num' ? selectedNumerator : selectedDenominator;
-        if (!firstKey) {
-          audio.sfxSelect();
-          if (pickOrder === 'num') setSelectedNumerator(key);
-          else setSelectedDenominator(key);
-        } else if (firstKey === key) {
+        const curTarget = (!ratioSlots[activeRatioSlot.idx]?.solved && !ratioSlots[activeRatioSlot.idx]?.[activeRatioSlot.part])
+          ? activeRatioSlot
+          : findNextRatioSlot(ratioSlots);
+        if (!curTarget) return;
+        const { idx, part } = curTarget;
+        const otherPart = part === 'num' ? 'den' : 'num';
+        const curPair = ratioSlots[idx];
+        if (curPair[otherPart] === key) {
           audio.sfxClick();
-          setSelectedNumerator(null);
-          setSelectedDenominator(null);
+          setRatioSlots(prev => prev.map((s, i) => i === idx ? { ...s, [otherPart]: null } : s));
+          setActiveRatioSlot({ idx, part: otherPart });
+          return;
+        }
+        const nextPair = { ...curPair, [part]: key };
+        const draftSlots = ratioSlots.map((s, i) => i === idx ? nextPair : s);
+        setRatioSlots(draftSlots);
+        if (nextPair.num && nextPair.den) {
+          evaluateRatioPair(idx, nextPair.num, nextPair.den, draftSlots);
         } else {
-          const numKey = pickOrder === 'num' ? firstKey : key;
-          const denKey = pickOrder === 'num' ? key : firstKey;
-          setSelectedNumerator(numKey);
-          setSelectedDenominator(denKey);
-          evaluateRatioPair(numKey, denKey);
+          audio.sfxSelect();
+          setActiveRatioSlot({ idx, part: otherPart });
         }
       };
 
@@ -9955,12 +10129,10 @@
       };
 
       const getDisplayVal = (key) => !question ? '' : key === 'x' ? question.xStr : key === 'y' ? question.yStr : question.rStr;
-      const isSuccessKey = (k) => Boolean(isLockedSuccess && question && (question.correctNumeratorKey === k || question.correctDenominatorKey === k));
+      const isSuccessKey = (k) => Boolean(isLockedSuccess && question && (question.targetSpecs || []).some(sp => sp.numKey === k || sp.denKey === k));
       const rayAngles = Array.from({ length: 24 }, (_, i) => i * 15);
       const currentRad = (currentAngle * Math.PI) / 180;
       const ptTerminal = { x: origin.x + R * Math.cos(currentRad), y: origin.y - R * Math.sin(currentRad) };
-      const isLv8NumTurn = (pickOrder === 'num' && !selectedNumerator) || (pickOrder === 'den' && selectedDenominator && !selectedNumerator);
-      const isLv8DenTurn = (pickOrder === 'den' && !selectedDenominator) || (pickOrder === 'num' && selectedNumerator && !selectedDenominator);
 
       const renderSvgValLabel = (prefix, rawVal, fgColor) => {
         const val = String(rawVal);
@@ -10019,72 +10191,86 @@
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${isLockedSuccess ? 'ring-4 ring-emerald-400/75' : ''}`}>
                 <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['第 II/III/IV 象限特殊角 • 轉終邊 → 填 x, y, r → 定義', '象限角專練（含 0°）• 自動轉角與 r → 填 x, y → 定義', '廣義角綜合驗收 • 自動轉角與 r → 填 x, y → 定義']} />
-                <div data-coach="lv11-target" className="bg-gradient-to-r from-violet-600 to-indigo-700 h-[66px] px-3.5 flex justify-between items-center text-white border-b-2 border-indigo-950 shrink-0">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="text-base sm:text-xl font-serif font-black shrink-0">{question.targetFunc}({question.targetAngle}°) =</span>
-                    {(stage === 'rotate' || stage === 'assign') && (
-                      <span className="inline-flex items-center justify-center min-w-[30px] h-[30px] px-2 rounded-lg bg-white/15 border border-white/40 text-amber-200 font-serif font-black text-base sm:text-lg shrink-0">?</span>
-                    )}
-                    {stage === 'define' && (
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <div data-coach="lv11-ratio-box" className="flex flex-col items-center">
-                          <div
-                            ref={numSlotRef}
-                            onClick={() => { if (selectedNumerator && !isLockedSuccess) { audio.sfxClick(); setSelectedNumerator(null); } }}
-                            className={`min-w-[56px] px-2 h-6 rounded-lg border-2 flex items-center justify-center font-bold text-xs transition-all ${
-                              selectedNumerator
-                                ? 'bg-emerald-400 border-emerald-200 text-emerald-950 font-black cursor-pointer active:scale-95'
-                                : isLv8NumTurn
-                                ? 'border-amber-300 bg-amber-400/30 text-amber-100 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]'
-                                : 'border-dashed border-white/40 text-violet-200/70 bg-white/5'
-                            }`}
-                          >
-                            <span>{selectedNumerator ? <SqrtText text={`${selectedNumerator} (${getDisplayVal(selectedNumerator)})`} /> : '分子'}</span>
-                          </div>
-                          <div className="w-full h-0.5 bg-white/70 my-0.5"></div>
-                          <div
-                            ref={denSlotRef}
-                            onClick={() => { if (selectedDenominator && !isLockedSuccess) { audio.sfxClick(); setSelectedDenominator(null); } }}
-                            className={`min-w-[56px] px-2 h-6 rounded-lg border-2 flex items-center justify-center font-bold text-xs transition-all ${
-                              selectedDenominator
-                                ? 'bg-amber-400 border-amber-200 text-amber-950 font-black cursor-pointer active:scale-95'
-                                : isLv8DenTurn
-                                ? 'border-amber-300 bg-amber-400/30 text-amber-100 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]'
-                                : 'border-dashed border-white/40 text-violet-200/70 bg-white/5'
-                            }`}
-                          >
-                            <span>{selectedDenominator ? <SqrtText text={`${selectedDenominator} (${getDisplayVal(selectedDenominator)})`} /> : '分母'}</span>
-                          </div>
-                        </div>
-                        {isLockedSuccess && (
-                          <div className="inline-flex items-center gap-1.5 text-amber-200 font-black animate-jelly shrink-0">
-                            <span className="text-base sm:text-lg">=</span>
-                            <FracText value={question.exactValText} size="xs" barClass="bg-amber-200" className="text-amber-200" />
-                          </div>
-                        )}
-                        <SuccessBadge show={isLockedSuccess} />
-                      </div>
-                    )}
+                <div data-coach="lv11-target" className="bg-gradient-to-r from-violet-600 to-indigo-700 min-h-[50px] py-1.5 px-3 flex justify-between items-center gap-2 text-white border-b-2 border-indigo-950 shrink-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-base sm:text-lg font-serif font-black shrink-0">θ = {question.targetAngle}°</span>
+                    <span className="text-xs font-bold text-violet-100/90 truncate">
+                      {stage === 'rotate'
+                        ? (isAutoRotating ? '✨ 自動定位終邊…' : '拖曳終邊至目標角度')
+                        : stage === 'assign'
+                        ? (question.phase > 0 ? '點選下方數字填入 x, y' : '點選下方數字填入 x, y, r')
+                        : isLockedSuccess
+                        ? '雙比值定義完成！'
+                        : '點擊圖上 x, y, r 填入兩組比值！'}
+                    </span>
                   </div>
-                  {(stage === 'rotate' || stage === 'assign') && (
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {stage === 'rotate' && (
-                        <>
-                          <span className="text-xs font-black bg-amber-400/20 text-amber-200 border border-amber-300/50 px-2.5 py-1 rounded-xl whitespace-nowrap">
-                            {isAutoRotating ? '✨ 自動定位終邊' : '① 拖曳終邊'}
-                          </span>
-                          <span className="text-xs font-black bg-white/20 px-2.5 py-1 rounded-xl border border-white/40 whitespace-nowrap">
-                            {currentAngle}°
-                          </span>
-                        </>
-                      )}
-                      {stage === 'assign' && (
-                        <span className="text-xs font-black bg-sky-400/20 text-sky-100 border border-sky-300/50 px-2.5 py-1 rounded-xl whitespace-nowrap">
-                          {question.phase > 0 ? '① 填入 x, y 數值' : '② 填入 x, y, r 數值'}
-                        </span>
-                      )}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {stage === 'rotate' && (
+                      <span className="text-xs font-black bg-white/20 px-2 py-0.5 rounded-lg border border-white/40 whitespace-nowrap font-mono">
+                        {currentAngle}°
+                      </span>
+                    )}
+                    <span className="w-6 h-6 inline-flex items-center justify-center shrink-0">
+                      <SuccessBadge show={isLockedSuccess} />
+                    </span>
+                  </div>
+                </div>
+
+                {/* 繪圖區頂部：滿寬大字體雙比值公式填空列（對齊 Lv.15~17 規格） */}
+                <div data-coach="lv11-ratio-box" className="bg-violet-50/90 border-b border-violet-200/90 px-2 py-2 shrink-0 flex items-center justify-center gap-2.5 sm:gap-5">
+                  {(question.targetSpecs || []).map((spec, idx) => {
+                    const pair = ratioSlots[idx] || { num: null, den: null, solved: false };
+                    const isWrong = wrongRatioIdx === idx;
+                    return (
+                      <React.Fragment key={spec.func}>
+                        {idx === 1 && <div className="w-px h-11 bg-violet-200 shrink-0" />}
+                        <div className={`flex items-center gap-1.5 font-serif font-black text-sm sm:text-base transition-opacity ${stage === 'define' || pair.solved ? 'opacity-100' : 'opacity-60'}`}>
+                          <span className={pair.solved ? 'text-emerald-700' : 'text-indigo-950'}>{spec.func} {question.targetAngle}° =</span>
+                          <div className="inline-flex flex-col items-center leading-none">
+                            {['num', 'den'].map((part, pIdx) => {
+                              const kVal = pair[part];
+                              const isFocused = stage === 'define' && !pair.solved && !isLockedSuccess && activeRatioSlot.idx === idx && activeRatioSlot.part === part && !kVal;
+                              return (
+                                <React.Fragment key={part}>
+                                  {pIdx === 1 && <div className={`w-full min-w-[54px] h-[2px] my-1 transition-colors ${pair.solved ? 'bg-emerald-500' : 'bg-slate-500'}`} />}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (stage !== 'define' || pair.solved || isLockedSuccess) return;
+                                      audio.sfxClick();
+                                      if (kVal) {
+                                        setRatioSlots(prev => prev.map((s, i) => i === idx ? { ...s, [part]: null } : s));
+                                      }
+                                      setActiveRatioSlot({ idx, part });
+                                    }}
+                                    className={`min-w-[54px] h-[26px] px-1.5 rounded-lg border-2 font-black inline-flex items-center justify-center text-xs transition-all ${
+                                      pair.solved
+                                        ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
+                                        : isWrong
+                                        ? 'border-rose-500 bg-rose-100 text-rose-800 animate-shake'
+                                        : kVal
+                                        ? 'border-violet-500 bg-violet-100 text-violet-900'
+                                        : isFocused
+                                        ? 'border-amber-400 bg-amber-100 text-amber-900 font-sans animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.55)]'
+                                        : 'border-dashed border-slate-300 bg-white text-slate-400 font-sans'
+                                    }`}
+                                  >
+                                    {kVal ? <SqrtText text={`${kVal}(${getDisplayVal(kVal)})`} /> : (part === 'num' ? '分子' : '分母')}
+                                  </button>
+                                </React.Fragment>
+                              );
+                            })}
+                          </div>
+                          {isLockedSuccess && spec.exactValText && (
+                            <span className="text-emerald-700 font-black inline-flex items-center gap-0.5 text-xs sm:text-sm animate-jelly">
+                              <span>=</span>
+                              <FracText value={spec.exactValText} size="xs" barClass="bg-emerald-700" />
+                            </span>
+                          )}
+                        </div>
+                      </React.Fragment>
+                    );
+                  })}
                 </div>
 
                 <div onClick={handleConfirmSkip} className="relative w-full flex-1 min-h-0 bg-white flex items-center justify-center overflow-hidden">
