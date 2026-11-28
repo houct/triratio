@@ -112,6 +112,8 @@
       color: rgba(148, 163, 184, 0.85);
     }
     html, body {
+      position: fixed;
+      inset: 0;
       height: 100dvh;
       width: 100%;
       margin: 0;
@@ -532,6 +534,20 @@
           setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 600);
         }, 120);
       };
+      // 全站跨平台防捲動守衛（iPhone / iPad Safari / Android / LINE WebView）：
+      // 保留知識聖所、設定與 Debug 等內部 .overflow-y-auto 容器捲動，其餘拖曳與畫板區域禁止帶動整頁
+      document.addEventListener('touchmove', function (e) {
+        var t = e.target;
+        if (!t || typeof t.closest !== 'function') return;
+        if (t.closest('.touch-none, canvas')) {
+          e.preventDefault();
+          return;
+        }
+        var scrollEl = t.closest('.overflow-y-auto, .overflow-auto');
+        if (!scrollEl || scrollEl.scrollHeight <= scrollEl.clientHeight) {
+          e.preventDefault();
+        }
+      }, { passive: false });
     })();
   </script>
 
@@ -9519,8 +9535,8 @@
                         <line x1={GRID_ORIGIN - gridExtent} y1={GRID_ORIGIN - i * GRID_STEP} x2={GRID_ORIGIN + gridExtent} y2={GRID_ORIGIN - i * GRID_STEP} stroke={i === 0 ? '#64748b' : '#e2e8f0'} strokeWidth={i === 0 ? '2.5' : '1.2'} />
                         {i !== 0 && (
                           <>
-                            <text x={GRID_ORIGIN + i * GRID_STEP} y={GRID_ORIGIN + 15} fill={(isDraggingP || dragCoordChip?.overGrid) && curP.x === i ? '#0284c7' : '#94a3b8'} fontSize={(isDraggingP || dragCoordChip?.overGrid) && curP.x === i ? '14' : '11.5'} fontWeight="bold" textAnchor="middle">{i}</text>
-                            <text x={GRID_ORIGIN - 13} y={GRID_ORIGIN - i * GRID_STEP + 4} fill={(isDraggingP || dragCoordChip?.overGrid) && curP.y === i ? '#0284c7' : '#94a3b8'} fontSize={(isDraggingP || dragCoordChip?.overGrid) && curP.y === i ? '14' : '11.5'} fontWeight="bold" textAnchor="end">{i}</text>
+                            <text x={GRID_ORIGIN + i * GRID_STEP} y={GRID_ORIGIN + 19} fill={(isDraggingP || dragCoordChip?.overGrid) && curP.x === i ? '#0284c7' : '#64748b'} fontSize={(isDraggingP || dragCoordChip?.overGrid) && curP.x === i ? '18' : '15'} fontWeight="bold" textAnchor="middle">{i}</text>
+                            <text x={GRID_ORIGIN - 14} y={GRID_ORIGIN - i * GRID_STEP + 5} fill={(isDraggingP || dragCoordChip?.overGrid) && curP.y === i ? '#0284c7' : '#64748b'} fontSize={(isDraggingP || dragCoordChip?.overGrid) && curP.y === i ? '18' : '15'} fontWeight="bold" textAnchor="end">{i}</text>
                           </>
                         )}
                       </React.Fragment>
@@ -9572,7 +9588,7 @@
                           onPointerDown={(e) => handleTagPointerDown(e, 'r')}
                         />
 
-                        {/* r 標籤（pickR 階段變身為虛線吸附定點；ratio 階段可拖進分子/分母或點擊） */}
+                        {/* r 標籤（pickR 階段變身為虛線吸附定點；ratio 階段可點擊填入） */}
                         <g
                           ref={rDropRef}
                           data-coach="lv10-r-drop"
@@ -9582,58 +9598,58 @@
                           onPointerDown={(e) => handleTagPointerDown(e, 'r')}
                         >
                           <rect
-                            x={isPureSym ? '-20' : '-34'} y="-14" width={isPureSym ? '40' : '68'} height="28" rx="10"
+                            x={isPureSym ? '-22' : '-40'} y="-16" width={isPureSym ? '44' : '80'} height="32" rx="11"
                             fill={stage === 'pickR' ? '#fffbeb' : (isSuccessKey('r') || rSnapFlash ? '#10b981' : 'white')}
                             stroke={stage === 'pickR' ? '#f59e0b' : (isSuccessKey('r') || rSnapFlash ? '#059669' : '#f59e0b')}
                             strokeWidth={stage === 'pickR' ? '3' : (isSuccessKey('r') || rSnapFlash ? '3.5' : '2.5')}
                             strokeDasharray={stage === 'pickR' ? '5 3' : undefined}
                           />
                           {isPureSym && stage !== 'pickR' ? (
-                            <text x="0" y="1" fill={isSuccessKey('r') ? '#ffffff' : '#b45309'} fontSize="16" fontWeight="900" fontFamily="serif" fontStyle="italic" textAnchor="middle" dominantBaseline="middle">r</text>
+                            <text x="0" y="1" fill={isSuccessKey('r') ? '#ffffff' : '#b45309'} fontSize="20" fontWeight="900" fontFamily="serif" fontStyle="italic" textAnchor="middle" dominantBaseline="middle">r</text>
                           ) : stage !== 'pickR' && curRLabel.includes('√') ? (() => {
                             const sqrtIdx = curRLabel.indexOf('√');
                             const coef = curRLabel.slice(0, sqrtIdx);
                             const rad = curRLabel.slice(sqrtIdx + 1);
                             const fg = isSuccessKey('r') || rSnapFlash ? '#ffffff' : '#b45309';
-                            const prefixX = coef ? -19 : -17;
+                            const prefixX = coef ? -22 : -19;
                             const tickOffset = coef ? -4 : -5;
-                            const radX = rad.length > 1 ? tickOffset + 19.5 : tickOffset + 15.5;
-                            const lineEnd = rad.length > 1 ? tickOffset + 30 : tickOffset + 21;
+                            const radX = rad.length > 1 ? tickOffset + 22.5 : tickOffset + 17.5;
+                            const lineEnd = rad.length > 1 ? tickOffset + 35 : tickOffset + 24;
                             return (
                               <g>
-                                <text x={prefixX} y="1" fill={fg} fontSize="14" fontWeight="900" textAnchor="middle" dominantBaseline="middle">r={coef}</text>
-                                <path d={`M ${tickOffset} 1.5 L ${tickOffset + 2.2} 0 L ${tickOffset + 4.6} 6.5 L ${tickOffset + 8.8} -6.5 L ${lineEnd} -6.5`} fill="none" stroke={fg} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                                <text x={radX} y="2" fill={fg} fontSize="13.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">{rad}</text>
+                                <text x={prefixX} y="1" fill={fg} fontSize="16.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">r={coef}</text>
+                                <path d={`M ${tickOffset} 1.5 L ${tickOffset + 2.4} 0 L ${tickOffset + 5} 7.5 L ${tickOffset + 9.6} -7.5 L ${lineEnd} -7.5`} fill="none" stroke={fg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                <text x={radX} y="2" fill={fg} fontSize="16" fontWeight="900" textAnchor="middle" dominantBaseline="middle">{rad}</text>
                               </g>
                             );
                           })() : (
-                            <text x="0" y="1" fill={isSuccessKey('r') || rSnapFlash ? '#ffffff' : '#b45309'} fontSize="14.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">
+                            <text x="0" y="1" fill={isSuccessKey('r') || rSnapFlash ? '#ffffff' : '#b45309'} fontSize="17.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">
                               {stage === 'pickR' ? 'r = ?' : `r=${curRLabel}`}
                             </text>
                           )}
                         </g>
 
-                        {/* x 標籤 */}
+                        {/* x 標籤（外推 ±27 避開 X 軸刻度） */}
                         <g
                           data-coach="lv10-demo-tag"
-                          transform={`translate(${svgFootX.x}, ${GRID_ORIGIN + (activeCoord.y >= 0 ? 22 : -22)})`}
-                          className={`animate-lv10-fade ${stage === 'ratio' ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                          transform={`translate(${svgFootX.x}, ${GRID_ORIGIN + (activeCoord.y >= 0 ? 27 : -27)})`}
+                          className={`animate-lv10-fade ${stage === 'ratio' ? 'cursor-pointer' : ''}`}
                           style={{ animationDelay: '200ms' }}
                           onPointerDown={(e) => handleTagPointerDown(e, 'x')}
                         >
-                          <rect x={isPureSym ? '-19' : '-30'} y="-13" width={isPureSym ? '38' : '60'} height="26" fill={isSuccessKey('x') ? '#10b981' : 'white'} stroke={isSuccessKey('x') ? '#059669' : '#2563eb'} strokeWidth={isSuccessKey('x') ? '3.5' : '2.5'} rx="9" />
-                          <text x="0" y="1" fill={isSuccessKey('x') ? '#ffffff' : '#1d4ed8'} fontSize={isPureSym ? '16' : '14.5'} fontWeight="900" fontFamily={isPureSym ? 'serif' : undefined} fontStyle={isPureSym ? 'italic' : undefined} textAnchor="middle" dominantBaseline="middle">{isPureSym ? 'x' : `x=${activeCoord.x}`}</text>
+                          <rect x={isPureSym ? '-22' : '-36'} y="-16" width={isPureSym ? '44' : '72'} height="32" fill={isSuccessKey('x') ? '#10b981' : 'white'} stroke={isSuccessKey('x') ? '#059669' : '#2563eb'} strokeWidth={isSuccessKey('x') ? '3.5' : '2.5'} rx="10" />
+                          <text x="0" y="1" fill={isSuccessKey('x') ? '#ffffff' : '#1d4ed8'} fontSize={isPureSym ? '20' : '17.5'} fontWeight="900" fontFamily={isPureSym ? 'serif' : undefined} fontStyle={isPureSym ? 'italic' : undefined} textAnchor="middle" dominantBaseline="middle">{isPureSym ? 'x' : `x=${activeCoord.x}`}</text>
                         </g>
 
-                        {/* y 標籤 */}
+                        {/* y 標籤（外推 ±46 避開 Y 軸刻度） */}
                         <g
-                          transform={`translate(${GRID_ORIGIN + (activeCoord.x >= 0 ? -36 : 36)}, ${svgFootY.y})`}
-                          className={`animate-lv10-fade ${stage === 'ratio' ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                          transform={`translate(${GRID_ORIGIN + (activeCoord.x >= 0 ? -46 : 46)}, ${svgFootY.y})`}
+                          className={`animate-lv10-fade ${stage === 'ratio' ? 'cursor-pointer' : ''}`}
                           style={{ animationDelay: '220ms' }}
                           onPointerDown={(e) => handleTagPointerDown(e, 'y')}
                         >
-                          <rect x={isPureSym ? '-19' : '-30'} y="-13" width={isPureSym ? '38' : '60'} height="26" fill={isSuccessKey('y') ? '#10b981' : 'white'} stroke={isSuccessKey('y') ? '#059669' : '#ef4444'} strokeWidth={isSuccessKey('y') ? '3.5' : '2.5'} rx="9" />
-                          <text x="0" y="1" fill={isSuccessKey('y') ? '#ffffff' : '#b91c1c'} fontSize={isPureSym ? '16' : '14.5'} fontWeight="900" fontFamily={isPureSym ? 'serif' : undefined} fontStyle={isPureSym ? 'italic' : undefined} textAnchor="middle" dominantBaseline="middle">{isPureSym ? 'y' : `y=${activeCoord.y}`}</text>
+                          <rect x={isPureSym ? '-22' : '-36'} y="-16" width={isPureSym ? '44' : '72'} height="32" fill={isSuccessKey('y') ? '#10b981' : 'white'} stroke={isSuccessKey('y') ? '#059669' : '#ef4444'} strokeWidth={isSuccessKey('y') ? '3.5' : '2.5'} rx="10" />
+                          <text x="0" y="1" fill={isSuccessKey('y') ? '#ffffff' : '#b91c1c'} fontSize={isPureSym ? '20' : '17.5'} fontWeight="900" fontFamily={isPureSym ? 'serif' : undefined} fontStyle={isPureSym ? 'italic' : undefined} textAnchor="middle" dominantBaseline="middle">{isPureSym ? 'y' : `y=${activeCoord.y}`}</text>
                         </g>
                       </g>
                     )}
@@ -10276,7 +10292,7 @@
         const val = String(rawVal);
         if (!val.includes('√')) {
           return (
-            <text x="0" y="1" fill={fgColor} fontSize="15.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">
+            <text x="0" y="1" fill={fgColor} fontSize="18.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">
               {prefix}{val}
             </text>
           );
@@ -10285,13 +10301,13 @@
         const before = val.slice(0, idx);
         const rad = val.slice(idx + 1);
         const fullPrefix = `${prefix}${before}`;
-        const prefixX = fullPrefix.length >= 3 ? -18 : -15;
-        const tickX = fullPrefix.length >= 3 ? -1 : -2;
+        const prefixX = fullPrefix.length >= 3 ? -20 : -16;
+        const tickX = fullPrefix.length >= 3 ? 0 : -1;
         return (
           <g>
-            <text x={prefixX} y="1" fill={fgColor} fontSize="15" fontWeight="900" textAnchor="middle" dominantBaseline="middle">{fullPrefix}</text>
-            <path d={`M ${tickX} 1.5 L ${tickX + 2.2} 0 L ${tickX + 4.4} 6.5 L ${tickX + 8.8} -7 L ${tickX + 21} -7`} fill="none" stroke={fgColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            <text x={tickX + 15} y="2" fill={fgColor} fontSize="15" fontWeight="900" textAnchor="middle" dominantBaseline="middle">{rad}</text>
+            <text x={prefixX} y="1" fill={fgColor} fontSize="17.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">{fullPrefix}</text>
+            <path d={`M ${tickX} 1.5 L ${tickX + 2.4} 0 L ${tickX + 5} 7.5 L ${tickX + 9.8} -8 L ${tickX + 24} -8`} fill="none" stroke={fgColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <text x={tickX + 17} y="2" fill={fgColor} fontSize="17.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">{rad}</text>
           </g>
         );
       };
@@ -10565,7 +10581,7 @@
                                 className={isActive ? 'animate-light-breath' : ''}
                               />
                               {rVal ? renderSvgValLabel('r=', rVal, fg) : (
-                                <text x="0" y="1" fill="#b45309" fontSize="15.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">r = ?</text>
+                                <text x="0" y="1" fill="#b45309" fontSize="18.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">r = ?</text>
                               )}
                             </g>
                           );
@@ -10596,7 +10612,7 @@
                                 className={isActive ? 'animate-light-breath' : ''}
                               />
                               {xVal ? renderSvgValLabel('x=', xVal, fg) : (
-                                <text x="0" y="1" fill="#1d4ed8" fontSize="15.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">x = ?</text>
+                                <text x="0" y="1" fill="#1d4ed8" fontSize="18.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">x = ?</text>
                               )}
                             </g>
                           );
@@ -10627,7 +10643,7 @@
                                 className={isActive ? 'animate-light-breath' : ''}
                               />
                               {yVal ? renderSvgValLabel('y=', yVal, fg) : (
-                                <text x="0" y="1" fill="#b91c1c" fontSize="15.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">y = ?</text>
+                                <text x="0" y="1" fill="#b91c1c" fontSize="18.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">y = ?</text>
                               )}
                             </g>
                           );
