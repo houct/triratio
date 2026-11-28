@@ -19455,23 +19455,23 @@
     };
 
 
-    // ==================== 第 18 關組件：暗夜燈塔探照燈 ＋ 巡航測繪車（三角測量實景互動） ====================
+    // ==================== 第 18 關組件：暗夜燈塔探照燈 ＋ 巡航測繪車 ＋ 海圖群島（三角測量實景互動） ====================
     const LV18_SURVEY_POOLS = {
       0: [
-        { id: 'm0_1', scene: 'searchlight', towerH: 40, targetDep: 30, boatX: 274, ans: '40√3', opts: ['40', '40√3', '20√3', '80'], formula: '探照燈鎖定俯角 30°（內錯角＝仰角 30°）⇒ 船距 d = 40 / tan 30° = 40√3 m' },
-        { id: 'm0_2', scene: 'searchlight', towerH: 50, targetDep: 45, boatX: 190, ans: '50', opts: ['25', '50', '50√2', '50√3'], formula: '探照燈鎖定俯角 45°（等腰直角）⇒ 船距 d = 50 m' },
-        { id: 'm0_3', scene: 'searchlight', towerH: 60, targetDep: 60, boatX: 134, ans: '20√3', opts: ['30', '20√3', '60√3', '40√3'], formula: '探照燈鎖定俯角 60° ⇒ 船距 d = 60 / tan 60° = 20√3 m' }
+        { id: 'm0_1', scene: 'searchlight', towerH: 40, targetDep: 30, boatX: 287, ans: '40√3', opts: ['40', '40√3', '20√3', '80'], formula: '俯角 30° = 仰角 30° ⇒ 水平距 d = 40 / tan 30° = 40√3 m' },
+        { id: 'm0_2', scene: 'searchlight', towerH: 50, targetDep: 45, boatX: 190, ans: '50', opts: ['25', '50', '50√2', '50√3'], formula: '俯角 45° = 仰角 45°（等腰直角）⇒ 水平距 d = 50 m' },
+        { id: 'm0_3', scene: 'searchlight', towerH: 60, targetDep: 60, boatX: 134, ans: '20√3', opts: ['30', '20√3', '60√3', '40√3'], formula: '俯角 60° = 仰角 60° ⇒ 水平距 d = 60 / tan 60° = 20√3 m' }
       ],
       1: [
-        { id: 'm1_1', scene: 'jeep', walkDist: 100, ans: '50√3', opts: ['50', '50√3', '100√3', '50√2'], formula: '開進 100m 仰角 30°→60° ⇒ 外側等腰斜邊 = 100m ⇒ 塔高 = 50√3 m' },
-        { id: 'm1_2', scene: 'jeep', walkDist: 80, ans: '40√3', opts: ['40', '40√3', '80√3', '40√2'], formula: '開進 80m 仰角 30°→60° ⇒ 外側等腰斜邊 = 80m ⇒ 塔高 = 40√3 m' },
-        { id: 'm1_3', scene: 'jeep', walkDist: 60, ans: '30√3', opts: ['30', '30√3', '60√3', '30√2'], formula: '開進 60m 仰角 30°→60° ⇒ 外側等腰斜邊 = 60m ⇒ 塔高 = 30√3 m' }
+        { id: 'm1_1', scene: 'jeep', walkDist: 100, ans: '50√3', opts: ['50', '50√3', '100√3', '50√2'], formula: '外側 30°-30° 等腰 ⇒ 斜邊 = 100m ⇒ 塔高 h = 100·sin 60° = 50√3 m' },
+        { id: 'm1_2', scene: 'jeep', walkDist: 80, ans: '40√3', opts: ['40', '40√3', '80√3', '40√2'], formula: '外側 30°-30° 等腰 ⇒ 斜邊 = 80m ⇒ 塔高 h = 80·sin 60° = 40√3 m' },
+        { id: 'm1_3', scene: 'jeep', walkDist: 60, ans: '30√3', opts: ['30', '30√3', '60√3', '30√2'], formula: '外側 30°-30° 等腰 ⇒ 斜邊 = 60m ⇒ 塔高 h = 60·sin 60° = 30√3 m' }
       ],
       2: [
-        { id: 'm2_1', scene: 'sea_sine', ab: '100', angA: 45, angC: 30, ans: '100√2', opts: ['50√2', '100', '100√2', '100√3'], formula: '正弦測距：BC / sin 45° = 100 / sin 30° ⇒ BC = 100√2 m' },
-        { id: 'm2_2', scene: 'sea_sine', ab: '60', angA: 60, angC: 30, ans: '60√3', opts: ['30√3', '60', '60√2', '60√3'], formula: '正弦測距：BC / sin 60° = 60 / sin 30° ⇒ BC = 60√3 m' },
-        { id: 'm2_3', scene: 'sea_cos', pa: 30, pb: 50, deg: 120, ans: '70', opts: ['60', '70', '80', '10√19'], formula: '餘弦測距：AB² = 30² + 50² − 2·30·50·(−½) = 4900 ⇒ AB = 70 m' },
-        { id: 'm2_4', scene: 'sea_cos', pa: 50, pb: 80, deg: 60, ans: '70', opts: ['60', '70', '75', '90'], formula: '餘弦測距：AB² = 50² + 80² − 2·50·80·(½) = 4900 ⇒ AB = 70 m' }
+        { id: 'm2_1', scene: 'sea_sine', law: 'sine', ab: '100', angA: 45, angC: 30, ans: '100√2', opts: ['50√2', '100', '100√2', '100√3'], eqHint: 'BC / sin 45° = 100 / sin 30°', formula: '正弦測距：BC / sin 45° = 100 / sin 30° ⇒ BC = 100√2 m' },
+        { id: 'm2_2', scene: 'sea_sine', law: 'sine', ab: '60', angA: 60, angC: 30, ans: '60√3', opts: ['30√3', '60', '60√2', '60√3'], eqHint: 'BC / sin 60° = 60 / sin 30°', formula: '正弦測距：BC / sin 60° = 60 / sin 30° ⇒ BC = 60√3 m' },
+        { id: 'm2_3', scene: 'sea_cos', law: 'cos', pa: 30, pb: 50, deg: 120, ans: '70', opts: ['60', '70', '80', '10√19'], eqHint: 'AB² = 30² + 50² − 2·30·50·cos 120°', formula: '餘弦測距：AB² = 900 + 2500 + 1500 = 4900 ⇒ AB = 70 m' },
+        { id: 'm2_4', scene: 'sea_cos', law: 'cos', pa: 50, pb: 80, deg: 60, ans: '70', opts: ['60', '70', '75', '90'], eqHint: 'AB² = 50² + 80² − 2·50·80·cos 60°', formula: '餘弦測距：AB² = 2500 + 6400 − 4000 = 4900 ⇒ AB = 70 m' }
       ]
     };
 
@@ -19488,8 +19488,9 @@
 
       const [question, setQuestion] = useState(null);
       const [beamDep, setBeamDep] = useState(15); // P0 探照燈俯角 (15..75)
-      const [jeepX, setJeepX] = useState(52); // P1 測繪車位置 (52 -> 190)
-      const [targetFound, setTargetFound] = useState(false);
+      const [jeepX, setJeepX] = useState(32); // P1 測繪車位置 (32 -> 190，精準 30° -> 60°)
+      const [targetFound, setTargetFound] = useState(false); // P0/P1 定位鎖定；P2 選對定理
+      const [wrongLaw, setWrongLaw] = useState(null);
       const [isDragging, setIsDragging] = useState(false);
       const [solvedAns, setSolvedAns] = useState(null);
       const [wrongOpt, setWrongOpt] = useState(null);
@@ -19501,7 +19502,7 @@
         currentStars,
         hasSeenGuide,
         onMarkGuideSeen,
-        activeStageKey: question ? (targetFound ? 'calc' : question.scene) : null,
+        activeStageKey: question ? (targetFound ? 'calc' : (qPhase === 2 ? 'pick_law' : question.scene)) : null,
         phase: qPhase,
         enabled: gameState === 'playing',
         finalStageKey: 'calc'
@@ -19534,14 +19535,22 @@
       const nextQuestion = (curProg) => {
         const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
         if (!bagRefs.current[phase] || bagRefs.current[phase].length === 0) {
-          bagRefs.current[phase] = shuffle([...LV18_SURVEY_POOLS[phase]]);
+          if (phase === 2) {
+            // P2 固定保證 1 題正弦測距 ＋ 1 題餘弦測距（隨機順序）
+            const sinePool = shuffle(LV18_SURVEY_POOLS[2].filter(q => q.law === 'sine'));
+            const cosPool = shuffle(LV18_SURVEY_POOLS[2].filter(q => q.law === 'cos'));
+            bagRefs.current[2] = shuffle([sinePool[0], cosPool[0]]);
+          } else {
+            bagRefs.current[phase] = shuffle([...LV18_SURVEY_POOLS[phase]]);
+          }
         }
         const raw = bagRefs.current[phase].shift();
         questionMissedRef.current = false;
         setQuestion({ ...raw, phase, shuffledOpts: shuffle([...raw.opts]) });
         setBeamDep(raw.targetDep === 30 ? 65 : 18);
-        setJeepX(52);
-        setTargetFound(phase === 2);
+        setJeepX(32);
+        setTargetFound(false);
+        setWrongLaw(null);
         setSolvedAns(null);
         setWrongOpt(null);
         setConceptTip(null);
@@ -19580,14 +19589,14 @@
         }
       };
 
-      // P1 測繪車前進拖曳（x: 52 -> 190）
+      // P1 測繪車前進拖曳（x: 32 -> 190，精準 30° -> 60°）
       const updateJeep = (clientX, clientY) => {
         if (!svgRef.current || !question || question.scene !== 'jeep' || targetFound) return;
         const ctm = svgRef.current.getScreenCTM();
         if (!ctm) return;
         const inv = ctm.inverse();
         const sx = inv.a * clientX + inv.c * clientY + inv.e;
-        const clamped = Math.max(52, Math.min(190, Math.round(sx)));
+        const clamped = Math.max(32, Math.min(190, Math.round(sx)));
         setJeepX(clamped);
         if (clamped >= 182) {
           setJeepX(190);
@@ -19598,9 +19607,33 @@
         }
       };
 
+      // P2 Step 1：3 秒選定理（正弦 vs 餘弦，答錯溫和提示不扣心）
+      const handlePickLaw = (pickedLaw) => {
+        if (gameState !== 'playing' || !question || qPhase !== 2 || targetFound || solvedAns) return;
+        if (showGuide) dismissGuide(false);
+        audio.init();
+        if (pickedLaw === question.law) {
+          audio.sfxBonus();
+          setTargetFound(true);
+          setWrongLaw(null);
+          setConceptTip(null);
+        } else {
+          audio.sfxError();
+          setWrongLaw(pickedLaw);
+          setConceptTip({
+            text: question.law === 'sine'
+              ? '這題已知「一組對邊與對角（AB 與 ∠C）」，適合用「正弦定理」喔！'
+              : '這題已知「兩鄰邊與一夾角（PA、PB 與 ∠P）」，適合用「餘弦定理」喔！',
+            id: Date.now()
+          });
+          setFeedbackAnim('animate-shake');
+          setTimeout(() => { setFeedbackAnim(''); setWrongLaw(null); }, 380);
+        }
+      };
+
       const handleScenePointerDown = (e) => {
         if (solvedAns) { handleConfirmSkip(); return; }
-        if (!question || targetFound || (!isRelaxMode && lives <= 0)) return;
+        if (!question || targetFound || qPhase === 2 || (!isRelaxMode && lives <= 0)) return;
         if (showGuide) dismissGuide(false);
         e.preventDefault();
         audio.init();
@@ -19635,7 +19668,7 @@
             tone: 'success',
             canSkip: true,
             skipLabel: completed ? '輕點查看結算 ▸' : '輕點繼續 ▸',
-            text: question.formula,
+            node: <SqrtText text={question.formula} className="font-serif font-black" />,
             id: Date.now()
           });
           pendingNextRef.current = () => {
@@ -19652,12 +19685,12 @@
           setWrongOpt(val);
           setConceptTip({
             text: question.scene === 'jeep'
-              ? `外側 30°-30° 等腰 ⇒ 內側斜邊 = ${question.walkDist}m，再乘 sin 60° 即為塔高！`
+              ? `外側 30°-30° 等腰 ⇒ 內側斜邊 = ${question.walkDist}m，塔高 h = ${question.walkDist} · sin 60°！`
               : question.scene === 'sea_sine'
               ? `正弦定理：BC / sin ${question.angA}° = ${question.ab} / sin ${question.angC}°`
               : question.scene === 'sea_cos'
               ? `餘弦定理：AB² = ${question.pa}² + ${question.pb}² − 2·${question.pa}·${question.pb}·cos ${question.deg}°`
-              : `俯角 ${question.targetDep}°（＝仰角 ${question.targetDep}°），塔高 ${question.towerH}m，用 30°/45°/60° 比例求船距！`,
+              : `俯角 ${question.targetDep}° ＝ 小船仰角 ${question.targetDep}°，由直角三角形對邊 ${question.towerH}m 求鄰邊水平距離 d！`,
             id: Date.now()
           });
           setFeedbackAnim('animate-shake');
@@ -19667,7 +19700,7 @@
 
       // 計算探照燈光束打在海面 y=198 的落點
       const beamHitX = Math.min(335, 58 + (198 - 66) / Math.tan((beamDep * Math.PI) / 180));
-      // 計算測繪車當前仰角（塔頂 (268, 62), 地面 y=198）
+      // 計算測繪車當前仰角（塔頂 (268, 62), 地面 y=198，x=32 時精準 30°，x=190 時精準 60°）
       const jeepElevDeg = Math.round(Math.atan2(198 - 62, Math.max(10, 268 - jeepX)) * (180 / Math.PI));
 
       return (
@@ -19680,41 +19713,84 @@
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-cyan-900 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${solvedAns ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                <StagePhaseStrip phase={qPhase} labels={['暗夜燈塔探照燈 • 掃描海面鎖定俯角', '巡航測繪車 • 拖曳前進 30°→60° 測塔高', '暗夜雷達群島 • 正弦與餘弦隔海測距']} />
+                <StagePhaseStrip phase={qPhase} labels={['暗夜燈塔探照燈 • 掃描海面鎖定俯角', '巡航測繪車 • 拖曳前進 30°→60° 測塔高', '暗夜海圖群島 • 選定理並隔海測距']} />
 
-                <div data-coach="lv18-prompt" className="bg-gradient-to-r from-slate-900 via-cyan-950 to-indigo-950 h-[66px] px-3.5 flex justify-between items-center text-white border-b-2 border-cyan-500/60 shrink-0">
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-[10px] font-bold text-cyan-200/90 leading-tight truncate">
-                      {!targetFound && question.scene === 'searchlight'
-                        ? `燈塔高 ${question.towerH}m • 拖曳探照燈光束找出黑暗中的小船！`
-                        : !targetFound && question.scene === 'jeep'
-                        ? `拖曳地面測繪車前進 ${question.walkDist}m 至仰角 60° 定位點！`
-                        : question.scene === 'searchlight'
-                        ? `已鎖定小船！塔高 ${question.towerH}m，俯角 ${question.targetDep}°`
-                        : question.scene === 'jeep'
-                        ? `定位完成！仰角 30°→60°，前進 ${question.walkDist}m`
-                        : question.scene === 'sea_sine'
-                        ? `雷達測距：AB = ${question.ab}m，∠A = ${question.angA}°，∠C = ${question.angC}°`
-                        : `雷達測距：PA = ${question.pa}m，PB = ${question.pb}m，夾角 ${question.deg}°`}
-                    </span>
-                    <div className="flex items-center gap-1.5 font-serif font-black text-base sm:text-lg leading-tight mt-0.5">
-                      <span>
-                        {question.scene === 'searchlight' ? '求船隻距離 d =' : question.scene === 'jeep' ? '求高塔高度 h =' : question.scene === 'sea_sine' ? '求島距 BC =' : '求兩島距 AB ='}
-                      </span>
-                      <div
-                        className={`min-w-[66px] h-[30px] px-2.5 rounded-xl border-2 flex items-center justify-center font-serif font-black text-base transition-all ${
-                          solvedAns ? 'bg-emerald-400 border-emerald-200 text-emerald-950 scale-105'
-                            : targetFound ? 'border-amber-300 bg-amber-400/30 text-amber-100 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.6)]'
-                            : 'border-dashed border-white/35 bg-white/5 text-white/60 text-xs'
-                        }`}
-                      >
-                        {solvedAns ? <><SqrtText text={solvedAns} /><span className="text-xs ml-0.5">m</span></> : targetFound ? '? m' : '先掃描'}
-                      </div>
-                    </div>
+                {/* 置頂清爽指令列（對齊 Lv.6/9/10/15~17 規格） */}
+                <div data-coach="lv18-prompt" className="bg-gradient-to-r from-slate-900 via-cyan-950 to-indigo-950 min-h-[46px] px-3 py-1.5 flex justify-between items-center gap-2 text-white border-b-2 border-cyan-500/60 shrink-0">
+                  <div className="flex-1 text-center font-black text-xs sm:text-sm text-cyan-50 leading-snug">
+                    {!targetFound && question.scene === 'searchlight'
+                      ? `燈塔高 ${question.towerH}m • 拖曳探照燈光束照亮海面小船！`
+                      : !targetFound && question.scene === 'jeep'
+                      ? `拖曳測繪車向右前進 ${question.walkDist}m，直到仰角升至 60°！`
+                      : !targetFound && qPhase === 2
+                      ? '觀察群島已知條件：該啟動「正弦定理」還是「餘弦定理」？'
+                      : question.scene === 'searchlight'
+                      ? `已鎖定小船！求小船離燈塔底的水平距離 d`
+                      : question.scene === 'jeep'
+                      ? `定位完成！仰角 30°→60° 前進 ${question.walkDist}m，求高塔高度 h`
+                      : question.scene === 'sea_sine'
+                      ? `已啟動正弦定理！依下方算式求出島距 BC`
+                      : `已啟動餘弦定理！依下方算式求出兩島距 AB`}
                   </div>
                   <span className="w-6 h-6 inline-flex items-center justify-center shrink-0">
                     <SuccessBadge show={Boolean(solvedAns)} />
                   </span>
+                </div>
+
+                {/* 繪圖區頂部：滿寬大字體引導算式＋所求目標列 */}
+                <div className="bg-cyan-50/95 border-b border-cyan-200/90 px-2.5 py-2 shrink-0 flex items-center justify-center flex-wrap gap-1.5 font-serif font-black text-sm sm:text-base text-slate-800">
+                  {question.scene === 'searchlight' && (
+                    <>
+                      <span className="text-xs sm:text-sm font-sans font-bold text-cyan-800">
+                        {targetFound ? `俯角 ${question.targetDep}° ＝ 仰角 ${question.targetDep}° ⇒` : `塔高 ${question.towerH}m •`}
+                      </span>
+                      <span>水平船距 d =</span>
+                      <span className={`min-w-[72px] h-[30px] px-2 rounded-xl border-2 inline-flex items-center justify-center font-mono text-sm sm:text-base transition-colors ${
+                        solvedAns
+                          ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
+                          : targetFound
+                          ? 'border-amber-400 bg-amber-100 text-amber-900 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.55)]'
+                          : 'border-dashed border-slate-300 bg-white text-slate-400 font-sans text-xs'
+                      }`}>
+                        {solvedAns ? <><SqrtText text={solvedAns} /><span className="text-xs ml-0.5">m</span></> : targetFound ? '? m' : '先掃描'}
+                      </span>
+                    </>
+                  )}
+                  {question.scene === 'jeep' && (
+                    <>
+                      <span className="text-xs sm:text-sm font-sans font-bold text-cyan-800">
+                        {targetFound ? `等腰斜邊 ${question.walkDist}m ⇒ h = ${question.walkDist}·sin 60° =` : `前進 ${question.walkDist}m • 高塔高度 h =`}
+                      </span>
+                      <span className={`min-w-[72px] h-[30px] px-2 rounded-xl border-2 inline-flex items-center justify-center font-mono text-sm sm:text-base transition-colors ${
+                        solvedAns
+                          ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
+                          : targetFound
+                          ? 'border-amber-400 bg-amber-100 text-amber-900 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.55)]'
+                          : 'border-dashed border-slate-300 bg-white text-slate-400 font-sans text-xs'
+                      }`}>
+                        {solvedAns ? <><SqrtText text={solvedAns} /><span className="text-xs ml-0.5">m</span></> : targetFound ? '? m' : '先定位'}
+                      </span>
+                    </>
+                  )}
+                  {qPhase === 2 && (
+                    <>
+                      {targetFound && (
+                        <span className="text-xs sm:text-sm font-mono font-black text-indigo-800 bg-indigo-100/80 border border-indigo-200 px-2 py-0.5 rounded-lg">
+                          {question.eqHint}
+                        </span>
+                      )}
+                      <span>{question.scene === 'sea_sine' ? '⇒ BC =' : '⇒ AB ='}</span>
+                      <span className={`min-w-[72px] h-[30px] px-2 rounded-xl border-2 inline-flex items-center justify-center font-mono text-sm sm:text-base transition-colors ${
+                        solvedAns
+                          ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
+                          : targetFound
+                          ? 'border-amber-400 bg-amber-100 text-amber-900 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.55)]'
+                          : 'border-dashed border-slate-300 bg-white text-slate-400 font-sans text-xs'
+                      }`}>
+                        {solvedAns ? <><SqrtText text={solvedAns} /><span className="text-xs ml-0.5">m</span></> : targetFound ? '? m' : '先選定理'}
+                      </span>
+                    </>
+                  )}
                 </div>
 
                 {/* 暗夜實景互動畫板 */}
@@ -19736,52 +19812,99 @@
                       {[[95,28],[160,20],[230,36],[295,22],[210,54],[312,62]].map(([sx,sy],i) => (
                         <circle key={i} cx={sx} cy={sy} r="1.4" fill="#e0f2fe" opacity="0.65" />
                       ))}
-                      <rect x="0" y="198" width="340" height="44" fill="#0c4a6e" opacity="0.7" />
-                      <line x1="0" y1="198" x2="340" y2="198" stroke="#38bdf8" strokeWidth="1.8" opacity="0.7" />
+                      <rect x="0" y="198" width="340" height="44" fill="#0c4a6e" opacity="0.72" />
+                      <line x1="0" y1="198" x2="340" y2="198" stroke="#38bdf8" strokeWidth="1.6" opacity="0.65" />
 
-                      {/* 燈塔剪影 */}
-                      <polygon points="44,198 51,72 65,72 72,198" fill="#334155" stroke="#94a3b8" strokeWidth="1.6" />
+                      {/* 燈塔剪影（鎖定後淡化退居背景，突顯中央幾何直角三角形） */}
+                      <polygon
+                        points="44,198 51,72 65,72 72,198"
+                        fill="#334155" stroke="#64748b" strokeWidth="1.4"
+                        opacity={targetFound ? 0.35 : 0.85}
+                      />
                       <rect x="49" y="56" width="18" height="16" rx="3" fill="#fef08a" stroke="#f59e0b" strokeWidth="1.8" />
-                      <text x="26" y="140" fill="#7dd3fc" fontSize="12" fontWeight="900" textAnchor="middle" className="font-mono">{question.towerH}m</text>
+                      <text x="26" y="138" fill="#7dd3fc" fontSize="13" fontWeight="900" textAnchor="middle" className="font-mono">{question.towerH}m</text>
 
                       {/* 水平視線虛線（明確定義俯角基準） */}
-                      <line x1="58" y1="66" x2="320" y2="66" stroke="#94a3b8" strokeWidth="1.6" strokeDasharray="5 4" opacity="0.65" />
+                      <line x1="58" y1="66" x2="322" y2="66" stroke="#94a3b8" strokeWidth="1.6" strokeDasharray="5 4" opacity="0.7" />
 
                       {/* 探照燈寬幅金色光錐 */}
                       <polygon
-                        points={`58,66 ${Math.max(70, beamHitX - 24)},198 ${Math.min(340, beamHitX + 24)},198`}
-                        fill={targetFound ? 'rgba(52,211,153,0.28)' : 'rgba(253,224,71,0.24)'}
+                        points={`58,66 ${Math.max(70, beamHitX - 22)},198 ${Math.min(340, beamHitX + 22)},198`}
+                        fill={targetFound ? 'rgba(52,211,153,0.18)' : 'rgba(253,224,71,0.22)'}
                       />
-                      <line x1="58" y1="66" x2={beamHitX} y2="198" stroke={targetFound ? '#34d399' : '#fde047'} strokeWidth="2.6" strokeDasharray="6 3" />
+
+                      {/* 鎖定瞬間顯影：完整幾何直角三角形（垂直塔高＋直角符號＋水平船距雙箭頭＋小船仰角） */}
+                      {targetFound && (
+                        <g>
+                          {/* 直角三角形半透明填充 */}
+                          <polygon points={`58,66 58,198 ${question.boatX},198`} fill="rgba(56,189,248,0.12)" />
+                          {/* 垂直塔高中軸線 */}
+                          <line x1="58" y1="66" x2="58" y2="198" stroke="#38bdf8" strokeWidth="3.2" strokeLinecap="round" />
+                          {/* 塔底直角符號 ∟ */}
+                          <polyline points="58,186 70,186 70,198" fill="none" stroke="#38bdf8" strokeWidth="2.2" />
+                          {/* 水平船距雙箭頭測距線（燈塔底 ↔ 小船） */}
+                          <line x1="60" y1="198" x2={question.boatX - 2} y2="198" stroke="#34d399" strokeWidth="3.6" />
+                          <polygon points="58,198 67,194 67,202" fill="#34d399" />
+                          <polygon points={`${question.boatX},198 ${question.boatX - 9},194 ${question.boatX - 9},202`} fill="#34d399" />
+                          {/* 小船處內錯角（仰角扇形） */}
+                          {(() => {
+                            const rA = 34;
+                            const rad = (question.targetDep * Math.PI) / 180;
+                            const ax = question.boatX - rA * Math.cos(rad);
+                            const ay = 198 - rA * Math.sin(rad);
+                            return (
+                              <>
+                                <path
+                                  d={`M ${question.boatX} 198 L ${question.boatX - rA} 198 A ${rA} ${rA} 0 0 1 ${ax.toFixed(1)} ${ay.toFixed(1)} Z`}
+                                  fill="rgba(52,211,153,0.34)" stroke="#34d399" strokeWidth="1.8"
+                                />
+                                <text
+                                  x={question.boatX - 54}
+                                  y={question.targetDep === 60 ? 184 : 188}
+                                  fill="#6ee7b7" fontSize="11.5" fontWeight="900" textAnchor="middle" className="font-mono"
+                                >
+                                  仰角 {question.targetDep}°
+                                </text>
+                              </>
+                            );
+                          })()}
+                          {/* 水平船距標籤置於燈塔底與小船正中下方 */}
+                          <g transform={`translate(${(58 + question.boatX) / 2}, 220)`}>
+                            <rect x="-42" y="-11" width="84" height="22" rx="8" fill="#064e3b" stroke="#34d399" strokeWidth="1.6" />
+                            <text x="0" y="4" fill="#a7f3d0" fontSize="12" fontWeight="900" textAnchor="middle" className="font-mono">
+                              {solvedAns ? `d = ${solvedAns}m` : '水平距 d = ?'}
+                            </text>
+                          </g>
+                        </g>
+                      )}
+
+                      {/* 探照燈斜邊光束主線 */}
+                      <line x1="58" y1="66" x2={targetFound ? question.boatX : beamHitX} y2="198" stroke={targetFound ? '#34d399' : '#fde047'} strokeWidth="2.8" strokeDasharray={targetFound ? undefined : '6 3'} />
 
                       {/* 俯角扇形（從水平視線往下） */}
                       <path
-                        d={`M 58 66 L 104 66 A 46 46 0 0 1 ${58 + 46 * Math.cos(beamDep * Math.PI / 180)} ${66 + 46 * Math.sin(beamDep * Math.PI / 180)} Z`}
-                        fill={targetFound ? 'rgba(52,211,153,0.38)' : 'rgba(251,191,36,0.35)'}
+                        d={`M 58 66 L 104 66 A 46 46 0 0 1 ${(58 + 46 * Math.cos(beamDep * Math.PI / 180)).toFixed(1)} ${(66 + 46 * Math.sin(beamDep * Math.PI / 180)).toFixed(1)} Z`}
+                        fill={targetFound ? 'rgba(52,211,153,0.36)' : 'rgba(251,191,36,0.34)'}
                         stroke={targetFound ? '#34d399' : '#fbbf24'}
                         strokeWidth="1.8"
                       />
-                      <text x="122" y="84" fill={targetFound ? '#6ee7b7' : '#fde047'} fontSize="13.5" fontWeight="900" className="font-mono">
+                      <text x={beamDep >= 52 ? 128 : 122} y={beamDep >= 52 ? 82 : 84} fill={targetFound ? '#6ee7b7' : '#fde047'} fontSize="13.5" fontWeight="900" className="font-mono">
                         俯角 {beamDep}°
                       </text>
 
-                      {/* 黑暗中隱藏的小船（未照到時微弱雷達閃點，照到瞬間發亮！） */}
+                      {/* 黑暗中隱藏的小船 */}
                       <g transform={`translate(${question.boatX}, 198)`}>
                         {!targetFound && (
                           <circle r="16" fill="none" stroke="#38bdf8" strokeWidth="1.6" className="animate-ping" opacity="0.45" />
                         )}
                         <polygon
-                          points="-15,0 15,0 10,8 -10,8"
+                          points="-14,0 14,0 9,7 -9,7"
                           fill={targetFound ? '#fbbf24' : '#1e293b'}
                           stroke={targetFound ? '#ffffff' : '#38bdf8'}
                           strokeWidth="1.8"
                         />
-                        <polygon points="-2,0 -2,-16 11,-4" fill={targetFound ? '#fef3c7' : '#334155'} opacity={targetFound ? 1 : 0.45} />
-                        {targetFound && (
-                          <text x="0" y="23" fill="#6ee7b7" fontSize="12" fontWeight="900" textAnchor="middle" className="font-mono">
-                            {solvedAns ? `d = ${solvedAns}m` : 'd = ?'}
-                          </text>
-                        )}
+                        <polygon points="-2,0 -2,-15 10,-4" fill={targetFound ? '#fef3c7' : '#334155'} opacity={targetFound ? 1 : 0.45} />
+                        <circle cx="0" cy="0" r="3" fill={targetFound ? '#34d399' : '#38bdf8'} />
                       </g>
                     </svg>
                   )}
@@ -19798,33 +19921,42 @@
                       className={`w-full h-full max-w-[440px] object-contain select-none touch-none ${!targetFound ? 'cursor-ew-resize' : 'cursor-pointer'}`}
                     >
                       <rect x="0" y="198" width="340" height="44" fill="#1e293b" />
-                      <line x1="16" y1="198" x2="324" y2="198" stroke="#64748b" strokeWidth="2.5" />
+                      <line x1="12" y1="198" x2="328" y2="198" stroke="#64748b" strokeWidth="2.5" />
 
-                      {/* 高塔 */}
-                      <line x1="268" y1="62" x2="268" y2="198" stroke={solvedAns ? '#34d399' : '#38bdf8'} strokeWidth="5.5" strokeLinecap="round" />
+                      {/* 高塔與塔底直角符號 ∟ */}
+                      <line x1="268" y1="62" x2="268" y2="198" stroke={solvedAns ? '#34d399' : '#38bdf8'} strokeWidth="5" strokeLinecap="round" />
+                      <polyline points="256,198 256,186 268,186" fill="none" stroke="#38bdf8" strokeWidth="2" />
                       <circle cx="268" cy="62" r="5" fill="#fde047" />
-                      <text x="302" y="134" fill={solvedAns ? '#6ee7b7' : '#7dd3fc'} fontSize="14" fontWeight="900" textAnchor="middle" className="font-mono">
+                      <text x="304" y="134" fill={solvedAns ? '#6ee7b7' : '#7dd3fc'} fontSize="14" fontWeight="900" textAnchor="middle" className="font-mono">
                         {solvedAns ? `${solvedAns}m` : 'h = ?'}
                       </text>
 
-                      {/* 起點 30° 淡虛線與定位點 60° 標記 */}
-                      <line x1="52" y1="198" x2="268" y2="62" stroke="#64748b" strokeWidth="1.8" strokeDasharray="5 4" />
-                      <circle cx="52" cy="198" r="4" fill="#94a3b8" />
-                      <text x="72" y="190" fill="#94a3b8" fontSize="11.5" fontWeight="900" className="font-mono">30°</text>
+                      {/* 起點精準 30°（x=32）淡虛線與 60° 定位點 */}
+                      <line x1="32" y1="198" x2="268" y2="62" stroke="#94a3b8" strokeWidth="1.8" strokeDasharray="5 4" />
+                      <circle cx="32" cy="198" r="4" fill="#94a3b8" />
+                      <text x="58" y="190" fill="#cbd5e1" fontSize="12" fontWeight="900" className="font-mono">30°</text>
                       <circle cx="190" cy="198" r="8" fill="none" stroke="#fbbf24" strokeWidth="2" strokeDasharray="3 2" opacity={targetFound ? 0 : 0.85} />
 
-                      {/* 定位後亮出等腰三角形印證 */}
+                      {/* 定位後亮出外側 30°-30° 等腰三角形＋頂角 30°＋等長雙撇記號 */}
                       {targetFound && (
-                        <>
-                          <polygon points="52,198 190,198 268,62" fill="rgba(251,191,36,0.18)" />
-                          <line x1="52" y1="198" x2="190" y2="198" stroke="#fbbf24" strokeWidth="4" />
-                          <text x="120" y="218" fill="#fde047" fontSize="13" fontWeight="900" textAnchor="middle" className="font-mono">前進 {question.walkDist}m</text>
-                          <text x="206" y="118" fill="#fde047" fontSize="12.5" fontWeight="900" textAnchor="middle" className="font-mono">={question.walkDist}m</text>
-                        </>
+                        <g>
+                          <polygon points="32,198 190,198 268,62" fill="rgba(251,191,36,0.16)" />
+                          <line x1="32" y1="198" x2="190" y2="198" stroke="#fbbf24" strokeWidth="4" />
+                          {/* 底部前進段等長雙撇（x=111, y=198） */}
+                          <line x1="108" y1="193" x2="108" y2="203" stroke="#fef08a" strokeWidth="2" />
+                          <line x1="114" y1="193" x2="114" y2="203" stroke="#fef08a" strokeWidth="2" />
+                          {/* 內側斜邊等長雙撇（中點 (229, 130)） */}
+                          <line x1="224" y1="126" x2="233" y2="131" stroke="#fef08a" strokeWidth="2" />
+                          <line x1="221" y1="131" x2="230" y2="136" stroke="#fef08a" strokeWidth="2" />
+                          {/* 頂角 30° 標示，讓學生一眼看出 30° = 30° 等腰 */}
+                          <text x="234" y="88" fill="#fde047" fontSize="11.5" fontWeight="900" textAnchor="middle" className="font-mono">30°</text>
+                          <text x="111" y="220" fill="#fde047" fontSize="13" fontWeight="900" textAnchor="middle" className="font-mono">前進 {question.walkDist}m</text>
+                          <text x="202" y="122" fill="#fde047" fontSize="13" fontWeight="900" textAnchor="middle" className="font-mono">{question.walkDist}m</text>
+                        </g>
                       )}
 
                       {/* 測繪車雷射光束 */}
-                      <line x1={jeepX} y1="188" x2="268" y2="62" stroke={targetFound ? '#34d399' : '#fbbf24'} strokeWidth="3.2" />
+                      <line x1={jeepX} y1="198" x2="268" y2="62" stroke={targetFound ? '#34d399' : '#fbbf24'} strokeWidth="3.2" />
                       <text x={jeepX + 20} y="182" fill={targetFound ? '#6ee7b7' : '#fde047'} fontSize="13" fontWeight="900" className="font-mono">
                         {targetFound ? '60°' : `${jeepElevDeg}°`}
                       </text>
@@ -19843,47 +19975,92 @@
 
                   {(question.scene === 'sea_sine' || question.scene === 'sea_cos') && (
                     <svg viewBox="0 0 340 242" className="w-full h-full max-w-[440px] object-contain select-none">
-                      {/* 暗夜雷達群島圖 */}
-                      <circle cx="170" cy="121" r="102" fill="rgba(6,78,59,0.22)" stroke="rgba(52,211,153,0.35)" strokeWidth="1.4" />
-                      <circle cx="170" cy="121" r="64" fill="none" stroke="rgba(52,211,153,0.25)" strokeWidth="1.2" strokeDasharray="4 4" />
-                      <polygon points="74,186 266,186 182,52" fill="rgba(56,189,248,0.12)" stroke="#38bdf8" strokeWidth="2.4" strokeDasharray="5 4" />
-                      <circle cx="74" cy="186" r="13" fill="#059669" stroke="#6ee7b7" strokeWidth="2" />
-                      <circle cx="266" cy="186" r="13" fill="#059669" stroke="#6ee7b7" strokeWidth="2" />
-                      <circle cx="182" cy="52" r="14" fill="#d97706" stroke="#fde047" strokeWidth="2" />
-                      <text x="74" y="190" fill="#ffffff" fontSize="12" fontWeight="900" textAnchor="middle">A</text>
-                      <text x="266" y="190" fill="#ffffff" fontSize="12" fontWeight="900" textAnchor="middle">B</text>
-                      <text x="182" y="56" fill="#ffffff" fontSize="12" fontWeight="900" textAnchor="middle">{question.scene === 'sea_cos' ? 'P' : 'C'}</text>
+                      {/* 極淡航海經緯方格海圖背景（移除易誤導的同心圓） */}
+                      {[40, 85, 130, 175, 220, 265, 310].map(gx => (
+                        <line key={`gx-${gx}`} x1={gx} y1="10" x2={gx} y2="232" stroke="#38bdf8" strokeWidth="0.7" opacity="0.12" />
+                      ))}
+                      {[35, 80, 125, 170, 215].map(gy => (
+                        <line key={`gy-${gy}`} x1="10" y1={gy} x2="330" y2={gy} stroke="#38bdf8" strokeWidth="0.7" opacity="0.12" />
+                      ))}
+
+                      {/* 三座小島柔邊輪廓＋海浪外暈（底層氛圍，不遮擋三角形頂點） */}
+                      {[
+                        { cx: 74, cy: 186, d: 'M -24,4 C -26,-10 -12,-20 4,-17 C 18,-15 26,-4 22,9 C 17,20 -16,20 -24,4 Z', fill: '#065f46', stroke: '#34d399' },
+                        { cx: 266, cy: 186, d: 'M -22,6 C -25,-8 -10,-19 6,-16 C 21,-13 26,-1 20,11 C 14,21 -14,19 -22,6 Z', fill: '#065f46', stroke: '#34d399' },
+                        { cx: 182, cy: 52, d: 'M -23,3 C -24,-11 -9,-21 7,-17 C 21,-13 26,0 19,12 C 12,21 -15,18 -23,3 Z', fill: '#78350f', stroke: '#fbbf24' }
+                      ].map((isl, idx) => (
+                        <g key={idx} transform={`translate(${isl.cx}, ${isl.cy})`}>
+                          <path d={isl.d} transform="scale(1.22)" fill="none" stroke="#38bdf8" strokeWidth="1.2" strokeDasharray="3 4" opacity="0.32" />
+                          <path d={isl.d} fill={isl.fill} fillOpacity="0.65" stroke={isl.stroke} strokeWidth="1.4" opacity="0.85" />
+                        </g>
+                      ))}
+
+                      {/* 測距三角形底面 */}
+                      <polygon points="74,186 266,186 182,52" fill="rgba(56,189,248,0.10)" stroke="#38bdf8" strokeWidth="2" strokeDasharray="5 4" />
 
                       {question.scene === 'sea_sine' ? (
                         <>
                           <line x1="74" y1="186" x2="266" y2="186" stroke="#fbbf24" strokeWidth="3.8" />
                           <line x1="266" y1="186" x2="182" y2="52" stroke={solvedAns ? '#34d399' : '#38bdf8'} strokeWidth="4.2" />
-                          <text x="170" y="208" fill="#fde047" fontSize="13.5" fontWeight="900" textAnchor="middle" className="font-mono">{question.ab}m</text>
-                          <text x="108" y="174" fill="#7dd3fc" fontSize="13" fontWeight="900" className="font-mono">{question.angA}°</text>
-                          <text x="182" y="86" fill="#fde047" fontSize="13" fontWeight="900" textAnchor="middle" className="font-mono">{question.angC}°</text>
-                          <text x="252" y="116" fill={solvedAns ? '#6ee7b7' : '#7dd3fc'} fontSize="14" fontWeight="900" textAnchor="middle" className="font-mono">{solvedAns ? `${solvedAns}m` : 'BC = ?'}</text>
+                          {/* 已知角度弧線（∠A 與 ∠C） */}
+                          <path d="M 102 186 A 28 28 0 0 0 92 164" fill="none" stroke="#38bdf8" strokeWidth="2.4" />
+                          <path d="M 164 74 A 28 28 0 0 0 197 76" fill="none" stroke="#fbbf24" strokeWidth="2.4" />
+                          <text x="170" y="210" fill="#fde047" fontSize="14" fontWeight="900" textAnchor="middle" className="font-mono">{question.ab}m</text>
+                          <text x="116" y="176" fill="#7dd3fc" fontSize="13.5" fontWeight="900" className="font-mono">{question.angA}°</text>
+                          <text x="182" y="92" fill="#fde047" fontSize="13.5" fontWeight="900" textAnchor="middle" className="font-mono">{question.angC}°</text>
+                          <text x="252" y="114" fill={solvedAns ? '#6ee7b7' : '#7dd3fc'} fontSize="14.5" fontWeight="900" textAnchor="middle" className="font-mono">{solvedAns ? `${solvedAns}m` : 'BC = ?'}</text>
                         </>
                       ) : (
                         <>
                           <line x1="182" y1="52" x2="74" y2="186" stroke="#2dd4bf" strokeWidth="3.8" />
                           <line x1="182" y1="52" x2="266" y2="186" stroke="#2dd4bf" strokeWidth="3.8" />
                           <line x1="74" y1="186" x2="266" y2="186" stroke={solvedAns ? '#34d399' : '#fbbf24'} strokeWidth="4.2" />
-                          <text x="108" y="116" fill="#99f6e4" fontSize="13" fontWeight="900" textAnchor="middle" className="font-mono">{question.pa}m</text>
-                          <text x="242" y="116" fill="#99f6e4" fontSize="13" fontWeight="900" textAnchor="middle" className="font-mono">{question.pb}m</text>
-                          <text x="182" y="88" fill="#fde047" fontSize="13.5" fontWeight="900" textAnchor="middle" className="font-mono">{question.deg}°</text>
-                          <text x="170" y="210" fill={solvedAns ? '#6ee7b7' : '#fde047'} fontSize="14" fontWeight="900" textAnchor="middle" className="font-mono">{solvedAns ? `AB = ${solvedAns}m` : 'AB = ?'}</text>
+                          {/* 已知夾角弧線 ∠P */}
+                          <path d="M 164 74 A 28 28 0 0 0 197 76" fill="none" stroke="#fbbf24" strokeWidth="2.4" />
+                          <text x="104" y="114" fill="#99f6e4" fontSize="13.5" fontWeight="900" textAnchor="middle" className="font-mono">{question.pa}m</text>
+                          <text x="246" y="114" fill="#99f6e4" fontSize="13.5" fontWeight="900" textAnchor="middle" className="font-mono">{question.pb}m</text>
+                          <text x="182" y="92" fill="#fde047" fontSize="14" fontWeight="900" textAnchor="middle" className="font-mono">{question.deg}°</text>
+                          <text x="170" y="212" fill={solvedAns ? '#6ee7b7' : '#fde047'} fontSize="14.5" fontWeight="900" textAnchor="middle" className="font-mono">{solvedAns ? `AB = ${solvedAns}m` : 'AB = ?'}</text>
                         </>
                       )}
+
+                      {/* 島嶼正中央的精準測繪燈標頂點（確保三角形交點清晰無比） */}
+                      <circle cx="74" cy="186" r="10.5" fill="#059669" stroke="#ecfdf5" strokeWidth="2" />
+                      <circle cx="266" cy="186" r="10.5" fill="#059669" stroke="#ecfdf5" strokeWidth="2" />
+                      <circle cx="182" cy="52" r="11" fill="#d97706" stroke="#fef3c7" strokeWidth="2" />
+                      <text x="74" y="190" fill="#ffffff" fontSize="11.5" fontWeight="900" textAnchor="middle">A</text>
+                      <text x="266" y="190" fill="#ffffff" fontSize="11.5" fontWeight="900" textAnchor="middle">B</text>
+                      <text x="182" y="56" fill="#ffffff" fontSize="11.5" fontWeight="900" textAnchor="middle">{question.scene === 'sea_cos' ? 'P' : 'C'}</text>
                     </svg>
                   )}
                 </div>
 
+                {/* 統一貼底滿寬固定高度深色機台條（P0/P1 掃描提示 ↔ 4 選 1；P2 選定理 ↔ 4 選 1，全程 0px 零跳動） */}
                 <div className="bg-slate-900 border-t-2 border-slate-800 px-2.5 py-2.5 shrink-0">
-                  {!targetFound ? (
-                    <div className="h-[46px] flex items-center justify-center text-xs font-black text-amber-300 tracking-wide">
+                  {!targetFound && qPhase < 2 ? (
+                    <div className="h-[46px] flex items-center justify-center text-xs sm:text-sm font-black text-amber-300 tracking-wide">
                       {question.scene === 'searchlight'
                         ? '🔦 在畫板上拖曳探照燈光束，照亮黑暗中的迷航小船！'
                         : '🚙 按住小測繪車向右拖曳前進，直到雷射仰角達到 60°！'}
+                    </div>
+                  ) : !targetFound && qPhase === 2 ? (
+                    <div data-coach="lv18-law-opts" className="grid grid-cols-2 gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => handlePickLaw('sine')}
+                        className={`h-[46px] rounded-xl bg-gradient-to-b from-sky-400 to-indigo-600 border-b-[3px] border-indigo-900 text-white font-black text-sm shadow flex flex-col items-center justify-center leading-tight active:scale-95 transition-all hover:brightness-110 ${wrongLaw === 'sine' ? 'btn-wrong-flash' : ''}`}
+                      >
+                        <span>⚡ 正弦定理</span>
+                        <span className="text-[10px] font-bold text-sky-100">已知對邊與對角</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePickLaw('cos')}
+                        className={`h-[46px] rounded-xl bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-black text-sm shadow flex flex-col items-center justify-center leading-tight active:scale-95 transition-all hover:brightness-105 ${wrongLaw === 'cos' ? 'btn-wrong-flash' : ''}`}
+                      >
+                        <span>📐 餘弦定理</span>
+                        <span className="text-[10px] font-bold text-amber-900">已知兩鄰邊一夾角</span>
+                      </button>
                     </div>
                   ) : (
                     <div data-coach="lv18-opts" className="grid grid-cols-4 gap-2">
@@ -19913,11 +20090,18 @@
                 mode={guideMode || 'spotlight'}
                 onDismiss={dismissGuide}
                 steps={guideMode === 'manual' ? [
-                  { desc: 'P0 暗夜燈塔：拖曳金色探照燈掃描海面照亮小船，依鎖定的俯角與塔高算出船距！' },
-                  { desc: 'P1 巡航測繪車：拖曳測繪車向右前進至仰角 60°，利用等腰三角形秒算塔高！' },
-                  { desc: 'P2 雷達群島：綜合正弦與餘弦定理求出島嶼距離。' }
+                  { desc: 'P0 暗夜燈塔：拖曳金色探照燈照亮小船，依顯影的直角三角形與仰角算出水平船距 d！' },
+                  { desc: 'P1 巡航測繪車：拖曳測繪車向右前進至仰角 60°，利用 30°-30° 等腰三角形算出塔高 h！' },
+                  { desc: 'P2 海圖群島：先判斷用「正弦」或「餘弦」定理，再依展開的算式選出島距！' }
                 ] : !targetFound ? [
-                  question.scene === 'jeep' ? {
+                  qPhase === 2 ? {
+                    target: 'lv18-law-opts',
+                    shape: 'pill',
+                    pad: 6,
+                    tap: false,
+                    placement: 'top',
+                    desc: '先看海圖已知條件，選擇要啟動「正弦定理」還是「餘弦定理」！（選錯不扣心）'
+                  } : question.scene === 'jeep' ? {
                     targets: [
                       { id: 'lv18-jeep', shape: 'circle', pad: 16 },
                       { id: 'lv18-scene', shape: 'rect', pad: 6 }
@@ -19935,7 +20119,7 @@
                     desc: '按住海面上下拖曳金色探照燈光束，照亮黑暗中的小船！'
                   }
                 ] : [
-                  { target: 'lv18-opts', shape: 'pill', pad: 6, tap: false, placement: 'top', desc: '已鎖定目標！請點選下方正確的測繪距離！' }
+                  { target: 'lv18-opts', shape: 'pill', pad: 6, tap: false, placement: 'top', desc: '參考上方算式提示，點選下方正確的測繪距離！' }
                 ]}
               />
             </div>
