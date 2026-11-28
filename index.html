@@ -5734,7 +5734,7 @@
 
     const Level4SpecialAnglesMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
-      const starsThreshold = [2, 4, 6];
+      const starsThreshold = [3, 6, 9];
       const maxLives = 3;
       const healTarget = 3;
       const {
@@ -9180,7 +9180,7 @@
     // ==================== 第 8 關組件：動徑星標 ====================
     const Level6VectorCompassMaster = ({ currentStars, onUpdateStars, onCompleteLevel, onBackToMap, hasSeenGuide = false, onMarkGuideSeen }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
-      const starsThreshold = [2, 4, 6];
+      const starsThreshold = [3, 6, 9];
       const maxLives = 3;
       const healTarget = 3;
       const {
@@ -16818,7 +16818,7 @@
 
     const Level15AreaBeamMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
-      const starsThreshold = [2, 4, 6];
+      const starsThreshold = [2, 5, 9];
       const maxLives = 3;
       const healTarget = 3;
       const {
@@ -16871,12 +16871,12 @@
       const buildDeck = () => {
         const p0Max = { ...shuffle([...LV15_AREA_P0_MAX])[0], phase: 0 };
         const p0Supp = { ...shuffle([...LV15_AREA_P0_SUPP])[0], phase: 0 };
-        const p1 = shuffle([...LV15_AREA_P1]).slice(0, 2).map(q => ({ ...q, phase: 1 }));
-        const p2Pair = shuffle([
-          { ...shuffle([...LV15_AREA_P2_ACUTE])[0], phase: 2 },
-          { ...shuffle([...LV15_AREA_P2_OBTUSE])[0], phase: 2 }
+        const p1 = shuffle([...LV15_AREA_P1]).slice(0, 3).map(q => ({ ...q, phase: 1 }));
+        const p2List = shuffle([
+          ...shuffle([...LV15_AREA_P2_ACUTE]).slice(0, 2).map(q => ({ ...q, phase: 2 })),
+          ...shuffle([...LV15_AREA_P2_OBTUSE]).slice(0, 2).map(q => ({ ...q, phase: 2 }))
         ]).map(q => ({ ...q, opts: shuffle([...q.opts]) }));
-        return [p0Max, p0Supp, ...p1, ...p2Pair];
+        return [p0Max, p0Supp, ...p1, ...p2List];
       };
 
       const nextQuestion = (curProg) => {
@@ -17795,6 +17795,73 @@
         ans: '6√3',
         opts: ['3√3', '6√2', '6√3', '12'],
         formula: '6 / sin 30° = 12 ⇒ x = 12 × sin 60° = 6√3'
+      },
+      // 新形態 A：鈍角正弦定理（120° / 150°）
+      {
+        id: 'sf2_5', mode: '2R', variant: 'obtuse',
+        pts: [[102, 178], [254, 178], [52, 76]],
+        edges: [
+          { idx: 2, label: '6√3', ok: true },
+          { idx: 0, label: '7', ok: false }
+        ],
+        angles: [
+          { v: 0, deg: '120°', ok: true }
+        ],
+        askLabel: 'R',
+        ans: '6',
+        opts: ['3', '6', '12', '6√3'],
+        hintEdge: '底邊 7 沒有給對角，請選與鈍角 120° 正對的邊 6√3！',
+        formula: 'sin 120° = sin 60° = √3/2 ⇒ 6√3 / (√3/2) = 12 = 2R ⇒ R = 6'
+      },
+      {
+        id: 'sf2_6', mode: 'ratio', variant: 'obtuse',
+        pts: [[104, 178], [258, 178], [54, 82]],
+        givenNum: '6', givenDen: '150°', givenEdgeIdx: 2, givenAngV: 0,
+        edges: [
+          { idx: 2, label: '6', ok: false, isGiven: true },
+          { idx: 1, label: 'x', ok: true }
+        ],
+        angles: [
+          { v: 0, deg: '150°', ok: false, isGiven: true },
+          { v: 1, deg: '45°', ok: true }
+        ],
+        askLabel: 'x',
+        ans: '6√2',
+        opts: ['3√2', '6√2', '6√3', '12'],
+        formula: 'sin 150° = ½ ⇒ 6 / ½ = 12 ⇒ x = 12 × sin 45° = 6√2'
+      },
+      // 新形態 B：已知外接圓半徑 R 反求對邊弦長 x（x = 2R · sin A）
+      {
+        id: 'sf2_7', mode: '2R', variant: 'knownR', knownR: 6,
+        pts: [[86, 176], [234, 176], [182, 48]],
+        edges: [
+          { idx: 1, label: 'x', ok: true },
+          { idx: 0, label: '9', ok: false }
+        ],
+        angles: [
+          { v: 1, deg: '60°', ok: true }
+        ],
+        askLabel: 'x',
+        ans: '6√3',
+        opts: ['3√3', '6', '6√3', '12'],
+        hintEdge: '已知 R = 6，底邊 9 沒有給頂角，請選與 60° 正對的未知弦 x！',
+        formula: 'x / sin 60° = 2R = 12 ⇒ x = 12 × (√3/2) = 6√3'
+      },
+      {
+        id: 'sf2_8', mode: '2R', variant: 'knownR', knownR: 5,
+        pts: [[106, 178], [252, 178], [54, 86]],
+        edges: [
+          { idx: 2, label: 'x', ok: true },
+          { idx: 0, label: '7', ok: false }
+        ],
+        angles: [
+          { v: 0, deg: '150°', ok: true }
+        ],
+        askLabel: 'x',
+        ans: '5',
+        opts: ['5', '5√2', '5√3', '10'],
+        hintEdge: '已知 R = 5，請選與鈍角 150° 正對的未知弦 x！',
+        formula: 'x / sin 150° = 2R = 10 ⇒ x = 10 × ½ = 5'
       }
     ];
 
@@ -17822,7 +17889,7 @@
 
     const Level16SineBridgeMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
-      const starsThreshold = [2, 4, 6];
+      const starsThreshold = [2, 5, 9];
       const maxLives = 3;
       const healTarget = 3;
       const {
@@ -17870,13 +17937,26 @@
         fn();
       };
 
-      // P0：2 題外接圓物理探索（30° → 45°）｜P1：1 題對邊對角比例 ＋ 1 題外接圓 2R（不限邊角順序）｜P2：2 題列式＋心算
-      const buildDeck = () => [
-        ...LV16_SINE_P0_EXPLORE.map(q => ({ ...q, phase: 0 })),
-        { ...shuffle([...LV16_SINE_P0])[0], phase: 1 },
-        { ...shuffle([...LV16_SINE_P1])[0], phase: 1 },
-        ...shuffle([...LV16_SINE_P2]).slice(0, 2).map(q => ({ ...q, phase: 2, opts: shuffle([...q.opts]) }))
-      ];
+      // P0：2 題外接圓物理探索（30° → 45°）｜P1：3 題防干擾列式（比例與 2R 混出）｜P2：4 題列式＋心算（必含銳角、鈍角與已知 R 反求弦長）
+      const buildDeck = () => {
+        const p1RatioCnt = Math.random() < 0.5 ? 2 : 1;
+        const p1List = shuffle([
+          ...shuffle([...LV16_SINE_P0]).slice(0, p1RatioCnt).map(q => ({ ...q, phase: 1 })),
+          ...shuffle([...LV16_SINE_P1]).slice(0, 3 - p1RatioCnt).map(q => ({ ...q, phase: 1 }))
+        ]);
+        const p2Classic = shuffle(LV16_SINE_P2.filter(q => !q.variant));
+        const p2Obtuse = shuffle(LV16_SINE_P2.filter(q => q.variant === 'obtuse'));
+        const p2KnownR = shuffle(LV16_SINE_P2.filter(q => q.variant === 'knownR'));
+        const p2Picked = [p2Classic[0], p2Obtuse[0], p2KnownR[0]];
+        const p2Rest = shuffle([...p2Classic.slice(1), ...p2Obtuse.slice(1), ...p2KnownR.slice(1)]);
+        p2Picked.push(p2Rest[0]);
+        const p2List = shuffle(p2Picked).map(q => ({ ...q, phase: 2, opts: shuffle([...q.opts]) }));
+        return [
+          ...LV16_SINE_P0_EXPLORE.map(q => ({ ...q, phase: 0 })),
+          ...p1List,
+          ...p2List
+        ];
+      };
 
       const nextQuestion = (curProg) => {
         const q = deckRef.current[Math.min(curProg, deckRef.current.length - 1)] || buildDeck()[0];
@@ -18134,6 +18214,8 @@
                   <div className="flex-1 text-center font-black text-xs sm:text-sm text-sky-50 leading-snug">
                     {isDragPhase
                       ? `沿外接圓拖曳金球 A，讓一邊穿過圓心形成直徑 2R！`
+                      : question.knownR
+                      ? `已知外接圓半徑 R = ${question.knownR}！點選「未知弦 x」與「對角」填入 = 2R！`
                       : question.mode === '2R'
                       ? '不限順序！點選圖上「已知對邊」與「對角」填入 = 2R！'
                       : '不限順序！點選圖上互為正對的「對邊」與「對角」完成比例！'}
@@ -18203,7 +18285,9 @@
                       {question.mode === '2R' && (
                         <>
                           <span className="text-slate-400 text-lg">=</span>
-                          <span className="text-amber-700 font-mono text-base sm:text-lg">2R</span>
+                          <span className="text-amber-700 font-mono text-base sm:text-lg">
+                            {question.knownR ? `2R=${question.knownR * 2}` : '2R'}
+                          </span>
                         </>
                       )}
 
@@ -18509,7 +18593,14 @@
                             <text x={diamLbl.x} y={diamLbl.y + 0.8 * s} fill="#b45309" fontSize={11 * s} fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">2R</text>
                           </g>
                         ) : radLbl ? (
-                          <text x={radLbl.x} y={radLbl.y} fill="#0369a1" fontSize={11 * s} fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-serif italic pointer-events-none">R</text>
+                          question.knownR ? (
+                            <g className="pointer-events-none">
+                              <rect x={radLbl.x - 19 * s} y={radLbl.y - 9.5 * s} width={38 * s} height={19 * s} rx={9.5 * s} fill="#e0f2fe" stroke="#0284c7" strokeWidth={1.4 * s} />
+                              <text x={radLbl.x} y={radLbl.y + 0.6 * s} fill="#0369a1" fontSize={10 * s} fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">R={question.knownR}</text>
+                            </g>
+                          ) : (
+                            <text x={radLbl.x} y={radLbl.y} fill="#0369a1" fontSize={11 * s} fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-serif italic pointer-events-none">R</text>
+                          )
                         ) : null)}
                         {angleGeos.map(({ ang, ac }) => {
                           const isHighlight = pickedAngle?.v === ang.v || (isSolved && ang.ok);
@@ -18838,6 +18929,39 @@
         ans: '5',
         opts: ['5', '√7', '7', '√13'],
         formula: 'x² = 3² + 4² − 2·3·4·0 = 25 ⇒ x = 5（90° 時餘弦定理直接退化成畢氏定理！）'
+      },
+      // 新形態：SSS 給三邊反求 cos θ 心算（鈍角 −1/2 與銳角 +1/2）
+      {
+        id: 'c2_5', mode: 'cos', needCalc: true,
+        pts: [[62, 178], [280, 178], [148, 46]],
+        edges: [
+          { id: 'e01', label: '7', role: 'opp' },
+          { id: 'e12', label: '5', role: 'adj' },
+          { id: 'e20', label: '3', role: 'adj' }
+        ],
+        angles: [
+          { id: 'v2', label: 'θ', role: 'target' }
+        ],
+        cosHint: '分子 = 3² + 5² − 7²',
+        ans: '-1/2',
+        opts: ['-1/2', '1/2', '-1/3', '1/3'],
+        formula: 'cos θ = (9 + 25 − 49) / (2·3·5) = −15 / 30 = −½（θ = 120° 鈍角！）'
+      },
+      {
+        id: 'c2_6', mode: 'cos', needCalc: true,
+        pts: [[68, 178], [282, 162], [118, 46]],
+        edges: [
+          { id: 'e01', label: '8', role: 'adj' },
+          { id: 'e20', label: '3', role: 'adj' },
+          { id: 'e12', label: '7', role: 'opp' }
+        ],
+        angles: [
+          { id: 'v0', label: 'θ', role: 'target' }
+        ],
+        cosHint: '分子 = 3² + 8² − 7²',
+        ans: '1/2',
+        opts: ['1/2', '-1/2', '1/4', '3/4'],
+        formula: 'cos θ = (9 + 64 − 49) / (2·3·8) = 24 / 48 = ½（θ = 60° 銳角！）'
       }
     ];
 
@@ -18865,7 +18989,7 @@
 
     const Level17CosineScaleMaster = ({ currentStars, hasSeenGuide = false, onMarkGuideSeen, onUpdateStars, onCompleteLevel, onBackToMap }) => {
       const { isRelaxMode } = React.useContext(GameModeContext);
-      const starsThreshold = [2, 4, 6];
+      const starsThreshold = [2, 5, 9];
       const maxLives = 3;
       const healTarget = 3;
       const {
@@ -18915,13 +19039,22 @@
         fn();
       };
 
-      // P0：2 題物理探索（90° 畢氏退化 → 120° 鈍角變長）｜P1：1 題防干擾求邊 ＋ 1 題反求 cos θ（不限順序）｜P2：2 題列式＋輕量心算
-      const buildDeck = () => [
-        ...LV17_COS_P0_EXPLORE.map(q => ({ ...q, phase: 0 })),
-        { ...shuffle([...LV17_COS_P1_SIDE])[0], phase: 1 },
-        { ...shuffle([...LV17_COS_P1_COS])[0], phase: 1 },
-        ...shuffle([...LV17_COS_P2]).slice(0, 2).map(q => ({ ...q, phase: 2, shuffledOpts: shuffle([...q.opts]) }))
-      ];
+      // P0：2 題物理探索（90° 畢氏退化 → 120° 鈍角變長）｜P1：3 題防干擾求邊與反求 cos θ｜P2：4 題列式＋心算（2 題求邊長 x ＋ 2 題反求 cos θ）
+      const buildDeck = () => {
+        const p1SideCnt = Math.random() < 0.5 ? 2 : 1;
+        const p1List = shuffle([
+          ...shuffle([...LV17_COS_P1_SIDE]).slice(0, p1SideCnt).map(q => ({ ...q, phase: 1 })),
+          ...shuffle([...LV17_COS_P1_COS]).slice(0, 3 - p1SideCnt).map(q => ({ ...q, phase: 1 }))
+        ]);
+        const p2Side = shuffle(LV17_COS_P2.filter(q => q.mode === 'side')).slice(0, 2);
+        const p2Cos = shuffle(LV17_COS_P2.filter(q => q.mode === 'cos')).slice(0, 2);
+        const p2List = shuffle([...p2Side, ...p2Cos]).map(q => ({ ...q, phase: 2, shuffledOpts: shuffle([...q.opts]) }));
+        return [
+          ...LV17_COS_P0_EXPLORE.map(q => ({ ...q, phase: 0 })),
+          ...p1List,
+          ...p2List
+        ];
+      };
 
       const nextQuestion = (curProg) => {
         const q = deckRef.current[Math.min(curProg, deckRef.current.length - 1)] || buildDeck()[0];
@@ -19138,7 +19271,13 @@
         if (opt === question.ans) {
           triggerSuccess(opt);
         } else {
-          triggerWrong(`代入 ${question.cosHint} 再心算一次 x²，最後記得開根號求 x 喔！`, null, opt);
+          triggerWrong(
+            isSideMode
+              ? `代入 ${question.cosHint} 再心算一次 x²，最後記得開根號求 x 喔！`
+              : `再算一次分子（${question.cosHint}）除以分母 2ab 約分看看喔！`,
+            null,
+            opt
+          );
         }
       };
 
@@ -19184,7 +19323,9 @@
                       ? (isSideMode
                           ? '不限順序！點擊圖中「兩條鄰邊」與「夾角」自動同步代入！'
                           : '不限順序！點擊「兩鄰邊」與「θ 的對邊（放減號後）」！')
-                      : (question.needCalc && !solvedAns ? `公式完成！搭配 ${question.cosHint} 心算選出 x` : '餘弦定理公式代入完成！')}
+                      : (question.needCalc && !solvedAns
+                          ? (isSideMode ? `公式完成！搭配 ${question.cosHint} 心算選出 x` : '公式完成！心算分子除以分母選出 cos θ')
+                          : '餘弦定理公式代入完成！')}
                   </div>
                   <span className="w-6 h-6 inline-flex items-center justify-center shrink-0">
                     <SuccessBadge show={Boolean(solvedAns)} />
@@ -19632,12 +19773,12 @@
                   <div className="bg-slate-900 border-t-2 border-slate-800 px-2.5 py-2 shrink-0">
                     {!formulaDone ? (
                       <div className="h-[46px] rounded-xl bg-slate-800/90 border border-slate-700 flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-amber-200">
-                        <span>👆 點選圖中的「兩條鄰邊」與「夾角」（順序不限）完成餘弦公式</span>
+                        <span>{isSideMode ? '👆 點選圖中的「兩條鄰邊」與「夾角」（順序不限）完成餘弦公式' : '👆 點選圖中的「兩鄰邊」與「θ 的對邊（放減號後）」完成餘弦公式'}</span>
                       </div>
                     ) : (
                       <div data-coach="lv17-opts" className="flex flex-col gap-1.5">
                         <div className="flex items-center justify-between px-1 text-[11px] font-bold text-amber-200">
-                          <span>選出邊長 x = ?</span>
+                          <span>{isSideMode ? '選出邊長 x = ?' : '選出 cos θ = ?'}</span>
                           <span className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/40 font-mono">{question.cosHint}</span>
                         </div>
                         <div className="grid grid-cols-4 gap-2">
@@ -19655,7 +19796,7 @@
                                   : 'bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 hover:brightness-105 active:scale-95'
                               }`}
                             >
-                              <SqrtText text={opt} />
+                              {String(opt).includes('/') ? <FracText value={opt} size="sm" /> : <SqrtText text={opt} />}
                             </button>
                           ))}
                         </div>
