@@ -6914,24 +6914,24 @@
             const t1 = setTimeout(() => {
               if (cancelled) return;
               setAutoFlyItems(prev => prev ? prev.map(it => it.key === 'num' ? { ...it, launched: true } : it) : null);
-            }, 50);
+            }, 140);
             const t2 = setTimeout(() => {
               if (cancelled) return;
               setAutoFlyItems(prev => prev ? prev.map(it => it.key === 'den' ? { ...it, launched: true } : it) : null);
-            }, 190);
+            }, 440);
             const t3 = setTimeout(() => {
               if (cancelled) return;
               audio.sfxSelect();
               setPlacedTokens(prev => ({ ...prev, num: true }));
               setAutoFlyItems(prev => prev ? prev.map(it => it.key === 'num' ? { ...it, landed: true } : it) : null);
-            }, 430);
+            }, 740);
             const t4 = setTimeout(() => {
               if (cancelled) return;
               audio.sfxSelect();
               setPlacedTokens({ num: true, den: true });
               setActiveTargetSlot('num');
               setAutoFlyItems(null);
-            }, 570);
+            }, 1040);
             autoFlyTimersRef.current = [t1, t2, t3, t4];
           });
         });
@@ -7694,7 +7694,7 @@
                         top: `${it.fromY}px`,
                         transform: `translate(-50%, -50%) translate3d(${dx}px, ${dy}px, 0) scale(${it.launched ? 1.06 : 0.92})`,
                         opacity: it.launched ? 1 : 0,
-                        transition: 'transform 380ms cubic-bezier(0.22, 1, 0.36, 1), opacity 80ms ease-out'
+                        transition: 'transform 600ms cubic-bezier(0.22, 1, 0.36, 1), opacity 120ms ease-out'
                       }}
                       className="pointer-events-none absolute z-40 w-11 h-11 rounded-full bg-gradient-to-b from-amber-300 to-amber-500 border-2 border-white text-amber-950 font-serif font-black text-lg shadow-[0_8px_20px_rgba(245,158,11,0.55)] flex items-center justify-center will-change-transform"
                     >
@@ -9205,12 +9205,13 @@
       const [wrongBtnKey, setWrongBtnKey] = useState(null);
       const [conceptTip, setConceptTip] = useState(null);
 
-      // 分段接力實機引導（Just-in-Time：依序在 drag / ratio / pickR 首次出現時演示）
+      // 分段接力實機引導（Just-in-Time：依序在 drag / ratio / pickR 首次出現時演示；P1/P2 自動定位期間暫緩）
+      const isAutoLocating = Boolean(question && question.phase > 0 && stage === 'drag');
       const { showGuide, guideMode, openGuide, dismissGuide } = useStagedLevelGuide({
         currentStars,
         hasSeenGuide,
         onMarkGuideSeen,
-        activeStageKey: question ? stage : null,
+        activeStageKey: question ? (isAutoLocating ? null : stage) : null,
         phase: question ? question.phase : 0,
         enabled: gameState === 'playing',
         finalStageKey: 'pickR'
@@ -9227,6 +9228,20 @@
       const [rSnapFlash, setRSnapFlash] = useState(false);
       const confirmTimerRef = useRef(null);
       const pendingNextRef = useRef(null);
+      const autoLocateRafRef = useRef(0);
+      const autoLocateTimerRef = useRef(0);
+
+      const clearAutoLocate = () => {
+        if (autoLocateRafRef.current) {
+          cancelAnimationFrame(autoLocateRafRef.current);
+          autoLocateRafRef.current = 0;
+        }
+        if (autoLocateTimerRef.current) {
+          clearTimeout(autoLocateTimerRef.current);
+          autoLocateTimerRef.current = 0;
+        }
+      };
+
       const handleConfirmSkip = () => {
         if (!pendingNextRef.current) return;
         if (Date.now() - justSolvedAtRef.current < 260) return;
@@ -9236,7 +9251,48 @@
         audio.sfxClick();
         fn();
       };
-      useEffect(() => () => clearTimeout(confirmTimerRef.current), []);
+      useEffect(() => () => {
+        clearTimeout(confirmTimerRef.current);
+        clearAutoLocate();
+      }, []);
+
+      // Phase 1 / Phase 2 開場自動定位：藍點 P 由原點平滑射出至目標 (x, y)，停穩後進入 pickR
+      useEffect(() => {
+        clearAutoLocate();
+        if (gameState !== 'playing' || !question || question.phase === 0) return;
+        let cancelled = false;
+        const tx = question.xVal;
+        const ty = question.yVal;
+        const duration = 720;
+        let startTs = 0;
+
+        const step = (ts) => {
+          if (cancelled) return;
+          if (!startTs) startTs = ts;
+          const t = Math.min(1, (ts - startTs) / duration);
+          const eased = 1 - Math.pow(1 - t, 3);
+          setCurP({ x: tx * eased, y: ty * eased });
+          if (t < 1) {
+            autoLocateRafRef.current = requestAnimationFrame(step);
+          } else {
+            setCurP({ x: tx, y: ty });
+            audio.sfxSelect();
+            autoLocateTimerRef.current = setTimeout(() => {
+              if (cancelled) return;
+              setStage('pickR');
+            }, 240);
+          }
+        };
+
+        autoLocateTimerRef.current = setTimeout(() => {
+          if (!cancelled) autoLocateRafRef.current = requestAnimationFrame(step);
+        }, 160);
+
+        return () => {
+          cancelled = true;
+          clearAutoLocate();
+        };
+      }, [gameState, question]);
 
       const triggerFloat = (text, color) => {
         const id = Date.now();
@@ -9245,6 +9301,7 @@
       };
 
       const nextQuestion = (curProg) => {
+        clearAutoLocate();
         const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
         const isLastOfP1 = phase === 1 && curProg === starsThreshold[1] - 1;
         const nextQ = generateLevel6Question(phase, bagRef.current, isLastOfP1);
@@ -9437,7 +9494,7 @@
           handleConfirmSkip();
           return;
         }
-        if (gameState !== 'playing' || !question || stage !== 'drag' || (!isRelaxMode && lives <= 0)) return;
+        if (gameState !== 'playing' || !question || stage !== 'drag' || isAutoLocating || (!isRelaxMode && lives <= 0)) return;
         const offsetY = e.pointerType === 'touch' ? 42 : 0;
         const pt = getGridFromPointer(e.clientX, e.clientY - offsetY);
         if (!pt) return;
@@ -9470,7 +9527,7 @@
 
       // 從頂部題目坐標膠囊直接拖曳進網格（觸控自動往上偏移 46px 避開手指遮擋）
       const handleCoordChipDown = (e) => {
-        if (gameState !== 'playing' || !question || stage !== 'drag' || isLockedSuccess || (!isRelaxMode && lives <= 0)) return;
+        if (gameState !== 'playing' || !question || stage !== 'drag' || isAutoLocating || isLockedSuccess || (!isRelaxMode && lives <= 0)) return;
         e.preventDefault();
         if (showGuide) dismissGuide(false);
         audio.init();
@@ -9676,7 +9733,7 @@
         return sd === 1 ? `${neg ? '-' : ''}${sn}` : `${neg ? '-' : ''}${sn}/${sd}`;
       }, [question]);
       const targetSvgP = question ? toSvgPt(question.xVal, question.yVal) : null;
-      const showTargetRing = stage === 'drag' && question && question.phase === 0;
+      const showTargetRing = stage === 'drag' && question && question.phase === 0 && progress === 0;
       // P(x, y) 膠囊永遠朝遠離原點的外側偏移並夾在畫板邊界內
       const pTagOffsetX = activeCoord.x >= 0 ? 52 : -52;
       const pTagOffsetY = activeCoord.y >= 0 ? -32 : 32;
@@ -9718,21 +9775,30 @@
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${isLockedSuccess ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['拖點建構 P(x,y) → 填比值', '無瞄準圈定位 → 拖 r 貼定點', '無瞄準圈＋純符號 x/y/r → 定義盲測']} />
+                <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['拖點建構 P(x,y) → 填比值', '自動定位 P(x,y) → 填動徑 r → 比值', '自動定位＋純符號 x/y/r → 定義盲測']} />
                 <div data-coach="lv10-prompt" className="bg-gradient-to-r from-cyan-600 to-indigo-700 h-[66px] px-3.5 flex justify-between items-center text-white border-b-2 border-indigo-900 shrink-0">
                   {stage === 'drag' && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm sm:text-base font-black">拖曳坐標</span>
-                      <button
-                        type="button"
-                        data-coach="lv10-coord-chip"
-                        onPointerDown={handleCoordChipDown}
-                        className={`bg-slate-900/90 border-2 border-cyan-300 px-3 py-0.5 rounded-xl font-mono font-black text-sm text-cyan-200 shadow-[0_3px_10px_rgba(34,211,238,0.35)] cursor-grab active:cursor-grabbing active:scale-95 touch-none select-none transition-transform ${dragCoordChip ? 'opacity-45 scale-95' : 'hover:scale-105'}`}
-                      >
-                        ({question.xVal}, {question.yVal})
-                      </button>
-                      <span className="text-xs font-bold text-cyan-100/90 hidden sm:inline">進網格 → 求 {question.targetFunc}(θ)</span>
-                    </div>
+                    isAutoLocating ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs sm:text-sm font-black bg-cyan-300/20 border border-cyan-200/50 text-cyan-100 px-2.5 py-0.5 rounded-xl whitespace-nowrap">✨ 自動定位</span>
+                        <span className="bg-slate-900/90 border-2 border-cyan-300 px-3 py-0.5 rounded-xl font-mono font-black text-sm text-cyan-200 shadow-sm">
+                          P({question.xVal}, {question.yVal})
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm sm:text-base font-black">拖曳坐標</span>
+                        <button
+                          type="button"
+                          data-coach="lv10-coord-chip"
+                          onPointerDown={handleCoordChipDown}
+                          className={`bg-slate-900/90 border-2 border-cyan-300 px-3 py-0.5 rounded-xl font-mono font-black text-sm text-cyan-200 shadow-[0_3px_10px_rgba(34,211,238,0.35)] cursor-grab active:cursor-grabbing active:scale-95 touch-none select-none transition-transform ${dragCoordChip ? 'opacity-45 scale-95' : 'hover:scale-105'}`}
+                        >
+                          ({question.xVal}, {question.yVal})
+                        </button>
+                        <span className="text-xs font-bold text-cyan-100/90 hidden sm:inline">進網格 → 求 {question.targetFunc}(θ)</span>
+                      </div>
+                    )
                   )}
                   {stage === 'pickR' && (
                     <div className="flex items-center gap-2">
@@ -9802,7 +9868,7 @@
                     onPointerMove={handleGridPointerMove}
                     onPointerUp={handleGridPointerUp}
                     onPointerCancel={handleGridPointerUp}
-                    className="w-full h-full object-contain select-none touch-none cursor-crosshair"
+                    className={`w-full h-full object-contain select-none touch-none ${stage === 'drag' && !isAutoLocating ? 'cursor-crosshair' : ''}`}
                   >
                     {/* 動態縮放整數格線 */}
                     {gridTicks.map(i => (
@@ -9932,14 +9998,16 @@
 
                     {/* 藍點 P（外側避讓膠囊） */}
                     <g transform={`translate(${svgP.x}, ${svgP.y})`}>
-                      {stage === 'drag' && !isDraggingP && !dragCoordChip && (
+                      {stage === 'drag' && !isAutoLocating && !isDraggingP && !dragCoordChip && (
                         <circle cx="0" cy="0" r="22" fill="none" stroke="#38bdf8" strokeWidth="3" className="animate-ping" opacity="0.65" />
                       )}
                       <circle cx="0" cy="0" r="15" fill={isDraggingP || dragCoordChip?.overGrid ? '#0284c7' : '#3b82f6'} stroke="#ffffff" strokeWidth="3" />
                     </g>
                     <g transform={`translate(${pTagX}, ${pTagY})`} className="pointer-events-none">
                       <rect x="-46" y="-14" width="92" height="28" fill="#0f172a" rx="10" stroke="#38bdf8" strokeWidth="2" />
-                      <text x="0" y="1" fill="#ffffff" fontSize="13.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">P({activeCoord.x}, {activeCoord.y})</text>
+                      <text x="0" y="1" fill="#ffffff" fontSize="13.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle">
+                        P({isAutoLocating ? question.xVal : Math.round(activeCoord.x)}, {isAutoLocating ? question.yVal : Math.round(activeCoord.y)})
+                      </text>
                     </g>
                   </svg>
 
@@ -10030,10 +10098,10 @@
             onDismiss={dismissGuide}
             steps={guideMode === 'manual' ? (
               question?.phase === 0 ? [
-                { text: '拖曳題目上的 (x, y) 坐標膠囊（或直接在網格上）至綠色瞄準圈放開。' },
+                { text: '拖曳題目上的 (x, y) 坐標膠囊（或直接在網格上）至對應整數格點放開。' },
                 { text: '依三角比定義（sin=y/r、cos=x/r、tan=y/x）依序點擊圖上的 x、y、r 標籤填入上方分子與分母格（亦可拖曳）。' }
               ] : [
-                { text: '依 x、y 軸格線，將題目 (x, y) 坐標膠囊（或直接在網格上）拖至對應整數格點放開。' },
+                { text: '第二、三階段藍點 P(x, y) 會自動射出定位至目標格點。' },
                 { text: '依 r = √(x² + y²) 點選下方正確的 r 膠囊填入動徑 r = ?（亦可拖曳貼上）。' },
                 { text: '依三角比定義（sin=y/r、cos=x/r、tan=y/x）依序點擊圖上的 x、y、r 標籤填入上方分子與分母格（亦可拖曳）。' }
               ]
@@ -10127,11 +10195,12 @@
       const [isLockedSuccess, setIsLockedSuccess] = useState(false);
       const [feedbackAnim, setFeedbackAnim] = useState('');
       const [conceptTip, setConceptTip] = useState(null);
+      const isAutoRotating = Boolean(question && question.phase > 0 && stage === 'rotate');
       const { showGuide, guideMode, openGuide, dismissGuide } = useStagedLevelGuide({
         currentStars,
         hasSeenGuide,
         onMarkGuideSeen,
-        activeStageKey: question ? stage : null,
+        activeStageKey: question ? (isAutoRotating ? null : stage) : null,
         phase: question ? question.phase : 0,
         enabled: gameState === 'playing',
         finalStageKey: 'define'
@@ -10155,6 +10224,19 @@
       const pendingNextRef = useRef(null);
       const preferredAssignOrderRef = useRef(['x', 'y', 'r']);
       const currentAssignOrderRef = useRef([]);
+      const autoRotateRafRef = useRef(0);
+      const autoRotateTimerRef = useRef(0);
+
+      const clearAutoRotate = () => {
+        if (autoRotateRafRef.current) {
+          cancelAnimationFrame(autoRotateRafRef.current);
+          autoRotateRafRef.current = 0;
+        }
+        if (autoRotateTimerRef.current) {
+          clearTimeout(autoRotateTimerRef.current);
+          autoRotateTimerRef.current = 0;
+        }
+      };
 
       const handleConfirmSkip = () => {
         if (!pendingNextRef.current) return;
@@ -10171,10 +10253,75 @@
       useEffect(() => {
         const preventTouchScroll = (e) => { if (isDraggingRef.current) e.preventDefault(); };
         document.addEventListener('touchmove', preventTouchScroll, { passive: false });
-        return () => document.removeEventListener('touchmove', preventTouchScroll);
+        return () => {
+          document.removeEventListener('touchmove', preventTouchScroll);
+          clearAutoRotate();
+        };
       }, []);
 
+      // Phase 1 / Phase 2 開場自動旋轉終邊定位（停穩後直接進入 assign，且 r 已自動帶入）
+      useEffect(() => {
+        clearAutoRotate();
+        if (gameState !== 'playing' || !question || question.phase === 0) return;
+        let cancelled = false;
+        const target = question.targetAngle;
+
+        if (target === 0) {
+          setCurrentAngle(0);
+          autoRotateTimerRef.current = setTimeout(() => {
+            if (cancelled) return;
+            audio.sfxBonus();
+            setStage('assign');
+          }, 560);
+          return () => {
+            cancelled = true;
+            clearAutoRotate();
+          };
+        }
+
+        const duration = Math.max(620, Math.min(1050, Math.round((target / 360) * 850 + 400)));
+        let startTs = 0;
+        let lastStep30 = 0;
+
+        const step = (ts) => {
+          if (cancelled) return;
+          if (!startTs) startTs = ts;
+          const t = Math.min(1, (ts - startTs) / duration);
+          const eased = 1 - Math.pow(1 - t, 3);
+          const cur = target * eased;
+          const rounded = Math.round(cur);
+          setCurrentAngle(rounded);
+          const step30 = Math.floor(cur / 30);
+          if (step30 > lastStep30) {
+            lastStep30 = step30;
+            audio.sfxTick();
+          }
+          if (t < 1) {
+            autoRotateRafRef.current = requestAnimationFrame(step);
+          } else {
+            setCurrentAngle(target);
+            exactAngleRef.current = target;
+            lastTickAngleRef.current = target;
+            autoRotateTimerRef.current = setTimeout(() => {
+              if (cancelled) return;
+              audio.sfxBonus();
+              setStage('assign');
+            }, 260);
+          }
+        };
+
+        autoRotateTimerRef.current = setTimeout(() => {
+          if (!cancelled) autoRotateRafRef.current = requestAnimationFrame(step);
+        }, 160);
+
+        return () => {
+          cancelled = true;
+          clearAutoRotate();
+        };
+      }, [gameState, question]);
+
       const nextQuestion = (curProg) => {
+        clearAutoRotate();
         const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
         const forceAxis = phase === 1 && curProg === starsThreshold[1] - 1 && !bagRef.current.p1AxisDone;
         const q = generateLevel7Question(phase, bagRef.current, forceAxis);
@@ -10184,9 +10331,11 @@
         setCurrentAngle(0);
         exactAngleRef.current = 0;
         lastTickAngleRef.current = 0;
-        setAssignedVals({ x: null, y: null, r: null });
+        const initialAssigned = phase > 0 ? { x: null, y: null, r: q.rStr } : { x: null, y: null, r: null };
+        setAssignedVals(initialAssigned);
         currentAssignOrderRef.current = [];
-        setActiveAssignSlot(preferredAssignOrderRef.current[0] || 'x');
+        const firstEmpty = preferredAssignOrderRef.current.find(k => !initialAssigned[k]) || 'x';
+        setActiveAssignSlot(firstEmpty);
         setWrongSlotKey(null);
         setDragAssignChip(null);
         setSelectedNumerator(null);
@@ -10219,7 +10368,7 @@
           handleConfirmSkip();
           return;
         }
-        if (gameState !== 'playing' || stage !== 'rotate' || !dialSvgRef.current || (!isRelaxMode && lives <= 0)) return;
+        if (gameState !== 'playing' || stage !== 'rotate' || isAutoRotating || !dialSvgRef.current || (!isRelaxMode && lives <= 0)) return;
         if (showGuide) dismissGuide(false);
         setIsDragging(true);
         didDragRef.current = false;
@@ -10280,7 +10429,7 @@
           handleConfirmSkip();
           return;
         }
-        if (gameState !== 'playing' || stage !== 'rotate' || !question || didDragRef.current || (!isRelaxMode && lives <= 0)) return;
+        if (gameState !== 'playing' || stage !== 'rotate' || isAutoRotating || !question || didDragRef.current || (!isRelaxMode && lives <= 0)) return;
         if (showGuide) dismissGuide(false);
         if (currentAngle === question.targetAngle) {
           audio.sfxBonus();
@@ -10316,7 +10465,7 @@
           const nextAssigned = { ...assignedVals, [slot]: val };
           setAssignedVals(nextAssigned);
           if (nextAssigned.x && nextAssigned.y && nextAssigned.r) {
-            if (currentAssignOrderRef.current.length === 3) {
+            if (question.phase === 0 && currentAssignOrderRef.current.length === 3) {
               preferredAssignOrderRef.current = [...currentAssignOrderRef.current];
             }
             audio.sfxBonus();
@@ -10613,7 +10762,7 @@
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${isLockedSuccess ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['第 II/III/IV 象限特殊角 • 轉終邊 → 貼邊 → 定義', '象限角專練（含 0°）• 軸上點 (x, y, r) 求值', '廣義角綜合驗收 • 異象限 × 象限角獨立推導']} />
+                <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['第 II/III/IV 象限特殊角 • 轉終邊 → 填 x, y, r → 定義', '象限角專練（含 0°）• 自動轉角與 r → 填 x, y → 定義', '廣義角綜合驗收 • 自動轉角與 r → 填 x, y → 定義']} />
                 <div data-coach="lv11-target" className="bg-gradient-to-r from-violet-600 to-indigo-700 h-[66px] px-3.5 flex justify-between items-center text-white border-b-2 border-indigo-950 shrink-0">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span className="text-base sm:text-xl font-serif font-black shrink-0">{question.targetFunc}({question.targetAngle}°) =</span>
@@ -10669,14 +10818,18 @@
                     <div className="flex items-center gap-1.5 shrink-0">
                       {stage === 'rotate' && (
                         <>
-                          <span className="text-xs font-black bg-amber-400/20 text-amber-200 border border-amber-300/50 px-2.5 py-1 rounded-xl whitespace-nowrap">① 拖曳終邊</span>
+                          <span className="text-xs font-black bg-amber-400/20 text-amber-200 border border-amber-300/50 px-2.5 py-1 rounded-xl whitespace-nowrap">
+                            {isAutoRotating ? '✨ 自動定位終邊' : '① 拖曳終邊'}
+                          </span>
                           <span className="text-xs font-black bg-white/20 px-2.5 py-1 rounded-xl border border-white/40 whitespace-nowrap">
                             {currentAngle}°
                           </span>
                         </>
                       )}
                       {stage === 'assign' && (
-                        <span className="text-xs font-black bg-sky-400/20 text-sky-100 border border-sky-300/50 px-2.5 py-1 rounded-xl whitespace-nowrap">② 填入 x, y, r 數值</span>
+                        <span className="text-xs font-black bg-sky-400/20 text-sky-100 border border-sky-300/50 px-2.5 py-1 rounded-xl whitespace-nowrap">
+                          {question.phase > 0 ? '① 填入 x, y 數值' : '② 填入 x, y, r 數值'}
+                        </span>
                       )}
                     </div>
                   )}
@@ -10689,7 +10842,7 @@
                     data-coach="lv11-board"
                     viewBox={`0 0 ${width} ${height}`}
                     preserveAspectRatio="xMidYMid meet"
-                    className={`w-full h-full object-contain select-none ${stage === 'rotate' ? 'cursor-grab active:cursor-grabbing touch-none' : ''}`}
+                    className={`w-full h-full object-contain select-none ${stage === 'rotate' && !isAutoRotating ? 'cursor-grab active:cursor-grabbing touch-none' : ''}`}
                     onPointerDown={handleDialPointerDown}
                     onPointerMove={handleDialPointerMove}
                     onPointerUp={handleDialPointerUp}
@@ -10919,7 +11072,7 @@
                       onClick={(e) => e.stopPropagation()}
                       className="absolute bottom-2 left-2 right-2 z-20 bg-slate-900/92 backdrop-blur-sm border border-white/15 rounded-2xl p-1.5 flex items-center justify-center gap-1.5 shadow-xl"
                     >
-                      {LV11_NUM_CAPSULES.map((val) => (
+                      {(question.phase > 0 ? ['-√3', '-1', '0', '1', '√3'] : LV11_NUM_CAPSULES).map((val) => (
                         <button
                           key={val}
                           type="button"
@@ -11002,13 +11155,17 @@
                 { text: '依幾何圖形與位置，從下方 7 顆數字膠囊拖曳或點選填入 x、y、r。' },
                 { text: '將圖上的 x、y、r 標籤拖進（或點擊填入）上方分子與分母格求比值。' }
               ] : [
-                { text: '拖曳終邊旋轉到目標特殊角或象限角，鬆手即自動鎖定進入下一步。' },
-                { text: '從下方 7 顆數字膠囊點選填入 x、y、r（亦可拖曳，軸上點留意 0 與 ±1）。' },
+                { text: '第二、三階段終邊會自動旋轉定位，並已帶入動徑 r。' },
+                { text: '從下方 5 顆數字膠囊點選填入 x、y（亦可拖曳，軸上點留意 0 與 ±1）。' },
                 { text: '依序點擊圖上的 x、y、r 標籤填入上方分子與分母格求比值（亦可拖曳）。' }
               ]
             ) : stage === 'assign' ? [
               {
-                targets: [
+                targets: question?.phase > 0 ? [
+                  { id: 'lv11-num-pool', shape: 'pill', pad: 8 },
+                  { id: 'lv11-assign-x', shape: 'pill', pad: 10 },
+                  { id: 'lv11-assign-y', shape: 'pill', pad: 10 }
+                ] : [
                   { id: 'lv11-num-pool', shape: 'pill', pad: 8 },
                   { id: 'lv11-assign-x', shape: 'pill', pad: 10 },
                   { id: 'lv11-assign-y', shape: 'pill', pad: 10 },
@@ -11018,7 +11175,9 @@
                 tap: false,
                 drag: false,
                 placement: 'top',
-                text: '點擊下方數值直接填入呼吸框，或按住拖進 x、y、r 任一格（點圖上框可切換順序）！',
+                text: question?.phase > 0
+                  ? '動徑 r 已自動帶入！點擊下方數值直接填入呼吸框，或按住拖進 x、y 任一格！'
+                  : '點擊下方數值直接填入呼吸框，或按住拖進 x、y、r 任一格（點圖上框可切換順序）！',
                 shape: 'pill',
                 pad: 8
               }
@@ -12598,7 +12757,11 @@
           desc: '觀察單位圓終邊與坐標正負，將廣義角化為「± 三角比 銳角」'
         },
         {
-          target: 'lv12-wheel',
+          targets: [
+            { id: 'lv12-ref-wheel', shape: 'rect', pad: 4 },
+            { id: 'lv12-wheel', shape: 'rect', pad: 4 }
+          ],
+          target: 'lv12-ref-wheel',
           pad: 4,
           shape: 'rect',
           swipe: 'y',
@@ -17187,7 +17350,7 @@
 
                       {/* 可旋轉翡翠光臂 b */}
                       <line x1={P0_OX} y1={P0_OY} x2={p0Ax} y2={p0Ay} stroke="#059669" strokeWidth="4.2" strokeLinecap="round" />
-                      <circle cx={P0_OX} cy={P0_OY} r="5" fill="#0f172a" stroke="#ffffff" strokeWidth="2" />
+                      <circle data-coach="lv15-p0-pivot" cx={P0_OX} cy={P0_OY} r="5" fill="#0f172a" stroke="#ffffff" strokeWidth="2" />
                       <circle cx={P0_OX + P0_BASE} cy={P0_OY} r="4.5" fill="#ffffff" stroke="#1e293b" strokeWidth="2" />
 
                       {/* 即時垂線高 h（側移至垂線旁空位，絕不壓在 90° 光臂上） */}
@@ -17211,17 +17374,31 @@
                         })()}
                       </g>
 
-                      {/* 可拖曳金色拉柄（加大觸控感應圈，且整張畫板皆可直接點拖） */}
-                      <g
-                        className="pointer-events-none"
-                      >
+                      {/* 可拖曳金色握把（純操作拉柄，邊長 b 改標於光臂中點外側膠囊） */}
+                      {(() => {
+                        const t = 0.56;
+                        const mx = P0_OX + (p0Ax - P0_OX) * t;
+                        const my = P0_OY + (p0Ay - P0_OY) * t;
+                        // 銳角時向左上（三角形外側）、直角與鈍角時向右上（避開左側高線 h 與底部延長線）
+                        const nx = armDeg >= 90 ? Math.sin(p0Rad) : -Math.sin(p0Rad);
+                        const ny = armDeg >= 90 ? Math.cos(p0Rad) : -Math.cos(p0Rad);
+                        const bx = Math.max(24, Math.min(296, mx + nx * 20));
+                        const by = Math.max(16, Math.min(P0_OY - 16, my + ny * 20));
+                        return (
+                          <g className="pointer-events-none">
+                            <rect x={bx - 16} y={by - 10.5} width="32" height="21" rx="10.5" fill="#ffffff" stroke="#059669" strokeWidth="1.8" />
+                            <text x={bx} y={by + 1} fill="#065f46" fontSize="12.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">
+                              {question.b}
+                            </text>
+                          </g>
+                        );
+                      })()}
+                      <g className="pointer-events-none">
                         {!isSolved && (
-                          <circle cx={p0Ax} cy={p0Ay} r="22" fill="rgba(245,158,11,0.18)" stroke="rgba(245,158,11,0.45)" strokeWidth="1.5" />
+                          <circle cx={p0Ax} cy={p0Ay} r="20" fill="rgba(245,158,11,0.18)" stroke="rgba(245,158,11,0.45)" strokeWidth="1.5" />
                         )}
-                        <circle cx={p0Ax} cy={p0Ay} r="15" fill="#f59e0b" stroke="#ffffff" strokeWidth="2.8" className={isSolved ? '' : 'animate-pulse'} />
-                        <text x={p0Ax} y={p0Ay + 1} fill="#ffffff" fontSize="12" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">
-                          {question.b}
-                        </text>
+                        <circle data-coach="lv15-p0-knob" cx={p0Ax} cy={p0Ay} r="12.5" fill="#f59e0b" stroke="#ffffff" strokeWidth="2.6" className={isSolved ? '' : 'animate-pulse'} />
+                        <circle cx={p0Ax} cy={p0Ay} r="3.8" fill="#ffffff" />
                       </g>
                     </svg>
                   ) : (
@@ -17413,11 +17590,29 @@
                   { desc: '第二、三階段：點選（或拖曳）圖上「夾住角度的兩條邊」與「夾角」填入頂部面積公式 Δ = ½·a·b·sin C（順序不限）！' },
                   { desc: '第三階段填完公式後，從底部心算選出最終面積！' }
                 ] : isDragPhase ? [
-                  { target: 'lv15-board', shape: 'rect', pad: 6, swipe: 'x', placement: 'bottom', desc: '按住金色圓球左右拖曳旋轉光臂，即時觀察高 h 與面積變化，調好後按下方按鈕鎖定！' }
+                  {
+                    targets: [
+                      { id: 'lv15-p0-knob', shape: 'circle', pad: 14 },
+                      { id: 'lv15-board', shape: 'rect', pad: 6 }
+                    ],
+                    target: 'lv15-p0-knob',
+                    arcPivot: 'lv15-p0-pivot',
+                    arcDeg: -45,
+                    placement: 'bottom',
+                    desc: '按住金色圓球沿圓弧拖曳旋轉光臂，即時觀察高 h 與面積變化，調好後按下方按鈕鎖定！'
+                  }
                 ] : needCalc ? [
                   { target: 'lv15-opts', shape: 'pill', pad: 6, tap: false, placement: 'top', desc: '公式已列好！心算約分後，點選正確的面積答案！' }
                 ] : [
-                  { target: 'lv15-board', shape: 'rect', pad: 6, tap: false, placement: 'bottom', desc: '小心干擾邊角！點選（順序不限）圖上「夾住角度的兩條邊」與「夾角」填入上方公式！' }
+                  {
+                    targets: [
+                      { id: 'lv15-board', shape: 'rect', pad: 6 },
+                      { id: 'lv15-prompt', shape: 'rect', pad: 6 }
+                    ],
+                    tap: false,
+                    placement: 'bottom',
+                    desc: '小心干擾邊角！點選（順序不限）圖上「夾住角度的兩條邊」與「夾角」填入上方公式！'
+                  }
                 ]}
               />
             </div>
@@ -19122,7 +19317,7 @@
                         stroke={armDeg === 90 ? '#059669' : armDeg > 90 ? '#e11d48' : '#0284c7'}
                         strokeWidth="4.4" strokeLinecap="round"
                       />
-                      <circle cx={P0_OX} cy={P0_OY} r="5" fill="#0f172a" stroke="#ffffff" strokeWidth="2" />
+                      <circle data-coach="lv17-p0-pivot" cx={P0_OX} cy={P0_OY} r="5" fill="#0f172a" stroke="#ffffff" strokeWidth="2" />
                       <circle cx={p0Bx} cy={p0By} r="4.5" fill="#ffffff" stroke="#1e293b" strokeWidth="2" />
 
                       {/* Layer 4（最頂層）：角度文字、底邊標籤、沿向外法線推出的對邊 c 標籤、金球拉柄 */}
@@ -19168,14 +19363,30 @@
                         );
                       })()}
 
+                      {/* 旋轉光臂邊長 b 膠囊（沿向外法線推出至三角形外側，與對邊 c、夾角零交疊） */}
+                      {(() => {
+                        const t = 0.54;
+                        const mx = P0_OX + (p0Ax - P0_OX) * t;
+                        const my = P0_OY + (p0Ay - P0_OY) * t;
+                        const bx = Math.max(24, Math.min(P0_VW - 24, mx - Math.sin(p0Rad) * 20));
+                        const by = Math.max(16, Math.min(P0_OY - 16, my - Math.cos(p0Rad) * 20));
+                        return (
+                          <g className="pointer-events-none">
+                            <rect x={bx - 16} y={by - 10.5} width="32" height="21" rx="10.5" fill="#ffffff" stroke="#d97706" strokeWidth="1.8" />
+                            <text x={bx} y={by + 1} fill="#92400e" fontSize="12.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">
+                              {question.b}
+                            </text>
+                          </g>
+                        );
+                      })()}
+
+                      {/* 純操作金色握把 */}
                       <g className="pointer-events-none">
                         {!solvedAns && (
-                          <circle cx={p0Ax} cy={p0Ay} r="22" fill="rgba(245,158,11,0.18)" stroke="rgba(245,158,11,0.45)" strokeWidth="1.5" />
+                          <circle cx={p0Ax} cy={p0Ay} r="20" fill="rgba(245,158,11,0.18)" stroke="rgba(245,158,11,0.45)" strokeWidth="1.5" />
                         )}
-                        <circle cx={p0Ax} cy={p0Ay} r="14.5" fill="#f59e0b" stroke="#ffffff" strokeWidth="2.8" className={solvedAns ? '' : 'animate-pulse'} />
-                        <text x={p0Ax} y={p0Ay + 1} fill="#ffffff" fontSize="12" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">
-                          {question.b}
-                        </text>
+                        <circle data-coach="lv17-p0-knob" cx={p0Ax} cy={p0Ay} r="12.5" fill="#f59e0b" stroke="#ffffff" strokeWidth="2.6" className={solvedAns ? '' : 'animate-pulse'} />
+                        <circle cx={p0Ax} cy={p0Ay} r="3.8" fill="#ffffff" />
                       </g>
                     </svg>
                   ) : (() => {
@@ -19474,7 +19685,17 @@
                   { desc: '第二、三階段：點選圖中「兩條鄰邊」與「夾角」（或反求 cos θ 時點「對邊」），順序不限、系統自動同步代入！' },
                   { desc: '第三階段填完公式後，搭配小提示心算選出邊長 x！' }
                 ] : isDragPhase ? [
-                  { target: 'lv17-board', shape: 'rect', pad: 6, swipe: 'x', placement: 'bottom', desc: '按住畫板左右拖曳光臂張合夾角，觀察上方修正項與對邊 c 的變化，調好後按下方鎖定！' }
+                  {
+                    targets: [
+                      { id: 'lv17-p0-knob', shape: 'circle', pad: 14 },
+                      { id: 'lv17-board', shape: 'rect', pad: 6 }
+                    ],
+                    target: 'lv17-p0-knob',
+                    arcPivot: 'lv17-p0-pivot',
+                    arcDeg: -40,
+                    placement: 'bottom',
+                    desc: '按住金色圓球沿圓弧拖曳張合夾角，觀察上方修正項與對邊 c 的變化，調好後按下方鎖定！'
+                  }
                 ] : (qPhase === 2 && formulaDone) ? [
                   { target: 'lv17-opts', shape: 'pill', pad: 6, tap: false, placement: 'top', desc: '公式已完成！搭配 cos 提示心算選出邊長 x！' }
                 ] : [
@@ -19885,7 +20106,7 @@
                         {!targetFound && !isDragging && (
                           <circle r="18" fill="none" stroke="#fbbf24" strokeWidth="2" className="animate-ping" opacity="0.55" />
                         )}
-                        <rect x="-15" y="-8" width="30" height="14" rx="4" fill={targetFound ? '#10b981' : '#f59e0b'} stroke="#ffffff" strokeWidth="1.8" />
+                        <rect data-coach="lv18-jeep" x="-15" y="-8" width="30" height="14" rx="4" fill={targetFound ? '#10b981' : '#f59e0b'} stroke="#ffffff" strokeWidth="1.8" />
                         <circle cx="-8" cy="7" r="4" fill="#0f172a" stroke="#e2e8f0" strokeWidth="1.5" />
                         <circle cx="8" cy="7" r="4" fill="#0f172a" stroke="#e2e8f0" strokeWidth="1.5" />
                       </g>
@@ -19968,7 +20189,23 @@
                   { desc: 'P1 巡航測繪車：拖曳測繪車向右前進至仰角 60°，利用等腰三角形秒算塔高！' },
                   { desc: 'P2 雷達群島：綜合正弦與餘弦定理求出島嶼距離。' }
                 ] : !targetFound ? [
-                  { target: 'lv18-scene', shape: 'rect', pad: 6, swipe: question.scene === 'jeep' ? 'x' : 'y', placement: 'top', desc: question.scene === 'jeep' ? '按住金色小測繪車向右拖曳前進，直到仰角升至 60°！' : '按住海面上下拖曳金色探照燈光束，照亮黑暗中的小船！' }
+                  question.scene === 'jeep' ? {
+                    targets: [
+                      { id: 'lv18-jeep', shape: 'circle', pad: 16 },
+                      { id: 'lv18-scene', shape: 'rect', pad: 6 }
+                    ],
+                    target: 'lv18-jeep',
+                    swipe: 'x',
+                    placement: 'top',
+                    desc: '按住金色小測繪車向右拖曳前進，直到仰角升至 60°！'
+                  } : {
+                    target: 'lv18-scene',
+                    shape: 'rect',
+                    pad: 6,
+                    swipe: 'y',
+                    placement: 'top',
+                    desc: '按住海面上下拖曳金色探照燈光束，照亮黑暗中的小船！'
+                  }
                 ] : [
                   { target: 'lv18-opts', shape: 'pill', pad: 6, tap: false, placement: 'top', desc: '已鎖定目標！請點選下方正確的測繪距離！' }
                 ]}
