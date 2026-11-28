@@ -21192,8 +21192,9 @@
         const onControlsStart = () => {
           userInteracting = true;
           isTransitioning = false;
+          if (camGlide) camGlide = null;
           zoomStartDist = camera.position.distanceTo(controls.target);
-          if (cameraMode === 'closeupIda') cameraMode = 'idle';
+          if (cameraMode === 'closeupIda' || cameraMode === 'glide') cameraMode = 'idle';
         };
         const onControlsChange = () => {
           if (userInteracting && focusedNodeIdRef.current !== null) {
@@ -24438,6 +24439,35 @@
         let fogDensityTarget = 0.0115;
         let cameraMode = 'idle';
         let flightAnim = null;
+        // 幀率無關阻尼換算（60Hz / 120Hz / 144Hz 運鏡速度 100% 一致）
+        const damp60 = (alpha60, dt) => 1 - Math.exp(Math.log(1 - alpha60) * (dt * 60));
+        // 地圖下方視角按鈕專用 S 曲線運鏡（easeInOutCubic：緩慢起步 → 中段巡航 → 溫柔煞停）
+        let camGlide = null;
+        const startCameraGlide = (endCam, endTgt) => {
+          const startCam = camera.position.clone();
+          const startTgt = controls.target.clone();
+          const dist = Math.max(startCam.distanceTo(endCam), startTgt.distanceTo(endTgt));
+          if (dist < 0.08) {
+            camera.position.copy(endCam);
+            controls.target.copy(endTgt);
+            camGlide = null;
+            cameraMode = 'idle';
+            isTransitioning = false;
+            return;
+          }
+          const duration = Math.min(1.12, Math.max(0.72, 0.62 + dist * 0.011));
+          camGlide = {
+            active: true,
+            elapsed: 0,
+            duration,
+            startCam,
+            startTgt,
+            endCam: endCam.clone(),
+            endTgt: endTgt.clone()
+          };
+          cameraMode = 'glide';
+          isTransitioning = true;
+        };
 
         if (initialViewSnapshot && initialViewSnapshot.camPos && initialViewSnapshot.targetPos) {
           camera.position.set(initialViewSnapshot.camPos.x, initialViewSnapshot.camPos.y, initialViewSnapshot.camPos.z);
@@ -24848,8 +24878,7 @@
               heroPos.y + 0.8,
               heroPos.z + 1.0
             );
-            cameraMode = 'focusTarget';
-            isTransitioning = true;
+            startCameraGlide(cameraTargetPos, controlsTargetPos);
           },
           walkAndOpenNode: (fromId, toId) => {
             const destEntry = nodeObjects[toId];
@@ -25251,7 +25280,6 @@
           focusSea: (seaId) => {
             setFocusedNodeId(null);
             setActiveSea(seaId);
-            cameraMode = 'focusTarget';
             userInteracting = false;
 
             if (seaId === 'all') {
@@ -25262,7 +25290,7 @@
               controlsTargetPos.copy(seaView.target);
               cameraTargetPos.copy(seaView.pos);
             }
-            isTransitioning = true;
+            startCameraGlide(cameraTargetPos, controlsTargetPos);
           },
           flyOutToClouds: () => {
             userInteracting = false;
@@ -26442,8 +26470,8 @@
                 activePos.y + camH,
                 activePos.z + Math.cos(sweepAng) * distH
               );
-              camera.position.lerp(cameraTargetPos, 0.085);
-              controls.target.lerp(controlsTargetPos, 0.12);
+              camera.position.lerp(cameraTargetPos, damp60(0.085, dt));
+              controls.target.lerp(controlsTargetPos, damp60(0.12, dt));
             } else if (cameraMode === 'followWalker') {
               const isMovingNow = walkState.mode === 'walk' || walkState.mode === 'photonOut' || walkState.mode === 'photonFly' || walkState.mode === 'photonIn';
               if (isMovingNow) {
@@ -26468,8 +26496,8 @@
                   focusY + 6.9 * zFactor,
                   focusZ + 9.6 * zFactor
                 );
-                camera.position.lerp(cameraTargetPos, 0.12);
-                controls.target.lerp(controlsTargetPos, 0.16);
+                camera.position.lerp(cameraTargetPos, damp60(0.12, dt));
+                controls.target.lerp(controlsTargetPos, damp60(0.16, dt));
               } else {
                 const destEntry = nodeObjects[cb.currentTargetNodeId] || nodeObjects[1];
                 controlsTargetPos.set(destEntry.node.x, destEntry.node.y + 0.8, destEntry.node.z + 1.0);
@@ -26478,23 +26506,37 @@
                   destEntry.node.y + 7.6 * zFactor,
                   destEntry.node.z + 10.6 * zFactor
                 );
-                camera.position.lerp(cameraTargetPos, 0.09);
-                controls.target.lerp(controlsTargetPos, 0.12);
+                camera.position.lerp(cameraTargetPos, damp60(0.09, dt));
+                controls.target.lerp(controlsTargetPos, damp60(0.12, dt));
                 if (camera.position.distanceTo(cameraTargetPos) < 0.05 && controls.target.distanceTo(controlsTargetPos) < 0.04) {
                   cameraMode = 'idle';
                   isTransitioning = false;
                 }
               }
             } else if (cameraMode === 'closeupIda') {
-              camera.position.lerp(cameraTargetPos, 0.15);
-              controls.target.lerp(controlsTargetPos, 0.18);
+              camera.position.lerp(cameraTargetPos, damp60(0.15, dt));
+              controls.target.lerp(controlsTargetPos, damp60(0.18, dt));
               if (camera.position.distanceTo(cameraTargetPos) < 0.04 && controls.target.distanceTo(controlsTargetPos) < 0.03) {
                 cameraMode = 'idle';
                 isTransitioning = false;
               }
+            } else if (cameraMode === 'glide' && camGlide && camGlide.active) {
+              camGlide.elapsed += dt;
+              const u = Math.min(1, camGlide.elapsed / camGlide.duration);
+              const ease = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+              camera.position.lerpVectors(camGlide.startCam, camGlide.endCam, ease);
+              controls.target.lerpVectors(camGlide.startTgt, camGlide.endTgt, ease);
+              if (u >= 1) {
+                camera.position.copy(camGlide.endCam);
+                controls.target.copy(camGlide.endTgt);
+                camGlide = null;
+                cameraMode = 'idle';
+                isTransitioning = false;
+              }
             } else if (cameraMode === 'focusTarget' || isTransitioning) {
-              camera.position.lerp(cameraTargetPos, 0.085);
-              controls.target.lerp(controlsTargetPos, 0.11);
+              if (camGlide) camGlide = null;
+              camera.position.lerp(cameraTargetPos, damp60(0.068, dt));
+              controls.target.lerp(controlsTargetPos, damp60(0.09, dt));
               if (camera.position.distanceTo(cameraTargetPos) < 0.05 && controls.target.distanceTo(controlsTargetPos) < 0.04) {
                 cameraMode = 'idle';
                 isTransitioning = false;
