@@ -7399,27 +7399,27 @@
                       );
                     })}
                   </svg>
-
-                  {/* Phase 1/2 填寫未知邊步驟：浮動於畫板底緣的 Lv.11 風格數字膠囊列 */}
-                  {needFillMissing && (
-                    <div
-                      data-coach="lv6-opts"
-                      onClick={(e) => e.stopPropagation()}
-                      className="absolute bottom-2 left-2 right-2 z-20 bg-slate-900/92 backdrop-blur-sm border border-white/15 rounded-2xl p-1.5 flex items-center justify-center gap-1.5 shadow-xl"
-                    >
-                      {question.numOptions.map((numVal) => (
-                        <button
-                          key={numVal}
-                          type="button"
-                          onClick={() => { audio.init(); attemptFillMissingEdge(numVal); }}
-                          className="flex-1 min-w-0 py-2 rounded-xl bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-serif font-black text-base sm:text-lg shadow active:scale-95 select-none cursor-pointer flex items-center justify-center transition-transform hover:brightness-105"
-                        >
-                          {numVal}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
+
+                {/* Phase 1/2 填寫未知邊步驟：獨立於畫板下方（shrink-0），確保永不遮擋三角形邊標籤與畢氏提示 */}
+                {needFillMissing && (
+                  <div
+                    data-coach="lv6-opts"
+                    onClick={(e) => e.stopPropagation()}
+                    className="shrink-0 mx-2 mb-2 bg-slate-900/95 border border-white/15 rounded-2xl p-1.5 flex items-center justify-center gap-1.5 shadow-xl"
+                  >
+                    {question.numOptions.map((numVal) => (
+                      <button
+                        key={numVal}
+                        type="button"
+                        onClick={() => { audio.init(); attemptFillMissingEdge(numVal); }}
+                        className="flex-1 min-w-0 py-2 rounded-xl bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-serif font-black text-base sm:text-lg shadow active:scale-95 select-none cursor-pointer flex items-center justify-center transition-transform hover:brightness-105"
+                      >
+                        {numVal}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <CoachOverlay
                 containerRef={containerRef}
@@ -9637,23 +9637,23 @@
                       </text>
                     </g>
                   </svg>
-
-                  {/* pickR 階段浮動於畫板底緣，確保各步驟切換時坐標平面高度與位置完全不動 */}
-                  {stage === 'pickR' && (
-                    <div data-coach="lv10-r-opts" className="absolute bottom-2 left-2 right-2 z-20 bg-slate-900/92 backdrop-blur-sm border border-white/15 rounded-2xl p-1.5 grid grid-cols-4 gap-1.5 shadow-xl">
-                      {question.rOptions.map((opt) => (
-                        <button
-                          key={opt.label}
-                          type="button"
-                          onClick={() => { audio.init(); handlePickR(opt); }}
-                          className={`py-2 bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-mono font-black rounded-xl shadow active:scale-95 text-sm sm:text-base flex items-center justify-center select-none cursor-pointer transition-all hover:brightness-105 ${wrongBtnKey === opt.label ? 'btn-wrong-flash' : ''}`}
-                        >
-                          <span className="inline-flex items-center gap-0.5">r = <SqrtText text={opt.label} /></span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
+
+                {/* pickR 階段獨立置於畫板下方（shrink-0），確保永不遮擋第三、四象限與負 Y 軸標籤 */}
+                {stage === 'pickR' && (
+                  <div data-coach="lv10-r-opts" className="shrink-0 mx-2 mb-2 bg-slate-900/95 border border-white/15 rounded-2xl p-1.5 grid grid-cols-4 gap-1.5 shadow-xl">
+                    {question.rOptions.map((opt) => (
+                      <button
+                        key={opt.label}
+                        type="button"
+                        onClick={() => { audio.init(); handlePickR(opt); }}
+                        className={`py-2 bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-mono font-black rounded-xl shadow active:scale-95 text-sm sm:text-base flex items-center justify-center select-none cursor-pointer transition-all hover:brightness-105 ${wrongBtnKey === opt.label ? 'btn-wrong-flash' : ''}`}
+                      >
+                        <span className="inline-flex items-center gap-0.5">r = <SqrtText text={opt.label} /></span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -10607,26 +10607,27 @@
                       </g>
                     )}
                   </svg>
-
-                  {stage === 'assign' && (
-                    <div
-                      data-coach="lv11-num-pool"
-                      onClick={(e) => e.stopPropagation()}
-                      className="absolute bottom-2 left-2 right-2 z-20 bg-slate-900/92 backdrop-blur-sm border border-white/15 rounded-2xl p-1.5 flex items-center justify-center gap-1.5 shadow-xl"
-                    >
-                      {LV11_NUM_CAPSULES.map((val) => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => handleAssignChipClick(val)}
-                          className="flex-1 min-w-0 py-2 rounded-xl bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-serif font-black text-sm sm:text-base shadow active:scale-95 select-none cursor-pointer flex items-center justify-center transition-transform hover:brightness-105"
-                        >
-                          <SqrtText text={val} />
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
+
+                {/* assign 階段獨立置於畫板下方（shrink-0），確保永不遮擋第三、四象限與 270° 刻度標籤 */}
+                {stage === 'assign' && (
+                  <div
+                    data-coach="lv11-num-pool"
+                    onClick={(e) => e.stopPropagation()}
+                    className="shrink-0 mx-2 mb-2 bg-slate-900/95 border border-white/15 rounded-2xl p-1.5 flex items-center justify-center gap-1.5 shadow-xl"
+                  >
+                    {LV11_NUM_CAPSULES.map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => handleAssignChipClick(val)}
+                        className="flex-1 min-w-0 py-2 rounded-xl bg-gradient-to-b from-amber-300 to-amber-500 border-b-[3px] border-amber-700 text-amber-950 font-serif font-black text-sm sm:text-base shadow active:scale-95 select-none cursor-pointer flex items-center justify-center transition-transform hover:brightness-105"
+                      >
+                        <SqrtText text={val} />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
