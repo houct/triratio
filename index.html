@@ -6801,7 +6801,9 @@
 
       const [question, setQuestion] = useState(null);
       const [placedTokens, setPlacedTokens] = useState({ num: false, den: false });
+      const [autoFlyItems, setAutoFlyItems] = useState(null);
       const edgesReady = placedTokens.num && placedTokens.den;
+      const isAutoFlying = Boolean(question && question.phase > 0 && !edgesReady);
       const [selectedTokenKey, setSelectedTokenKey] = useState('num');
       const [dragState, setDragState] = useState(null);
       const [missingEdgeFilled, setMissingEdgeFilled] = useState(false);
@@ -6821,7 +6823,9 @@
         currentStars,
         hasSeenGuide,
         onMarkGuideSeen,
-        activeStageKey: question ? (!edgesReady ? 'place' : needFillMissing ? (qPhase === 1 ? 'assign_p1' : 'assign_p2') : 'select') : null,
+        activeStageKey: question
+          ? (isAutoFlying ? null : !edgesReady ? 'place' : needFillMissing ? (qPhase === 1 ? 'assign_p1' : 'assign_p2') : 'select')
+          : null,
         phase: qPhase,
         enabled: gameState === 'playing',
         finalStageKey: 'assign_p2'
@@ -6830,6 +6834,8 @@
       const containerRef = useRef(null);
       const cardBoxRef = useRef(null);
       const svgRef = useRef(null);
+      const tokenRefs = useRef({ num: null, den: null });
+      const autoFlyTimersRef = useRef([]);
       const assignEdgeRef = useRef(null);
       const targetNumRef = useRef(null);
       const targetDenRef = useRef(null);
@@ -6840,6 +6846,11 @@
       const pendingNextRef = useRef(null);
       const justSolvedAtRef = useRef(0);
 
+      const clearAutoFlyTimers = () => {
+        autoFlyTimersRef.current.forEach(id => clearTimeout(id));
+        autoFlyTimersRef.current = [];
+      };
+
       const handleConfirmSkip = () => {
         if (!pendingNextRef.current) return;
         if (Date.now() - justSolvedAtRef.current < 260) return;
@@ -6849,17 +6860,100 @@
         audio.sfxClick();
         fn();
       };
-      useEffect(() => () => clearTimeout(confirmTimerRef.current), []);
+      useEffect(() => () => {
+        clearTimeout(confirmTimerRef.current);
+        clearAutoFlyTimers();
+      }, []);
+
+      // Phase 1 / Phase 2 開場自動飛入定位：將已知分子、分母圓幣依序飛向三角形對應邊
+      useEffect(() => {
+        clearAutoFlyTimers();
+        if (gameState !== 'playing' || !question || question.phase === 0) {
+          setAutoFlyItems(null);
+          return;
+        }
+        let cancelled = false;
+        let raf1 = 0;
+        let raf2 = 0;
+        raf1 = requestAnimationFrame(() => {
+          raf2 = requestAnimationFrame(() => {
+            if (cancelled) return;
+            const boxEl = cardBoxRef.current;
+            const svgEl = svgRef.current;
+            if (!boxEl || !svgEl) {
+              setPlacedTokens({ num: true, den: true });
+              setActiveTargetSlot('num');
+              setAutoFlyItems(null);
+              return;
+            }
+            const boxRect = boxEl.getBoundingClientRect();
+            const svgRect = svgEl.getBoundingClientRect();
+            const size = Math.min(svgRect.width, svgRect.height);
+            if (!size) {
+              setPlacedTokens({ num: true, den: true });
+              setActiveTargetSlot('num');
+              setAutoFlyItems(null);
+              return;
+            }
+            const svgLeft = svgRect.left + (svgRect.width - size) / 2;
+            const svgTop = svgRect.top + (svgRect.height - size) / 2;
+
+            const items = question.knownTokens.map((tk) => {
+              const tkEl = tokenRefs.current[tk.key];
+              const tkRect = tkEl ? tkEl.getBoundingClientRect() : null;
+              const edge = question.edges.find(ed => ed.role === tk.targetRole);
+              const fromX = tkRect ? (tkRect.left + tkRect.width / 2 - boxRect.left) : boxRect.width * 0.3;
+              const fromY = tkRect ? (tkRect.top + tkRect.height / 2 - boxRect.top) : 56;
+              const toX = edge ? (svgLeft + (edge.pt.x / 500) * size - boxRect.left) : boxRect.width * 0.5;
+              const toY = edge ? (svgTop + (edge.pt.y / 500) * size - boxRect.top) : boxRect.height * 0.5;
+              return { key: tk.key, val: tk.val, fromX, fromY, toX, toY, launched: false, landed: false };
+            });
+
+            setAutoFlyItems(items);
+
+            const t1 = setTimeout(() => {
+              if (cancelled) return;
+              setAutoFlyItems(prev => prev ? prev.map(it => it.key === 'num' ? { ...it, launched: true } : it) : null);
+            }, 50);
+            const t2 = setTimeout(() => {
+              if (cancelled) return;
+              setAutoFlyItems(prev => prev ? prev.map(it => it.key === 'den' ? { ...it, launched: true } : it) : null);
+            }, 190);
+            const t3 = setTimeout(() => {
+              if (cancelled) return;
+              audio.sfxSelect();
+              setPlacedTokens(prev => ({ ...prev, num: true }));
+              setAutoFlyItems(prev => prev ? prev.map(it => it.key === 'num' ? { ...it, landed: true } : it) : null);
+            }, 430);
+            const t4 = setTimeout(() => {
+              if (cancelled) return;
+              audio.sfxSelect();
+              setPlacedTokens({ num: true, den: true });
+              setActiveTargetSlot('num');
+              setAutoFlyItems(null);
+            }, 570);
+            autoFlyTimersRef.current = [t1, t2, t3, t4];
+          });
+        });
+        return () => {
+          cancelled = true;
+          cancelAnimationFrame(raf1);
+          cancelAnimationFrame(raf2);
+          clearAutoFlyTimers();
+        };
+      }, [gameState, question]);
 
 
       const nextQuestion = (curProg) => {
+        clearAutoFlyTimers();
         const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
         const q = generateLevel6TripleQuestion(phase, prevKeyRef.current);
         prevKeyRef.current = q.key;
         questionMissedRef.current = false;
         setQuestion(q);
         setPlacedTokens({ num: false, den: false });
-        setSelectedTokenKey('num');
+        setAutoFlyItems(null);
+        setSelectedTokenKey(phase === 0 ? 'num' : null);
         setDragState(null);
         setMissingEdgeFilled(false);
         setAssignDragState(null);
@@ -6890,7 +6984,7 @@
       const lv6CoachSteps = useMemo(() => {
         if (guideMode === 'manual') {
           return [
-            { desc: '先點擊上方亮起的分子、分母圓幣對應的三角形邊長（亦支援拖曳）。' },
+            { desc: '第一階段先點擊上方分子、分母圓幣放到對應邊（亦支援拖曳）；第二、三階段會自動飛入定位。' },
             { desc: '第二、三階段需先點選下方數字填入未知第三邊「?」（亦支援拖曳）。' },
             { desc: '三邊就緒後，直接點擊三角形上的邊長填入右上「求」的分子與分母（亦支援拖曳）！' }
           ];
@@ -7010,7 +7104,7 @@
       };
 
       const handleTokenPointerDown = (e, tokenKey) => {
-        if (gameState !== 'playing' || !question || placedTokens[tokenKey] || solvedOpt || (!isRelaxMode && lives <= 0)) return;
+        if (gameState !== 'playing' || !question || question.phase > 0 || placedTokens[tokenKey] || solvedOpt || (!isRelaxMode && lives <= 0)) return;
         if (e.currentTarget.setPointerCapture) {
           try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
         }
@@ -7335,7 +7429,7 @@
               />
 
               <div ref={cardBoxRef} className={`relative flex-1 min-h-0 bg-white rounded-3xl border-3 border-teal-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${solvedOpt ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                <StagePhaseStrip phase={phase} labels={['拖邊定位 • 顯示第三邊', '拖邊定位 • 畢氏算式鷹架', '翻轉建構 • 純心算第三邊']} />
+                <StagePhaseStrip phase={phase} labels={['標邊定位 • 顯示第三邊', '自動標邊 • 畢氏算式鷹架', '自動標邊 • 翻轉純心算']} />
                 <div data-coach="lv6-clue" className="bg-gradient-to-r from-teal-700 to-emerald-800 min-h-[70px] py-1.5 px-3.5 flex items-center justify-between gap-2 text-white border-b-2 border-teal-950 shrink-0">
                   <div className="flex items-center gap-2 font-serif font-black text-base sm:text-lg">
                     <span className="text-[11px] font-sans bg-white/20 px-2 py-0.5 rounded-lg">已知</span>
@@ -7344,15 +7438,32 @@
                       {question.knownTokens.map((tk, tIdx) => {
                         const isPlaced = placedTokens[tk.key];
                         const isSel = selectedTokenKey === tk.key;
+                        const flyItem = autoFlyItems?.find(it => it.key === tk.key);
+                        const isFlyingNow = Boolean(flyItem && flyItem.launched && !flyItem.landed);
                         return (
                           <React.Fragment key={tk.key}>
                             {tIdx === 1 && <div className="w-10 h-0.5 bg-white/80 my-1" />}
                             {isPlaced ? (
-                              <span className="min-w-[36px] h-[26px] px-2 rounded-full bg-emerald-400/25 border border-emerald-300/70 text-emerald-100 text-sm font-black inline-flex items-center justify-center">
+                              <span
+                                ref={(el) => { tokenRefs.current[tk.key] = el; }}
+                                className="min-w-[36px] h-[26px] px-2 rounded-full bg-emerald-400/25 border border-emerald-300/70 text-emerald-100 text-sm font-black inline-flex items-center justify-center transition-colors"
+                              >
+                                {tk.val}
+                              </span>
+                            ) : question.phase > 0 ? (
+                              <span
+                                ref={(el) => { tokenRefs.current[tk.key] = el; }}
+                                className={`min-w-[38px] h-[28px] px-2.5 rounded-full text-base font-black inline-flex items-center justify-center transition-all ${
+                                  isFlyingNow
+                                    ? 'border-2 border-dashed border-amber-200/60 bg-amber-300/15 text-transparent'
+                                    : 'bg-gradient-to-b from-amber-300 to-amber-500 border-2 border-white/80 text-amber-950 shadow-md'
+                                }`}
+                              >
                                 {tk.val}
                               </span>
                             ) : (
                               <button
+                                ref={(el) => { tokenRefs.current[tk.key] = el; }}
                                 type="button"
                                 data-coach={(!placedTokens.num && tk.key === 'num') || (placedTokens.num && !placedTokens.den && tk.key === 'den') ? 'lv6-coin' : undefined}
                                 onPointerDown={(e) => handleTokenPointerDown(e, tk.key)}
@@ -7422,7 +7533,7 @@
 
                 <div onClick={handleConfirmSkip} className="relative w-full flex-1 min-h-0 bg-white flex flex-col items-center justify-between overflow-hidden">
                   <HintBanner tip={conceptTip} />
-                  {!edgesReady && (
+                  {!edgesReady && phase === 0 && (
                     <div className="pointer-events-none absolute top-2 inset-x-0 flex justify-center z-10">
                       <span className="text-[11px] font-black text-teal-800 bg-teal-50/95 border border-teal-200 px-3 py-0.5 rounded-full shadow-sm">
                         {selectedTokenKey ? `點擊三角形對應邊放入${selectedTokenKey === 'num' ? '分子' : '分母'}（也可拖曳）` : '點擊或拖曳上方數字到三角形對應邊'}
@@ -7569,6 +7680,28 @@
                     </div>
                   )}
                 </div>
+
+                {/* Phase 1/2 開場自動飛入定位圓幣 */}
+                {autoFlyItems && autoFlyItems.map((it) => {
+                  if (it.landed) return null;
+                  const dx = it.launched ? (it.toX - it.fromX) : 0;
+                  const dy = it.launched ? (it.toY - it.fromY) : 0;
+                  return (
+                    <div
+                      key={it.key}
+                      style={{
+                        left: `${it.fromX}px`,
+                        top: `${it.fromY}px`,
+                        transform: `translate(-50%, -50%) translate3d(${dx}px, ${dy}px, 0) scale(${it.launched ? 1.06 : 0.92})`,
+                        opacity: it.launched ? 1 : 0,
+                        transition: 'transform 380ms cubic-bezier(0.22, 1, 0.36, 1), opacity 80ms ease-out'
+                      }}
+                      className="pointer-events-none absolute z-40 w-11 h-11 rounded-full bg-gradient-to-b from-amber-300 to-amber-500 border-2 border-white text-amber-950 font-serif font-black text-lg shadow-[0_8px_20px_rgba(245,158,11,0.55)] flex items-center justify-center will-change-transform"
+                    >
+                      {it.val}
+                    </div>
+                  );
+                })}
 
                 {/* Step 1 跟手浮動拖曳圓幣 */}
                 {dragState && (() => {
@@ -14380,15 +14513,21 @@
       return { x: lx, y: ly, anchor };
     };
 
-    // 純原生 SVG 課本標準帶頂線根式標籤（避免 iOS Safari foreignObject 模糊偏移，亦徹底消除粗描邊 Unicode √ 變形）
-    const Lv14SvgSqrtLabel = ({ x, y, anchor = 'start', fill = '#fecdd3', stroke = '#12091c', text = '', fontSize = 11.5 }) => {
+    // 純原生 SVG 課本標準帶頂線根式標籤（支援描邊外框或膠囊內無描邊，避免 iOS Safari foreignObject 模糊偏移）
+    const Lv14SvgSqrtLabel = ({ x, y, anchor = 'start', fill = '#fecdd3', stroke = '#12091c', text = '', fontSize = 11.5, baseline = 'auto' }) => {
       const str = String(text ?? '');
+      const hasStroke = stroke && stroke !== 'none';
+      const txtStyle = hasStroke ? { paintOrder: 'stroke', stroke, strokeWidth: '3.5px', strokeLinejoin: 'round' } : undefined;
+      const fw = hasStroke ? '900' : '800';
+      const pathStrokeW = hasStroke ? 1.5 : Math.max(0.95, fontSize * 0.092);
+      const baseY = baseline === 'middle' ? y + fontSize * 0.36 : y;
       if (!str.includes('√')) {
         return (
           <text
-            x={x} y={y} textAnchor={anchor}
-            fill={fill} fontSize={fontSize} fontWeight="900" className="font-mono"
-            style={{ paintOrder: 'stroke', stroke, strokeWidth: '3.5px', strokeLinejoin: 'round' }}
+            x={x} y={baseline === 'middle' ? y : baseY} textAnchor={anchor}
+            dominantBaseline={baseline === 'middle' ? 'middle' : undefined}
+            fill={fill} fontSize={fontSize} fontWeight={fw} className="font-mono"
+            style={txtStyle}
           >
             {str}
           </text>
@@ -14434,23 +14573,23 @@
             if (tk.kind === 'text') {
               return (
                 <text
-                  key={i} x={x0} y={y} textAnchor="start"
-                  fill={fill} fontSize={fontSize} fontWeight="900" className="font-mono"
-                  style={{ paintOrder: 'stroke', stroke, strokeWidth: '3.5px', strokeLinejoin: 'round' }}
+                  key={i} x={x0} y={baseY} textAnchor="start"
+                  fill={fill} fontSize={fontSize} fontWeight={fw} className="font-mono"
+                  style={txtStyle}
                 >
                   {tk.val}
                 </text>
               );
             }
-            const d = `M ${(x0 + 0.5).toFixed(1)} ${(y - h * 0.34).toFixed(1)} L ${(x0 + tk.hookW * 0.30).toFixed(1)} ${(y - h * 0.44).toFixed(1)} L ${(x0 + tk.hookW * 0.56).toFixed(1)} ${(y + h * 0.04).toFixed(1)} L ${(x0 + tk.hookW * 0.96).toFixed(1)} ${(y - h * 0.88).toFixed(1)} L ${(x0 + tk.hookW + tk.radW).toFixed(1)} ${(y - h * 0.88).toFixed(1)}`;
+            const d = `M ${(x0 + 0.5).toFixed(1)} ${(baseY - h * 0.34).toFixed(1)} L ${(x0 + tk.hookW * 0.30).toFixed(1)} ${(baseY - h * 0.44).toFixed(1)} L ${(x0 + tk.hookW * 0.56).toFixed(1)} ${(baseY + h * 0.04).toFixed(1)} L ${(x0 + tk.hookW * 0.96).toFixed(1)} ${(baseY - h * 0.88).toFixed(1)} L ${(x0 + tk.hookW + tk.radW).toFixed(1)} ${(baseY - h * 0.88).toFixed(1)}`;
             return (
               <g key={i}>
-                <path d={d} fill="none" stroke={stroke} strokeWidth="4.2" strokeLinecap="round" strokeLinejoin="round" />
-                <path d={d} fill="none" stroke={fill} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                {hasStroke && <path d={d} fill="none" stroke={stroke} strokeWidth="4.2" strokeLinecap="round" strokeLinejoin="round" />}
+                <path d={d} fill="none" stroke={fill} strokeWidth={pathStrokeW} strokeLinecap="round" strokeLinejoin="round" />
                 <text
-                  x={x0 + tk.hookW + 0.8} y={y} textAnchor="start"
-                  fill={fill} fontSize={fontSize} fontWeight="900" className="font-mono"
-                  style={{ paintOrder: 'stroke', stroke, strokeWidth: '3.5px', strokeLinejoin: 'round' }}
+                  x={x0 + tk.hookW + 0.8} y={baseY} textAnchor="start"
+                  fill={fill} fontSize={fontSize} fontWeight={fw} className="font-mono"
+                  style={txtStyle}
                 >
                   {tk.val}
                 </text>
@@ -17598,8 +17737,11 @@
         if (!gameOver) setTimeout(() => setFeedbackAnim(''), 360);
       };
 
-      // ===== P0 外接圓拖曳頂點 A（全畫板點拖 ＋ getScreenCTM 精準座標換算） =====
-      const P0_CX = 160, P0_CY = 112, P0_R = 80;
+      // ===== P0 外接圓拖曳頂點 A（收窄方形 viewBox 放大 30% ＋ 依 angA 開放整條大優弧拖曳 ＋ getScreenCTM 精準換算） =====
+      const P0_VW = 256, P0_VH = 236, P0_CX = 128, P0_CY = 108, P0_R = 92;
+      const p0MinTheta = isDragPhase && question ? (-90 + question.angA + 15) : -45;
+      const p0MaxTheta = isDragPhase && question ? (270 - question.angA - 15) : 225;
+
       const updateThetaFromClient = (clientX, clientY) => {
         const svg = svgRef.current;
         if (!svg) return;
@@ -17614,15 +17756,16 @@
           sy = svgPt.y;
         } else {
           const rect = svg.getBoundingClientRect();
-          const scale = Math.min(rect.width / 320, rect.height / 218);
-          const offX = (rect.width - 320 * scale) / 2;
-          const offY = (rect.height - 218 * scale) / 2;
+          const scale = Math.min(rect.width / P0_VW, rect.height / P0_VH);
+          const offX = (rect.width - P0_VW * scale) / 2;
+          const offY = (rect.height - P0_VH * scale) / 2;
           sx = (clientX - rect.left - offX) / scale;
           sy = (clientY - rect.top - offY) / scale;
         }
+        // atan2 輸出 [-180, 180]；把下半圓左半部 (-180 ~ -90) 轉成 (180 ~ 270) 以連續對應大優弧 [-45..225]
         let deg = Math.atan2(P0_CY - sy, sx - P0_CX) * (180 / Math.PI);
-        if (deg < 0) deg = sx >= P0_CX ? 25 : 155;
-        deg = Math.max(25, Math.min(155, Math.round(deg / 5) * 5));
+        if (deg < -90) deg += 360;
+        deg = Math.max(p0MinTheta, Math.min(p0MaxTheta, Math.round(deg / 5) * 5));
         setThetaA(prev => {
           if (prev !== deg) audio.sfxTick();
           return deg;
@@ -17742,19 +17885,37 @@
         const u1x = others[0][0] - v[0], u1y = others[0][1] - v[1];
         const u2x = others[1][0] - v[0], u2y = others[1][1] - v[1];
         const l1 = Math.hypot(u1x, u1y) || 1, l2 = Math.hypot(u2x, u2y) || 1;
+        const dot = Math.max(-1, Math.min(1, (u1x * u2x + u1y * u2y) / (l1 * l2)));
+        const angDeg = Math.acos(dot) * (180 / Math.PI);
         const bx = u1x / l1 + u2x / l2, by = u1y / l1 + u2y / l2;
         const bl = Math.hypot(bx, by) || 1;
-        const rArc = 24;
+        const rArc = angDeg < 40 ? 18 : angDeg < 75 ? 22 : 24;
+        const labelDist = angDeg < 35 ? 46 : angDeg < 55 ? 39 : angDeg < 85 ? 33 : 28;
         const a1x = v[0] + (u1x / l1) * rArc, a1y = v[1] + (u1y / l1) * rArc;
         const a2x = v[0] + (u2x / l2) * rArc, a2y = v[1] + (u2y / l2) * rArc;
         const cross = (u1x / l1) * (u2y / l2) - (u1y / l1) * (u2x / l2);
         const sweep = cross > 0 ? 1 : 0;
         return {
           v,
+          angDeg,
           arcPath: `M ${v[0]} ${v[1]} L ${a1x} ${a1y} A ${rArc} ${rArc} 0 0 ${sweep} ${a2x} ${a2y} Z`,
-          lx: v[0] + (bx / bl) * 40,
-          ly: v[1] + (by / bl) * 40
+          lx: v[0] + (bx / bl) * labelDist,
+          ly: v[1] + (by / bl) * labelDist
         };
+      };
+
+      // 解析幾何精確計算三角形外接圓（外心 O 與半徑 R），確保三頂點 100% 精準落在圓周上
+      const computeCircumcircle = (pts) => {
+        const [[ax, ay], [bx, by], [cx, cy]] = pts;
+        const d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
+        if (Math.abs(d) < 1e-4) return { cx: 160, cy: 112, r: 80 };
+        const a2 = ax * ax + ay * ay;
+        const b2 = bx * bx + by * by;
+        const c2 = cx * cx + cy * cy;
+        const ux = (a2 * (by - cy) + b2 * (cy - ay) + c2 * (ay - by)) / d;
+        const uy = (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / d;
+        const r = Math.hypot(ax - ux, ay - uy);
+        return { cx: ux, cy: uy, r };
       };
 
       const slotEdgeActive = !isDragPhase && !isSolved && !pickedEdge;
@@ -17906,75 +18067,86 @@
                       rightSqPath = `M ${r1[0]} ${r1[1]} L ${r2[0]} ${r2[1]} L ${r3[0]} ${r3[1]}`;
                     }
 
+                    // 計算 2R 標籤位置（改放直徑下半段：自圓心 O 往底端點 B/C 約 48%，並向外側法線偏 16px，徹底避開頂點 A 角度膠囊與圓心 O）
+                    let diam2RLbl = null;
+                    if (isP0DiameterHit) {
+                      const dBase = isP0DiamRight ? [Bx, By] : [Cx, Cy];
+                      const mx = P0_CX + (dBase[0] - P0_CX) * 0.48;
+                      const my = P0_CY + (dBase[1] - P0_CY) * 0.48;
+                      const dx = Ax - dBase[0], dy = Ay - dBase[1];
+                      const dl = Math.hypot(dx, dy) || 1;
+                      let nx = -dy / dl, ny = dx / dl;
+                      const otherV = isP0DiamRight ? [Cx, Cy] : [Bx, By];
+                      if ((otherV[0] - mx) * nx + (otherV[1] - my) * ny > 0) { nx = -nx; ny = -ny; }
+                      diam2RLbl = { x: mx + nx * 16, y: my + ny * 16 };
+                    }
+
                     return (
                       <svg
                         ref={svgRef}
                         data-coach="lv16-board"
-                        viewBox="0 0 320 218"
+                        viewBox={`0 0 ${P0_VW} ${P0_VH}`}
                         onPointerDown={handleCirclePointerDown}
                         style={{ touchAction: 'none' }}
-                        className={`w-full h-full max-w-[420px] object-contain select-none touch-none ${isSolved ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
+                        className={`w-full h-full max-w-[460px] object-contain select-none touch-none ${isSolved ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
                       >
-                        {/* 外接圓與圓心 O */}
-                        <circle cx={P0_CX} cy={P0_CY} r={P0_R} fill="rgba(56,189,248,0.06)" stroke="#38bdf8" strokeWidth="2" strokeDasharray="5 4" />
-                        {/* 兩條淡橘直徑引導目標點 */}
+                        {/* Layer 1：外接圓與兩條直徑目標引導線 */}
+                        <circle cx={P0_CX} cy={P0_CY} r={P0_R} fill="rgba(56,189,248,0.06)" stroke="#38bdf8" strokeWidth="2.2" strokeDasharray="5 4" />
                         <line x1={Bx} y1={By} x2={T1x} y2={T1y} stroke="#f59e0b" strokeWidth="1.2" strokeDasharray="4 4" opacity={isP0DiamRight ? 0.9 : 0.35} />
                         <line x1={Cx} y1={Cy} x2={T2x} y2={T2y} stroke="#f59e0b" strokeWidth="1.2" strokeDasharray="4 4" opacity={isP0DiamLeft ? 0.9 : 0.35} />
-                        <circle cx={T1x} cy={T1y} r="5.5" fill="none" stroke="#f59e0b" strokeWidth="1.6" strokeDasharray="2 2" opacity={isP0DiamRight ? 0 : 0.7} />
-                        <circle cx={T2x} cy={T2y} r="5.5" fill="none" stroke="#f59e0b" strokeWidth="1.6" strokeDasharray="2 2" opacity={isP0DiamLeft ? 0 : 0.7} />
+                        <circle cx={T1x} cy={T1y} r="6" fill="none" stroke="#f59e0b" strokeWidth="1.8" strokeDasharray="2 2" opacity={isP0DiamRight ? 0 : 0.72} />
+                        <circle cx={T2x} cy={T2y} r="6" fill="none" stroke="#f59e0b" strokeWidth="1.8" strokeDasharray="2 2" opacity={isP0DiamLeft ? 0 : 0.72} />
 
-                        {/* 三角形填色 */}
+                        {/* Layer 2：三角形淡色填充 ＋ 恆定圓周角扇形 ＋ Thales 直角符號 */}
                         <polygon
                           points={`${Ax},${Ay} ${Bx},${By} ${Cx},${Cy}`}
-                          fill={isP0DiameterHit ? 'rgba(16,185,129,0.22)' : 'rgba(56,189,248,0.12)'}
-                          stroke="#334155" strokeWidth="2.4" strokeLinejoin="round"
+                          fill={isP0DiameterHit ? 'rgba(16,185,129,0.20)' : 'rgba(56,189,248,0.11)'}
+                          stroke="none"
                         />
+                        <path d={acA.arcPath} fill="rgba(16,185,129,0.32)" stroke="#059669" strokeWidth="1.8" />
+                        {rightSqPath && (
+                          <path d={rightSqPath} fill="none" stroke="#059669" strokeWidth="2.6" strokeLinejoin="round" />
+                        )}
 
-                        {/* 過圓心直徑發光標示 */}
+                        {/* Layer 3：三角形邊線 ＋ 過圓心金色直徑 ＋ 圓心 O 與底邊端點 */}
+                        <polygon
+                          points={`${Ax},${Ay} ${Bx},${By} ${Cx},${Cy}`}
+                          fill="none"
+                          stroke="#334155" strokeWidth="2.6" strokeLinejoin="round"
+                        />
                         {isP0DiamRight && (
-                          <>
-                            <line x1={Bx} y1={By} x2={Ax} y2={Ay} stroke="#f59e0b" strokeWidth="4.5" strokeLinecap="round" />
-                            <rect x={P0_CX - 18} y={P0_CY - 12} width="36" height="20" rx="10" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1.8" />
-                            <text x={P0_CX} y={P0_CY - 1} fill="#b45309" fontSize="11.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">2R</text>
-                          </>
+                          <line x1={Bx} y1={By} x2={Ax} y2={Ay} stroke="#f59e0b" strokeWidth="4.6" strokeLinecap="round" />
                         )}
                         {isP0DiamLeft && (
-                          <>
-                            <line x1={Cx} y1={Cy} x2={Ax} y2={Ay} stroke="#f59e0b" strokeWidth="4.5" strokeLinecap="round" />
-                            <rect x={P0_CX - 18} y={P0_CY - 12} width="36" height="20" rx="10" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1.8" />
-                            <text x={P0_CX} y={P0_CY - 1} fill="#b45309" fontSize="11.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">2R</text>
-                          </>
+                          <line x1={Cx} y1={Cy} x2={Ax} y2={Ay} stroke="#f59e0b" strokeWidth="4.6" strokeLinecap="round" />
                         )}
-
-                        {/* Thales 直角記號 */}
-                        {rightSqPath && (
-                          <path d={rightSqPath} fill="none" stroke="#059669" strokeWidth="2.4" strokeLinejoin="round" />
-                        )}
-
-                        {/* 圓心 O */}
-                        <circle cx={P0_CX} cy={P0_CY} r="4.2" fill={isP0DiameterHit ? '#f59e0b' : '#0284c7'} stroke="#ffffff" strokeWidth="1.8" />
-                        {!isP0DiameterHit && (
-                          <text x={P0_CX + 9} y={P0_CY + 4} fill="#0369a1" fontSize="11" fontWeight="900" className="font-serif italic">O</text>
-                        )}
-
-                        {/* 頂點 A 恆定圓周角標示 */}
-                        <path d={acA.arcPath} fill="rgba(16,185,129,0.32)" stroke="#059669" strokeWidth="1.8" />
-                        <rect x={acA.lx - 18} y={acA.ly - 10} width="36" height="20" rx="10" fill="#ecfdf5" stroke="#059669" strokeWidth="1.6" />
-                        <text x={acA.lx} y={acA.ly + 1} fill="#047857" fontSize="11" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">
-                          {question.angA}°
-                        </text>
-
-                        {/* 固定底邊 a */}
-                        <line x1={Bx} y1={By} x2={Cx} y2={Cy} stroke="#0284c7" strokeWidth="4.2" strokeLinecap="round" />
+                        <line x1={Bx} y1={By} x2={Cx} y2={Cy} stroke="#0284c7" strokeWidth="4.4" strokeLinecap="round" />
+                        <circle data-coach="lv16-p0-center" cx={P0_CX} cy={P0_CY} r="4.5" fill={isP0DiameterHit ? '#f59e0b' : '#0284c7'} stroke="#ffffff" strokeWidth="2" />
+                        <text x={P0_CX + 10} y={P0_CY + 4} fill={isP0DiameterHit ? '#b45309' : '#0369a1'} fontSize="11" fontWeight="900" className="font-serif italic">O</text>
                         <circle cx={Bx} cy={By} r="4.5" fill="#ffffff" stroke="#0284c7" strokeWidth="2.2" />
                         <circle cx={Cx} cy={Cy} r="4.5" fill="#ffffff" stroke="#0284c7" strokeWidth="2.2" />
-                        <rect x={(Bx + Cx) / 2 - 22} y={By + 6} width="44" height="21" rx="10.5" fill="#e0f2fe" stroke="#0284c7" strokeWidth="1.8" />
-                        <text x={(Bx + Cx) / 2} y={By + 17.5} fill="#0369a1" fontSize="11.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">
-                          a={question.aLabel}
-                        </text>
 
-                        {/* 可拖曳頂點 A 金球 */}
+                        {/* Layer 4（最頂層）：2R 標籤、圓周角膠囊、底邊膠囊、可拖曳頂點 A 金球 */}
+                        {diam2RLbl && (
+                          <g className="pointer-events-none">
+                            <rect x={diam2RLbl.x - 18} y={diam2RLbl.y - 10} width="36" height="20" rx="10" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1.8" />
+                            <text x={diam2RLbl.x} y={diam2RLbl.y + 1} fill="#b45309" fontSize="11" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">2R</text>
+                          </g>
+                        )}
                         <g className="pointer-events-none">
+                          <rect x={acA.lx - 19} y={acA.ly - 10.5} width="38" height="21" rx="10.5" fill="#ecfdf5" stroke="#059669" strokeWidth="1.6" />
+                          <text x={acA.lx} y={acA.ly + 1} fill="#047857" fontSize="11" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">
+                            {question.angA}°
+                          </text>
+                        </g>
+                        <g className="pointer-events-none">
+                          <rect x={(Bx + Cx) / 2 - 28} y={By + 7} width="56" height="24" rx="12" fill="#e0f2fe" stroke="#0284c7" strokeWidth="1.8" />
+                          <Lv14SvgSqrtLabel
+                            x={(Bx + Cx) / 2} y={By + 19.5} anchor="middle" baseline="middle"
+                            fill="#0369a1" stroke="none" text={`a=${question.aLabel}`} fontSize={12.5}
+                          />
+                        </g>
+                        <g data-coach="lv16-p0-knob" className="pointer-events-none">
                           {!isSolved && (
                             <circle cx={Ax} cy={Ay} r="21" fill="rgba(245,158,11,0.18)" stroke="rgba(245,158,11,0.45)" strokeWidth="1.5" />
                           )}
@@ -17983,122 +18155,223 @@
                         </g>
                       </svg>
                     );
-                  })() : (
-                    <svg data-coach="lv16-board" viewBox="0 0 320 218" className="w-full h-full max-w-[420px] object-contain select-none">
-                      {/* 2R 題型繪製柔和外接圓與半徑 R（答對時額外點亮直徑 2R） */}
-                      {question.mode === '2R' && (
-                        <g className="pointer-events-none">
-                          <circle cx="160" cy="122" r="88" fill="rgba(56,189,248,0.06)" stroke="#38bdf8" strokeWidth="1.8" strokeDasharray="5 4" />
-                          {isSolved ? (
-                            <>
-                              <line x1="72" y1="122" x2="248" y2="122" stroke="#f59e0b" strokeWidth="2.4" strokeDasharray="6 3" />
-                              <text x="160" y="112" fill="#b45309" fontSize="12" fontWeight="900" textAnchor="middle" className="font-mono">2R</text>
-                            </>
-                          ) : (
-                            <>
-                              <line x1="160" y1="122" x2="248" y2="122" stroke="#0284c7" strokeWidth="1.6" strokeDasharray="3 3" />
-                              <text x="206" y="114" fill="#0369a1" fontSize="12" fontWeight="900" textAnchor="middle" className="font-serif italic">R</text>
-                            </>
-                          )}
-                          <circle cx="160" cy="122" r="3" fill={isSolved ? '#f59e0b' : '#0284c7'} />
-                        </g>
-                      )}
+                  })() : (() => {
+                    // P1 / P2：真實精確外接圓 ＋ 動態貼合 viewBox ＋ 等比統一字體縮放 s = vbW / 260 ＋ 嚴格 4 層圖層
+                    const cc = question.mode === '2R' ? computeCircumcircle(question.pts) : null;
+                    const xs = question.pts.map(p => p[0]);
+                    const ys = question.pts.map(p => p[1]);
+                    if (cc) {
+                      xs.push(cc.cx - cc.r, cc.cx + cc.r);
+                      ys.push(cc.cy - cc.r, cc.cy + cc.r);
+                    }
+                    const pad = cc ? 24 : 34;
+                    const minX = Math.min(...xs) - pad;
+                    const maxX = Math.max(...xs) + pad;
+                    const minY = Math.min(...ys) - pad;
+                    const maxY = Math.max(...ys) + pad;
+                    const vbW = Math.max(180, maxX - minX);
+                    const vbH = Math.max(150, maxY - minY);
+                    const s = Math.max(0.85, Math.min(1.22, vbW / 260)); // 確保每題肉眼字體與膠囊大小一致
 
-                      {/* 三角形本體 */}
-                      <polygon
-                        points={question.pts.map(p => p.join(',')).join(' ')}
-                        fill={isSolved ? 'rgba(16,185,129,0.16)' : 'rgba(56,189,248,0.08)'}
-                        stroke="#334155"
-                        strokeWidth="2.6"
-                        strokeLinejoin="round"
-                      />
+                    // 2R 幾何邏輯：作答中半徑 R 指向最空曠圓弧且標籤放外緣 0.76R；答對後由已知對邊端點過圓心畫出完整淡金虛線 Thales 直角三角形與直徑 2R
+                    let radEnd = null, radLbl = null, thalesD1 = null, thalesD2 = null, thalesP2 = null, thalesRightSq = null, diamLbl = null;
+                    if (cc) {
+                      const vAngs = question.pts.map(p => Math.atan2(p[1] - cc.cy, p[0] - cc.cx));
+                      let bestA = -Math.PI / 6;
+                      let bestMinSep = -1;
+                      for (let k = 0; k < 24; k++) {
+                        const cand = -Math.PI + (k * Math.PI) / 12;
+                        const minSep = Math.min(...vAngs.map(va => {
+                          let d = Math.abs(cand - va);
+                          if (d > Math.PI) d = 2 * Math.PI - d;
+                          return d;
+                        }));
+                        if (minSep > bestMinSep) { bestMinSep = minSep; bestA = cand; }
+                      }
+                      radEnd = [cc.cx + cc.r * Math.cos(bestA), cc.cy + cc.r * Math.sin(bestA)];
+                      const rNx = -Math.sin(bestA), rNy = Math.cos(bestA);
+                      radLbl = {
+                        x: cc.cx + cc.r * 0.76 * Math.cos(bestA) + rNx * (10 * s),
+                        y: cc.cy + cc.r * 0.76 * Math.sin(bestA) + rNy * (10 * s)
+                      };
 
-                      {/* 選滿對邊與對角即亮起「對邊中點 ↔ 對角頂點」金色共振光橋 */}
-                      {pickedEdge && pickedAngle && (() => {
-                        const ec = getEdgeCoords(question.pts, pickedEdge.idx);
-                        const vp = question.pts[pickedAngle.v];
-                        return (
+                      // 答對後：以正解對邊的一端點過圓心 O 畫出完整 Thales 直角三角形（呼應 P0 證明！）
+                      const solvedEdge = pickedEdge || question.edges.find(e => e.ok);
+                      if (solvedEdge) {
+                        const sec = getEdgeCoords(question.pts, solvedEdge.idx);
+                        thalesD1 = sec.p1;
+                        thalesP2 = sec.p2;
+                        thalesD2 = [2 * cc.cx - sec.p1[0], 2 * cc.cy - sec.p1[1]];
+                        const dAng = Math.atan2(thalesD2[1] - cc.cy, thalesD2[0] - cc.cx);
+                        const dNx = -Math.sin(dAng), dNy = Math.cos(dAng);
+                        diamLbl = {
+                          x: cc.cx + cc.r * 0.68 * Math.cos(dAng) + dNx * (12 * s),
+                          y: cc.cy + cc.r * 0.68 * Math.sin(dAng) + dNy * (12 * s)
+                        };
+                        // 在 thalesP2 畫出 Thales 直角符號 ┐
+                        const u1x = thalesD1[0] - thalesP2[0], u1y = thalesD1[1] - thalesP2[1];
+                        const l1 = Math.hypot(u1x, u1y) || 1;
+                        const u2x = thalesD2[0] - thalesP2[0], u2y = thalesD2[1] - thalesP2[1];
+                        const l2 = Math.hypot(u2x, u2y) || 1;
+                        const sq = 9.5 * s;
+                        const q1 = [thalesP2[0] + (u1x / l1) * sq, thalesP2[1] + (u1y / l1) * sq];
+                        const q2 = [q1[0] + (u2x / l2) * sq, q1[1] + (u2y / l2) * sq];
+                        const q3 = [thalesP2[0] + (u2x / l2) * sq, thalesP2[1] + (u2y / l2) * sq];
+                        thalesRightSq = `M ${q1[0]} ${q1[1]} L ${q2[0]} ${q2[1]} L ${q3[0]} ${q3[1]}`;
+                      }
+                    }
+
+                    const angleGeos = question.angles.map(ang => ({ ang, ac: getAngleCoords(question.pts, ang.v) }));
+                    const edgeGeos = question.edges.map(edge => ({ edge, ec: getEdgeCoords(question.pts, edge.idx) }));
+
+                    return (
+                      <svg data-coach="lv16-board" viewBox={`${minX.toFixed(1)} ${minY.toFixed(1)} ${vbW.toFixed(1)} ${vbH.toFixed(1)}`} className="w-full h-full max-w-[450px] object-contain select-none">
+                        {/* Layer 1（最底層）：真實精確外接圓 ＋ 圓心 O ＋ 半徑 R / 完整淡金虛線 Thales 直角三角形與直徑 2R */}
+                        {cc && (
                           <g className="pointer-events-none">
-                            <line x1={ec.mx} y1={ec.my} x2={vp[0]} y2={vp[1]} stroke="rgba(251,191,36,0.45)" strokeWidth="7" strokeLinecap="round" />
-                            <line x1={ec.mx} y1={ec.my} x2={vp[0]} y2={vp[1]} stroke="#10b981" strokeWidth="2.8" strokeDasharray="6 4" strokeLinecap="round" />
+                            <circle cx={cc.cx} cy={cc.cy} r={cc.r} fill="rgba(56,189,248,0.06)" stroke="#38bdf8" strokeWidth={1.9 * s} strokeDasharray="5 4" />
+                            {isSolved && thalesD1 && thalesD2 && thalesP2 ? (
+                              <>
+                                <polygon
+                                  points={`${thalesD1[0]},${thalesD1[1]} ${thalesD2[0]},${thalesD2[1]} ${thalesP2[0]},${thalesP2[1]}`}
+                                  fill="rgba(251,191,36,0.09)" stroke="none"
+                                />
+                                <line x1={thalesD1[0]} y1={thalesD1[1]} x2={thalesD2[0]} y2={thalesD2[1]} stroke="#f59e0b" strokeWidth={2.5 * s} strokeDasharray="6 3" strokeLinecap="round" />
+                                <line x1={thalesD2[0]} y1={thalesD2[1]} x2={thalesP2[0]} y2={thalesP2[1]} stroke="#d97706" strokeWidth={1.7 * s} strokeDasharray="4 3" strokeLinecap="round" opacity="0.82" />
+                                {thalesRightSq && (
+                                  <path d={thalesRightSq} fill="none" stroke="#d97706" strokeWidth={2.0 * s} strokeLinejoin="round" />
+                                )}
+                                <circle cx={thalesD2[0]} cy={thalesD2[1]} r={3.6 * s} fill="#fef3c7" stroke="#d97706" strokeWidth={1.6 * s} />
+                              </>
+                            ) : (
+                              <line x1={cc.cx} y1={cc.cy} x2={radEnd[0]} y2={radEnd[1]} stroke="#0284c7" strokeWidth={1.6 * s} strokeDasharray="3 3" />
+                            )}
+                            <circle cx={cc.cx} cy={cc.cy} r={3.2 * s} fill={isSolved ? '#f59e0b' : '#0284c7'} stroke="#ffffff" strokeWidth={1.2 * s} />
                           </g>
-                        );
-                      })()}
+                        )}
 
-                      {/* 角度標籤 */}
-                      {question.angles.map((ang) => {
-                        const ac = getAngleCoords(question.pts, ang.v);
-                        const isPicked = pickedAngle?.v === ang.v;
-                        const isHighlight = isPicked || (isSolved && ang.ok);
-                        return (
-                          <g
-                            key={`ang-${ang.v}`}
-                            onClick={(e) => { e.stopPropagation(); handleClickAngle(ang); }}
-                            className="cursor-pointer"
-                          >
+                        {/* Layer 2：三角形淡色填色 ＋ 角度扇形 */}
+                        <polygon
+                          points={question.pts.map(p => p.join(',')).join(' ')}
+                          fill={isSolved ? 'rgba(16,185,129,0.16)' : 'rgba(56,189,248,0.08)'}
+                          stroke="none"
+                        />
+                        {angleGeos.map(({ ang, ac }) => {
+                          const isHighlight = pickedAngle?.v === ang.v || (isSolved && ang.ok);
+                          return (
                             <path
+                              key={`sec-${ang.v}`}
                               d={ac.arcPath}
-                              fill={ang.isGiven ? 'rgba(56,189,248,0.22)' : isHighlight ? 'rgba(16,185,129,0.35)' : 'rgba(251,191,36,0.22)'}
+                              onClick={(e) => { e.stopPropagation(); handleClickAngle(ang); }}
+                              className="cursor-pointer"
+                              fill={ang.isGiven ? 'rgba(56,189,248,0.22)' : isHighlight ? 'rgba(16,185,129,0.34)' : 'rgba(251,191,36,0.24)'}
                               stroke={ang.isGiven ? '#0284c7' : isHighlight ? '#059669' : '#f59e0b'}
-                              strokeWidth="1.8"
+                              strokeWidth={1.6 * s}
                             />
-                            <g transform={`translate(${ac.lx}, ${ac.ly})`}>
+                          );
+                        })}
+
+                        {/* Layer 3：三角形邊線 ＋ 高亮粗邊 ＋ 金色共振光橋 ＋ 三頂點白心收口 */}
+                        <polygon
+                          points={question.pts.map(p => p.join(',')).join(' ')}
+                          fill="none"
+                          stroke="#334155"
+                          strokeWidth={2.6 * s}
+                          strokeLinejoin="round"
+                        />
+                        {edgeGeos.map(({ edge, ec }) => {
+                          const isHighlight = pickedEdge?.idx === edge.idx || (isSolved && edge.ok);
+                          return (
+                            <g key={`eline-${edge.idx}`} onClick={(e) => { e.stopPropagation(); handleClickEdge(edge); }} className="cursor-pointer">
+                              {(isHighlight || edge.isGiven) && (
+                                <line
+                                  x1={ec.p1[0]} y1={ec.p1[1]} x2={ec.p2[0]} y2={ec.p2[1]}
+                                  stroke={edge.isGiven ? '#0284c7' : '#059669'} strokeWidth={(isHighlight ? 4.6 : 3.6) * s} strokeLinecap="round"
+                                />
+                              )}
+                              <line x1={ec.p1[0]} y1={ec.p1[1]} x2={ec.p2[0]} y2={ec.p2[1]} stroke="transparent" strokeWidth={18 * s} />
+                            </g>
+                          );
+                        })}
+                        {pickedEdge && pickedAngle && (() => {
+                          const ec = getEdgeCoords(question.pts, pickedEdge.idx);
+                          const vp = question.pts[pickedAngle.v];
+                          return (
+                            <g className="pointer-events-none">
+                              <line x1={ec.mx} y1={ec.my} x2={vp[0]} y2={vp[1]} stroke="rgba(251,191,36,0.42)" strokeWidth={6 * s} strokeLinecap="round" />
+                              <line x1={ec.mx} y1={ec.my} x2={vp[0]} y2={vp[1]} stroke="#10b981" strokeWidth={2.4 * s} strokeDasharray="5 4" strokeLinecap="round" />
+                            </g>
+                          );
+                        })}
+                        {question.pts.map((p, idx) => (
+                          <circle key={`vdot-${idx}`} cx={p[0]} cy={p[1]} r={4 * s} fill="#ffffff" stroke="#1e293b" strokeWidth={2.2 * s} className="pointer-events-none" />
+                        ))}
+
+                        {/* Layer 4（最頂層）：外接圓 R/2R 標籤（置於外側月牙區）＋ 統一字號之角度膠囊與邊長膠囊 */}
+                        {cc && (isSolved && diamLbl ? (
+                          <g className="pointer-events-none">
+                            <rect x={diamLbl.x - 16 * s} y={diamLbl.y - 9.5 * s} width={32 * s} height={19 * s} rx={9.5 * s} fill="#fef3c7" stroke="#f59e0b" strokeWidth={1.6 * s} />
+                            <text x={diamLbl.x} y={diamLbl.y + 0.8 * s} fill="#b45309" fontSize={11 * s} fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">2R</text>
+                          </g>
+                        ) : radLbl ? (
+                          <text x={radLbl.x} y={radLbl.y} fill="#0369a1" fontSize={11 * s} fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-serif italic pointer-events-none">R</text>
+                        ) : null)}
+                        {angleGeos.map(({ ang, ac }) => {
+                          const isHighlight = pickedAngle?.v === ang.v || (isSolved && ang.ok);
+                          const aw = 38 * s, ah = 21 * s;
+                          return (
+                            <g
+                              key={`apill-${ang.v}`}
+                              transform={`translate(${ac.lx}, ${ac.ly})`}
+                              onClick={(e) => { e.stopPropagation(); handleClickAngle(ang); }}
+                              className="cursor-pointer"
+                            >
                               <rect
-                                x="-24" y="-12" width="48" height="24" rx="12"
+                                x={-aw / 2} y={-ah / 2} width={aw} height={ah} rx={ah / 2}
                                 fill={ang.isGiven ? '#e0f2fe' : isHighlight ? '#059669' : slotAngleActive ? '#fef3c7' : '#ffffff'}
                                 stroke={ang.isGiven ? '#0284c7' : isHighlight ? '#047857' : slotAngleActive ? '#f59e0b' : '#cbd5e1'}
-                                strokeWidth={slotAngleActive && !ang.isGiven ? '2.4' : '1.8'}
+                                strokeWidth={(slotAngleActive && !ang.isGiven ? 2.2 : 1.7) * s}
                               />
                               <text
-                                x="0" y="1"
+                                x="0" y={0.8 * s}
                                 fill={ang.isGiven ? '#0369a1' : isHighlight ? '#ffffff' : '#92400e'}
-                                fontSize="11.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono"
+                                fontSize={11 * s} fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono"
                               >
                                 {ang.deg.replace('(頂)', '')}
                               </text>
                             </g>
-                          </g>
-                        );
-                      })}
-
-                      {/* 邊長標籤 */}
-                      {question.edges.map((edge) => {
-                        const ec = getEdgeCoords(question.pts, edge.idx);
-                        const isPicked = pickedEdge?.idx === edge.idx;
-                        const isHighlight = isPicked || (isSolved && edge.ok);
-                        return (
-                          <g
-                            key={`edge-${edge.idx}`}
-                            onClick={(e) => { e.stopPropagation(); handleClickEdge(edge); }}
-                            className="cursor-pointer"
-                          >
-                            {(isHighlight || edge.isGiven) && (
-                              <line
-                                x1={ec.p1[0]} y1={ec.p1[1]} x2={ec.p2[0]} y2={ec.p2[1]}
-                                stroke={edge.isGiven ? '#0284c7' : '#059669'} strokeWidth={isHighlight ? '5' : '3.8'} strokeLinecap="round"
-                              />
-                            )}
-                            <line x1={ec.p1[0]} y1={ec.p1[1]} x2={ec.p2[0]} y2={ec.p2[1]} stroke="transparent" strokeWidth="18" />
-                            <g transform={`translate(${ec.lx}, ${ec.ly})`}>
+                          );
+                        })}
+                        {edgeGeos.map(({ edge, ec }) => {
+                          const isHighlight = pickedEdge?.idx === edge.idx || (isSolved && edge.ok);
+                          const ew = (String(edge.label).length >= 3 ? 46 : 38) * s;
+                          const eh = 24 * s;
+                          return (
+                            <g
+                              key={`epill-${edge.idx}`}
+                              transform={`translate(${ec.lx}, ${ec.ly})`}
+                              onClick={(e) => { e.stopPropagation(); handleClickEdge(edge); }}
+                              className="cursor-pointer"
+                            >
                               <rect
-                                x="-22" y="-13" width="44" height="26" rx="13"
+                                x={-ew / 2} y={-eh / 2} width={ew} height={eh} rx={eh / 2}
                                 fill={edge.isGiven ? '#e0f2fe' : isHighlight ? '#059669' : slotEdgeActive ? '#fffbeb' : '#ffffff'}
                                 stroke={edge.isGiven ? '#0284c7' : isHighlight ? '#047857' : slotEdgeActive ? '#f59e0b' : '#64748b'}
-                                strokeWidth={slotEdgeActive && !edge.isGiven ? '2.4' : '1.8'}
+                                strokeWidth={(slotEdgeActive && !edge.isGiven ? 2.2 : 1.8) * s}
                               />
-                              <text
-                                x="0" y="1"
+                              <Lv14SvgSqrtLabel
+                                x={0} y={0.5 * s} anchor="middle" baseline="middle"
                                 fill={edge.isGiven ? '#0369a1' : isHighlight ? '#ffffff' : '#0f172a'}
-                                fontSize="13.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono"
-                              >
-                                {edge.label}
-                              </text>
+                                stroke="none"
+                                text={edge.label}
+                                fontSize={12.5 * s}
+                              />
                             </g>
-                          </g>
-                        );
-                      })}
-                    </svg>
-                  )}
+                          );
+                        })}
+                      </svg>
+                    );
+                  })()}
                 </div>
 
                 {/* 底部互動列：P0 鎖定直徑驗證鈕 ｜ P2 填完公式後浮出心算列 */}
@@ -18159,11 +18432,29 @@
                   { desc: '第二、三階段：點選圖上互為正對的「對邊」與「對角」填入正弦定理公式（順序不限）！' },
                   { desc: '第三階段填完公式後，利用特殊角 sin 值心算選出 R 或 x！' }
                 ] : isDragPhase ? [
-                  { target: 'lv16-board', shape: 'rect', pad: 6, swipe: 'x', placement: 'bottom', desc: '按住畫板左右拖曳金球 A 沿外接圓移動，讓其中一邊穿過圓心 O 形成直徑 2R，再按下方鎖定！' }
+                  {
+                    targets: [
+                      { id: 'lv16-p0-knob', shape: 'circle', pad: 14 },
+                      { id: 'lv16-board', shape: 'rect', pad: 6 }
+                    ],
+                    target: 'lv16-p0-knob',
+                    arcPivot: 'lv16-p0-center',
+                    arcDeg: -38,
+                    placement: 'bottom',
+                    desc: '按住金球 A 沿外接圓弧線左右拖曳，讓一邊穿過圓心 O 形成直徑 2R，再按下方鎖定！'
+                  }
                 ] : needCalc ? [
                   { target: 'lv16-opts', shape: 'pill', pad: 6, tap: false, placement: 'top', desc: '公式已列好！利用特殊角 sin 值心算選出答案！' }
                 ] : [
-                  { target: 'lv16-board', shape: 'rect', pad: 6, tap: false, placement: 'bottom', desc: '點選（順序不限）圖上互為正對的「對邊」與「對角」，填入上方正弦定理分數槽！' }
+                  {
+                    targets: [
+                      { id: 'lv16-board', shape: 'rect', pad: 6 },
+                      { id: 'lv16-prompt', shape: 'rect', pad: 6 }
+                    ],
+                    tap: false,
+                    placement: 'bottom',
+                    desc: '點選（順序不限）圖上互為正對的「對邊」與「對角」，填入上方正弦定理分數槽！'
+                  }
                 ]}
               />
             </div>
@@ -18500,8 +18791,8 @@
         }
       };
 
-      // ===== P0 物理張合夾角拖曳處理（getScreenCTM 精準座標換算 ＋ 全畫板點拖防手機捲動） =====
-      const P0_OX = 148, P0_OY = 178, P0_BASE = 112, P0_ARM = 84;
+      // ===== P0 物理張合夾角拖曳處理（放大版幾何 ＋ getScreenCTM 精準座標換算 ＋ 全畫板點拖防手機捲動） =====
+      const P0_VW = 310, P0_VH = 206, P0_OX = 128, P0_OY = 170, P0_BASE = 144, P0_ARM = 108;
       const updateCosArmFromClient = (clientX, clientY) => {
         const svg = svgRef.current;
         if (!svg) return;
@@ -18516,9 +18807,9 @@
           sy = svgPt.y;
         } else {
           const rect = svg.getBoundingClientRect();
-          const scale = Math.min(rect.width / 340, rect.height / 220);
-          const offX = (rect.width - 340 * scale) / 2;
-          const offY = (rect.height - 220 * scale) / 2;
+          const scale = Math.min(rect.width / P0_VW, rect.height / P0_VH);
+          const offX = (rect.width - P0_VW * scale) / 2;
+          const offY = (rect.height - P0_VH * scale) / 2;
           sx = (clientX - rect.left - offX) / scale;
           sy = (clientY - rect.top - offY) / scale;
         }
@@ -18793,74 +19084,81 @@
                   {isDragPhase ? (
                     <svg
                       ref={svgRef}
-                      viewBox="0 0 340 220"
+                      viewBox={`0 0 ${P0_VW} ${P0_VH}`}
                       onPointerDown={handleCosArmPointerDown}
                       style={{ touchAction: 'none' }}
-                      className={`w-full h-full max-w-[430px] object-contain select-none touch-none ${solvedAns ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
+                      className={`w-full h-full max-w-[450px] object-contain select-none touch-none ${solvedAns ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
                     >
-                      {/* 15° 半圓量角雷達弧 */}
+                      {/* Layer 1：半圓量角雷達弧 ＋ 90° 畢氏基準參考虛線 */}
                       <path
                         d={`M ${P0_OX + P0_ARM} ${P0_OY} A ${P0_ARM} ${P0_ARM} 0 0 0 ${P0_OX - P0_ARM} ${P0_OY}`}
                         fill="none" stroke="#cbd5e1" strokeWidth="1.4" strokeDasharray="4 4"
                       />
-                      {/* 90° 畢氏基準虛線參考 */}
                       <line x1={P0_OX} y1={P0_OY} x2={P0_OX} y2={P0_OY - P0_ARM} stroke="#10b981" strokeWidth="1.3" strokeDasharray="4 4" opacity={armDeg === 90 ? 0.9 : 0.38} />
                       <line x1={P0_OX} y1={P0_OY - P0_ARM} x2={p0Bx} y2={p0By} stroke="#10b981" strokeWidth="1.2" strokeDasharray="4 4" opacity={armDeg === 90 ? 0 : 0.3} />
 
-                      {/* 三角形淡色填充 */}
+                      {/* Layer 2：三角形淡色填充 ＋ 夾角扇形／直角符號 */}
                       <polygon
                         points={`${P0_OX},${P0_OY} ${p0Bx},${p0By} ${p0Ax},${p0Ay}`}
                         fill={armDeg === 90 ? 'rgba(16,185,129,0.20)' : armDeg > 90 ? 'rgba(244,63,94,0.14)' : 'rgba(56,189,248,0.14)'}
                         stroke="none"
                       />
-
-                      {/* 夾角扇形與度數（90° 時改畫直角符號） */}
                       {armDeg === 90 ? (
-                        <path d={`M ${P0_OX + 16} ${P0_OY} L ${P0_OX + 16} ${P0_OY - 16} L ${P0_OX} ${P0_OY - 16}`} fill="none" stroke="#059669" strokeWidth="2.4" />
+                        <path d={`M ${P0_OX + 17} ${P0_OY} L ${P0_OX + 17} ${P0_OY - 17} L ${P0_OX} ${P0_OY - 17}`} fill="none" stroke="#059669" strokeWidth="2.5" />
                       ) : (
                         <path
-                          d={`M ${P0_OX} ${P0_OY} L ${P0_OX + 28} ${P0_OY} A 28 28 0 0 0 ${P0_OX + 28 * Math.cos(p0Rad)} ${P0_OY - 28 * Math.sin(p0Rad)} Z`}
+                          d={`M ${P0_OX} ${P0_OY} L ${P0_OX + 30} ${P0_OY} A 30 30 0 0 0 ${P0_OX + 30 * Math.cos(p0Rad)} ${P0_OY - 30 * Math.sin(p0Rad)} Z`}
                           fill={armDeg > 90 ? 'rgba(244,63,94,0.24)' : 'rgba(56,189,248,0.24)'}
                           stroke={armDeg > 90 ? '#e11d48' : '#0284c7'}
                           strokeWidth="1.8"
                         />
                       )}
+
+                      {/* Layer 3：三條邊線 ＋ 頂點圓點 */}
+                      <line x1={P0_OX} y1={P0_OY} x2={p0Bx} y2={p0By} stroke="#1e293b" strokeWidth="4.2" strokeLinecap="round" />
+                      <line x1={P0_OX} y1={P0_OY} x2={p0Ax} y2={p0Ay} stroke="#d97706" strokeWidth="4.2" strokeLinecap="round" />
+                      <line
+                        x1={p0Ax} y1={p0Ay} x2={p0Bx} y2={p0By}
+                        stroke={armDeg === 90 ? '#059669' : armDeg > 90 ? '#e11d48' : '#0284c7'}
+                        strokeWidth="4.4" strokeLinecap="round"
+                      />
+                      <circle cx={P0_OX} cy={P0_OY} r="5" fill="#0f172a" stroke="#ffffff" strokeWidth="2" />
+                      <circle cx={p0Bx} cy={p0By} r="4.5" fill="#ffffff" stroke="#1e293b" strokeWidth="2" />
+
+                      {/* Layer 4（最頂層）：角度文字、底邊標籤、沿向外法線推出的對邊 c 標籤、金球拉柄 */}
                       <text
-                        x={P0_OX + 44 * Math.cos(p0Rad / 2)}
-                        y={P0_OY - 44 * Math.sin(p0Rad / 2) + 4}
+                        x={P0_OX + 46 * Math.cos(p0Rad / 2)}
+                        y={P0_OY - 46 * Math.sin(p0Rad / 2) + 4}
                         fill={armDeg === 90 ? '#047857' : armDeg > 90 ? '#be123c' : '#0369a1'}
                         fontSize="12.5" fontWeight="900" textAnchor="middle" className="font-mono"
                       >
                         {armDeg}°
                       </text>
-
-                      {/* 固定底邊 a = 4 */}
-                      <line x1={P0_OX} y1={P0_OY} x2={p0Bx} y2={p0By} stroke="#1e293b" strokeWidth="4" strokeLinecap="round" />
                       <rect x={(P0_OX + p0Bx) / 2 - 16} y={P0_OY + 8} width="32" height="21" rx="10.5" fill="#ffffff" stroke="#475569" strokeWidth="1.8" />
                       <text x={(P0_OX + p0Bx) / 2} y={P0_OY + 19.5} fill="#0f172a" fontSize="12.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono">{question.a}</text>
 
-                      {/* 可旋轉光臂 b = 3 */}
-                      <line x1={P0_OX} y1={P0_OY} x2={p0Ax} y2={p0Ay} stroke="#d97706" strokeWidth="4" strokeLinecap="round" />
-
-                      {/* 動態伸縮對邊 c（依銳/直/鈍變色與即時顯示長度） */}
-                      <line
-                        x1={p0Ax} y1={p0Ay} x2={p0Bx} y2={p0By}
-                        stroke={armDeg === 90 ? '#059669' : armDeg > 90 ? '#e11d48' : '#0284c7'}
-                        strokeWidth="4.2" strokeLinecap="round"
-                      />
                       {(() => {
+                        // 對邊 c 標籤沿對邊 AB 的向外法線推出 20px，任何角度都零交疊
                         const mx = (p0Ax + p0Bx) / 2;
                         const my = (p0Ay + p0By) / 2;
+                        const dx = p0Bx - p0Ax, dy = p0By - p0Ay;
+                        const dl = Math.hypot(dx, dy) || 1;
+                        let nx = -dy / dl, ny = dx / dl;
+                        const triCx = (P0_OX + p0Bx + p0Ax) / 3;
+                        const triCy = (P0_OY + p0By + p0Ay) / 3;
+                        if ((mx - triCx) * nx + (my - triCy) * ny < 0) { nx = -nx; ny = -ny; }
+                        const lx = Math.max(34, Math.min(P0_VW - 34, mx + nx * 21));
+                        const ly = Math.max(16, Math.min(P0_VH - 16, my + ny * 21));
                         return (
                           <g className="pointer-events-none">
                             <rect
-                              x={mx - 28} y={my - 26} width="56" height="22" rx="11"
+                              x={lx - 28} y={ly - 11} width="56" height="22" rx="11"
                               fill={armDeg === 90 ? '#ecfdf5' : armDeg > 90 ? '#fff1f2' : '#f0f9ff'}
                               stroke={armDeg === 90 ? '#059669' : armDeg > 90 ? '#e11d48' : '#0284c7'}
                               strokeWidth="1.8"
                             />
                             <text
-                              x={mx} y={my - 14}
+                              x={lx} y={ly + 1}
                               fill={armDeg === 90 ? '#047857' : armDeg > 90 ? '#be123c' : '#0369a1'}
                               fontSize="11.5" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-mono"
                             >
@@ -18870,11 +19168,6 @@
                         );
                       })()}
 
-                      {/* 固定頂點 */}
-                      <circle cx={P0_OX} cy={P0_OY} r="5" fill="#0f172a" stroke="#ffffff" strokeWidth="2" />
-                      <circle cx={p0Bx} cy={p0By} r="4.5" fill="#ffffff" stroke="#1e293b" strokeWidth="2" />
-
-                      {/* 可拖曳金色拉柄 b = 3 */}
                       <g className="pointer-events-none">
                         {!solvedAns && (
                           <circle cx={p0Ax} cy={p0Ay} r="22" fill="rgba(245,158,11,0.18)" stroke="rgba(245,158,11,0.45)" strokeWidth="1.5" />
@@ -18900,7 +19193,7 @@
                       v2: { v: p2, u1: p0, u2: p1 }
                     };
 
-                    const getEdgeMidOut = (A, B, dist = 22) => {
+                    const getEdgeMidOut = (A, B, dist = 21) => {
                       const mx = (A[0] + B[0]) / 2;
                       const my = (A[1] + B[1]) / 2;
                       const dx = B[0] - A[0], dy = B[1] - A[1];
@@ -18911,18 +19204,21 @@
                       return { x: mx + nx * dist, y: my + ny * dist };
                     };
 
-                    const getAngleArc = (v, u1, u2, r = 26) => {
+                    const getAngleArc = (v, u1, u2) => {
                       const a1 = Math.atan2(u1[1] - v[1], u1[0] - v[0]);
                       const a2 = Math.atan2(u2[1] - v[1], u2[0] - v[0]);
                       let diff = a2 - a1;
                       while (diff > Math.PI) diff -= 2 * Math.PI;
                       while (diff < -Math.PI) diff += 2 * Math.PI;
+                      const angDeg = Math.abs(diff) * (180 / Math.PI);
+                      const r = angDeg < 40 ? 18 : angDeg < 75 ? 22 : 25;
+                      const labelDist = angDeg < 35 ? 45 : angDeg < 55 ? 38 : angDeg < 85 ? 32 : 28;
                       const sweep = diff >= 0 ? 1 : 0;
                       const sx = v[0] + r * Math.cos(a1), sy = v[1] + r * Math.sin(a1);
                       const ex = v[0] + r * Math.cos(a2), ey = v[1] + r * Math.sin(a2);
                       const midA = a1 + diff / 2;
-                      const lx = v[0] + (r + 16) * Math.cos(midA);
-                      const ly = v[1] + (r + 16) * Math.sin(midA);
+                      const lx = v[0] + labelDist * Math.cos(midA);
+                      const ly = v[1] + labelDist * Math.sin(midA);
                       return {
                         sectorPath: `M ${v[0]} ${v[1]} L ${sx} ${sy} A ${r} ${r} 0 0 ${sweep} ${ex} ${ey} Z`,
                         arcPath: `M ${sx} ${sy} A ${r} ${r} 0 0 ${sweep} ${ex} ${ey}`,
@@ -18930,19 +19226,34 @@
                       };
                     };
 
+                    // 動態貼合 viewBox ＋ 等比統一字體縮放 s = vbW / 260（確保每題肉眼字體大小與 Lv.16 一致）
+                    const pad = 34;
+                    const minX = Math.min(p0[0], p1[0], p2[0]) - pad;
+                    const maxX = Math.max(p0[0], p1[0], p2[0]) + pad;
+                    const minY = Math.min(p0[1], p1[1], p2[1]) - pad;
+                    const maxY = Math.max(p0[1], p1[1], p2[1]) + pad;
+                    const vbW = Math.max(180, maxX - minX);
+                    const vbH = Math.max(150, maxY - minY);
+                    const s = Math.max(0.85, Math.min(1.22, vbW / 260));
+
+                    const angleItems = question.angles.map(ang => {
+                      const { v, u1, u2 } = vertMap[ang.id];
+                      return { ang, geo: getAngleArc(v, u1, u2) };
+                    });
+                    const edgeItems = question.edges.map(edge => {
+                      const [A, B] = edgeCoords[edge.id];
+                      return { edge, A, B, pos: getEdgeMidOut(A, B, 21) };
+                    });
+
                     return (
-                      <svg viewBox="0 0 340 220" className="w-full h-full max-w-[430px] object-contain select-none">
-                        {/* 三角形淡色填充 */}
+                      <svg viewBox={`${minX.toFixed(1)} ${minY.toFixed(1)} ${vbW.toFixed(1)} ${vbH.toFixed(1)}`} className="w-full h-full max-w-[450px] object-contain select-none">
+                        {/* Layer 1：三角形淡色填充 ＋ 角度扇形與弧線 */}
                         <polygon
                           points={`${p0[0]},${p0[1]} ${p1[0]},${p1[1]} ${p2[0]},${p2[1]}`}
                           fill="rgba(251, 191, 36, 0.10)"
                           stroke="none"
                         />
-
-                        {/* 角度扇形與可點擊膠囊 */}
-                        {question.angles.map((ang) => {
-                          const { v, u1, u2 } = vertMap[ang.id];
-                          const geo = getAngleArc(v, u1, u2, 26);
+                        {angleItems.map(({ ang, geo }) => {
                           const isPicked = usedAngId === ang.id;
                           const isWrong = wrongId === ang.id;
                           const isTargetTheta = ang.role === 'target';
@@ -18954,27 +19265,78 @@
                             : isPicked ? '#059669'
                             : isTargetTheta ? '#7c3aed'
                             : '#d97706';
-                          const pillBg = isWrong ? '#f43f5e'
-                            : isPicked ? '#10b981'
-                            : isTargetTheta ? '#7c3aed'
-                            : (isSideMode && activeSlotKey === 'third' && !formulaDone ? '#fef3c7' : '#ffffff');
-                          const pillText = (isWrong || isPicked || isTargetTheta) ? '#ffffff' : '#92400e';
-
                           return (
                             <g
-                              key={ang.id}
+                              key={`asec-${ang.id}`}
                               onClick={(e) => { e.stopPropagation(); handlePickAngle(ang); }}
                               className={formulaDone || solvedAns ? 'cursor-default' : 'cursor-pointer'}
                             >
                               <path d={geo.sectorPath} fill={fillSector} />
-                              <path d={geo.arcPath} fill="none" stroke={strokeArc} strokeWidth="2.5" strokeLinecap="round" />
+                              <path d={geo.arcPath} fill="none" stroke={strokeArc} strokeWidth="2.2" strokeLinecap="round" />
+                            </g>
+                          );
+                        })}
+
+                        {/* Layer 2：三條邊線 ＋ 三頂點白心圓點 */}
+                        {edgeItems.map(({ edge, A, B }) => {
+                          const isUnknown = edge.role === 'unknown';
+                          const isPicked = usedEdgeIds.has(edge.id);
+                          const isWrong = wrongId === edge.id;
+                          const isOppPicked = question.mode === 'cos' && slots.third?.id === edge.id;
+                          const lineStroke = isWrong ? '#e11d48'
+                            : isOppPicked ? '#e11d48'
+                            : isPicked ? '#10b981'
+                            : isUnknown ? '#d97706'
+                            : '#334155';
+                          return (
+                            <g
+                              key={`eline-${edge.id}`}
+                              onClick={(e) => { e.stopPropagation(); handlePickEdge(edge); }}
+                              className={formulaDone || solvedAns ? 'cursor-default' : 'cursor-pointer'}
+                            >
+                              <line x1={A[0]} y1={A[1]} x2={B[0]} y2={B[1]} stroke="transparent" strokeWidth="18" />
+                              <line
+                                x1={A[0]} y1={A[1]} x2={B[0]} y2={B[1]}
+                                stroke={lineStroke}
+                                strokeWidth={isPicked || isUnknown ? '4.4' : '3.4'}
+                                strokeDasharray={isUnknown ? '7 5' : undefined}
+                                strokeLinecap="round"
+                              />
+                            </g>
+                          );
+                        })}
+                        {question.pts.map((p, idx) => (
+                          <circle key={`vdot-${idx}`} cx={p[0]} cy={p[1]} r="4.2" fill="#ffffff" stroke="#1e293b" strokeWidth="2.3" className="pointer-events-none" />
+                        ))}
+
+                        {/* Layer 3（最頂層）：所有角度膠囊與邊長膠囊（絕不被邊線壓到，且答案根號帶標準頂線） */}
+                        {angleItems.map(({ ang, geo }) => {
+                          const isPicked = usedAngId === ang.id;
+                          const isWrong = wrongId === ang.id;
+                          const isTargetTheta = ang.role === 'target';
+                          const strokeArc = isWrong ? '#e11d48'
+                            : isPicked ? '#059669'
+                            : isTargetTheta ? '#7c3aed'
+                            : '#d97706';
+                          const pillBg = isWrong ? '#f43f5e'
+                            : isPicked ? '#10b981'
+                            : isTargetTheta ? '#7c3aed'
+                            : (isSideMode && !slots.third && !formulaDone ? '#fef3c7' : '#ffffff');
+                          const pillText = (isWrong || isPicked || isTargetTheta) ? '#ffffff' : '#92400e';
+                          const aw = 38 * s, ah = 21 * s;
+                          return (
+                            <g
+                              key={`apill-${ang.id}`}
+                              onClick={(e) => { e.stopPropagation(); handlePickAngle(ang); }}
+                              className={formulaDone || solvedAns ? 'cursor-default' : 'cursor-pointer'}
+                            >
                               <rect
-                                x={geo.lx - 21} y={geo.ly - 12} width="42" height="24" rx="12"
-                                fill={pillBg} stroke={strokeArc} strokeWidth="2"
+                                x={geo.lx - aw / 2} y={geo.ly - ah / 2} width={aw} height={ah} rx={ah / 2}
+                                fill={pillBg} stroke={strokeArc} strokeWidth={1.8 * s}
                               />
                               <text
-                                x={geo.lx} y={geo.ly + 1}
-                                fill={pillText} fontSize={isTargetTheta ? '14' : '12'} fontWeight="900"
+                                x={geo.lx} y={geo.ly + 0.8 * s}
+                                fill={pillText} fontSize={(isTargetTheta ? 13 : 11) * s} fontWeight="900"
                                 textAnchor="middle" dominantBaseline="middle"
                                 fontFamily={isTargetTheta ? 'serif' : 'monospace'}
                                 fontStyle={isTargetTheta ? 'italic' : 'normal'}
@@ -18984,21 +19346,11 @@
                             </g>
                           );
                         })}
-
-                        {/* 三條邊線與可點擊數值膠囊 */}
-                        {question.edges.map((edge) => {
-                          const [A, B] = edgeCoords[edge.id];
-                          const pos = getEdgeMidOut(A, B, 22);
+                        {edgeItems.map(({ edge, pos }) => {
                           const isUnknown = edge.role === 'unknown';
                           const isPicked = usedEdgeIds.has(edge.id);
                           const isWrong = wrongId === edge.id;
                           const isOppPicked = question.mode === 'cos' && slots.third?.id === edge.id;
-
-                          const lineStroke = isWrong ? '#e11d48'
-                            : isOppPicked ? '#e11d48'
-                            : isPicked ? '#10b981'
-                            : isUnknown ? '#d97706'
-                            : '#334155';
                           const pillBg = isWrong ? '#f43f5e'
                             : isOppPicked ? '#f43f5e'
                             : isPicked ? '#10b981'
@@ -19010,43 +19362,38 @@
                             : isUnknown ? '#d97706'
                             : '#475569';
                           const pillText = (isWrong || isPicked || isOppPicked) ? '#ffffff' : (isUnknown ? '#b45309' : '#0f172a');
-
+                          const shownLabel = isUnknown && solvedAns && question.needCalc ? solvedAns : edge.label;
+                          const ew = (String(shownLabel).length >= 3 ? 46 : 38) * s;
+                          const eh = 24 * s;
                           return (
                             <g
-                              key={edge.id}
+                              key={`epill-${edge.id}`}
                               onClick={(e) => { e.stopPropagation(); handlePickEdge(edge); }}
                               className={formulaDone || solvedAns ? 'cursor-default' : 'cursor-pointer'}
                             >
-                              {/* 擴大點擊熱區 */}
-                              <line x1={A[0]} y1={A[1]} x2={B[0]} y2={B[1]} stroke="transparent" strokeWidth="18" />
-                              <line
-                                x1={A[0]} y1={A[1]} x2={B[0]} y2={B[1]}
-                                stroke={lineStroke}
-                                strokeWidth={isPicked || isUnknown ? '4.5' : '3.5'}
-                                strokeDasharray={isUnknown ? '7 5' : undefined}
-                                strokeLinecap="round"
-                              />
                               <rect
-                                x={pos.x - 19} y={pos.y - 13} width="38" height="26" rx="13"
-                                fill={pillBg} stroke={pillStroke} strokeWidth="2.2"
+                                x={pos.x - ew / 2} y={pos.y - eh / 2} width={ew} height={eh} rx={eh / 2}
+                                fill={pillBg} stroke={pillStroke} strokeWidth={2 * s}
                               />
-                              <text
-                                x={pos.x} y={pos.y + 1}
-                                fill={pillText} fontSize={isUnknown ? '15' : '14'} fontWeight="900"
-                                textAnchor="middle" dominantBaseline="middle"
-                                fontFamily={isUnknown ? 'serif' : 'monospace'}
-                                fontStyle={isUnknown ? 'italic' : 'normal'}
-                              >
-                                {isUnknown && solvedAns && question.needCalc ? solvedAns : edge.label}
-                              </text>
+                              {String(shownLabel).includes('√') ? (
+                                <Lv14SvgSqrtLabel
+                                  x={pos.x} y={pos.y + 0.5 * s} anchor="middle" baseline="middle"
+                                  fill={pillText} stroke="none" text={shownLabel} fontSize={12.5 * s}
+                                />
+                              ) : (
+                                <text
+                                  x={pos.x} y={pos.y + 0.8 * s}
+                                  fill={pillText} fontSize={(isUnknown && !solvedAns ? 14 : 12.5) * s} fontWeight="900"
+                                  textAnchor="middle" dominantBaseline="middle"
+                                  fontFamily={isUnknown && !solvedAns ? 'serif' : 'monospace'}
+                                  fontStyle={isUnknown && !solvedAns ? 'italic' : 'normal'}
+                                >
+                                  {shownLabel}
+                                </text>
+                              )}
                             </g>
                           );
                         })}
-
-                        {/* 三頂點圓點 */}
-                        {question.pts.map((p, idx) => (
-                          <circle key={idx} cx={p[0]} cy={p[1]} r="4.5" fill="#ffffff" stroke="#1e293b" strokeWidth="2.5" />
-                        ))}
                       </svg>
                     );
                   })()}
@@ -19131,7 +19478,15 @@
                 ] : (qPhase === 2 && formulaDone) ? [
                   { target: 'lv17-opts', shape: 'pill', pad: 6, tap: false, placement: 'top', desc: '公式已完成！搭配 cos 提示心算選出邊長 x！' }
                 ] : [
-                  { target: 'lv17-board', shape: 'rect', pad: 6, tap: false, placement: 'bottom', desc: '直接點選三角形上的鄰邊與夾角（或對邊，順序不限），系統會自動同步代入上方公式！' }
+                  {
+                    targets: [
+                      { id: 'lv17-board', shape: 'rect', pad: 6 },
+                      { id: 'lv17-formula', shape: 'rect', pad: 6 }
+                    ],
+                    tap: false,
+                    placement: 'bottom',
+                    desc: '直接點選三角形上的鄰邊與夾角（或對邊，順序不限），系統會自動同步代入上方公式！'
+                  }
                 ]}
               />
             </div>
