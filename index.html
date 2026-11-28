@@ -588,7 +588,7 @@
         >
           <div className="flex items-start gap-1.5 min-w-0">
             <span className="shrink-0 mt-[1px]">{isSuccess ? '✓' : '💡'}</span>
-            <span className="leading-snug break-words">{tip.node || tip.text}</span>
+            <span className="leading-snug break-words">{tip.node || <SqrtText text={tip.text} />}</span>
           </div>
           {isSuccess && tip.canSkip && (
             <span className="text-[10px] font-bold text-emerald-700/80 shrink-0 whitespace-nowrap self-center">{tip.skipLabel || '輕點繼續 ▸'}</span>
@@ -639,8 +639,8 @@
         return className ? <span className={className}>{str}</span> : <>{str}</>;
       }
       const parts = [];
-      // 將緊鄰根號前的正負號與係數（如 -2√3、+3√2）綁定在同一不換行群組，避免窄按鈕或標題列把係數與根號拆成兩行
-      const regex = /([+-]?\d*)√(?:\(([^)]+)\)|([0-9a-zA-Zθ]+))/g;
+      // 將緊鄰根號前的正負號與係數（如 -2√3、+3√2）綁定在同一不換行群組，避免窄按鈕或標題列把係數與根號拆成兩行；數字根式不吞掉後方單位字母（如 m）
+      const regex = /([+-]?\d*)√(?:\(([^)]+)\)|(\d+|[a-zA-Zθ]+))/g;
       let lastIndex = 0;
       let match;
       let keyIdx = 0;
@@ -651,7 +651,7 @@
         const coeff = match[1] || '';
         const radicand = match[2] !== undefined ? match[2] : match[3];
         parts.push(
-          <span key={`r-${keyIdx++}`} className="inline-flex items-center whitespace-nowrap shrink-0">
+          <span key={`r-${keyIdx++}`} className="inline-flex items-baseline whitespace-nowrap shrink-0">
             {coeff}
             <RadicalBox>{radicand}</RadicalBox>
           </span>
@@ -661,8 +661,10 @@
       if (lastIndex < str.length) {
         parts.push(<React.Fragment key={`t-${keyIdx++}`}>{str.slice(lastIndex)}</React.Fragment>);
       }
-      const wrapCls = str.length > 10 ? 'flex-wrap' : 'whitespace-nowrap';
-      return <span className={`inline-flex items-center ${wrapCls} gap-0 ${className}`}>{parts}</span>;
+      if (str.length > 10) {
+        return <span className={`inline leading-snug ${className}`}>{parts}</span>;
+      }
+      return <span className={`inline-flex items-center whitespace-nowrap gap-0 ${className}`}>{parts}</span>;
     };
 
     // ==================== 共用定義鏈格式化（不有理化、自動約分與移負號、過渡步驟清晰顯示） ====================
@@ -5975,9 +5977,10 @@
                               {showEdgeNumbers && (
                                 <g>
                                   <circle cx={edge.midPt.x} cy={edge.midPt.y} r="21" fill={circleFill} stroke={strokeCol} strokeWidth="3.5" />
-                                  <text x={edge.midPt.x} y={edge.midPt.y + 1} fill={textCol} fontSize="19" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-serif pointer-events-none">
-                                    {edge.text}
-                                  </text>
+                                  <Lv14SvgSqrtLabel
+                                    x={edge.midPt.x} y={edge.midPt.y + 1} anchor="middle" baseline="middle"
+                                    fill={textCol} stroke="none" text={edge.text} fontSize={19}
+                                  />
                                 </g>
                               )}
                             </g>
@@ -14277,7 +14280,7 @@
         return w;
       };
       const tokens = [];
-      const regex = /√([0-9a-zA-Z]+)/g;
+      const regex = /√(\d+|[a-zA-Zθ]+)/g;
       let lastIdx = 0;
       let m;
       while ((m = regex.exec(str)) !== null) {
@@ -19742,8 +19745,13 @@
         }
       };
 
-      // 計算探照燈光束打在海面 y=186 的落點（塔頂 (50, 38)）
-      const beamHitX = Math.min(336, 50 + (186 - 38) / Math.tan((beamDep * Math.PI) / 180));
+      // 計算探照燈光束精準射線端點（塔頂 (50, 38)，海面 y=186；淺角度未達海面前直達右邊界 x=340，絕不折彎光束導致與俯角扇形錯位）
+      const beamRad = (beamDep * Math.PI) / 180;
+      const rawBeamHitX = 50 + (186 - 38) / Math.tan(beamRad);
+      const beamEndX = rawBeamHitX <= 340 ? rawBeamHitX : 340;
+      const beamEndY = rawBeamHitX <= 340 ? 186 : 38 + (340 - 50) * Math.tan(beamRad);
+      const coneSpreadX = rawBeamHitX <= 340 ? 22 : 0;
+      const coneSpreadY = rawBeamHitX <= 340 ? 0 : 18;
       // 計算測繪車當前仰角（塔頂 (290, 32), 地面 y=186，x=24 時精準 30°，x=201 時精準 60°）
       const jeepElevDeg = Math.round(Math.atan2(186 - 32, Math.max(10, 290 - jeepX)) * (180 / Math.PI));
 
@@ -19785,14 +19793,23 @@
                   </span>
                 </div>
 
-                {/* 繪圖區頂部：滿寬大字體引導算式＋所求目標列 */}
-                <div className="bg-cyan-50/95 border-b border-cyan-200/90 px-2.5 py-2 shrink-0 flex items-center justify-center flex-wrap gap-1.5 font-serif font-black text-sm sm:text-base text-slate-800">
+                {/* 繪圖區頂部：滿寬課本式引導算式＋所求目標列 */}
+                <div className="bg-cyan-50/95 border-b border-cyan-200/90 px-2.5 py-2 shrink-0 flex items-center justify-center flex-wrap gap-x-2 gap-y-1 font-serif font-black text-sm sm:text-base text-slate-800">
                   {question.scene === 'searchlight' && (
                     <>
-                      <span className="text-xs sm:text-sm font-sans font-bold text-cyan-800">
-                        {targetFound ? `俯角 ${question.targetDep}° ＝ 仰角 ${question.targetDep}° ⇒` : `塔高 ${question.towerH}m •`}
-                      </span>
-                      <span>水平船距 d =</span>
+                      {targetFound ? (
+                        <span className="inline-flex items-center gap-1.5 text-cyan-900">
+                          <span className="font-mono text-xs sm:text-sm">tan {question.targetDep}° =</span>
+                          <FracText value={`${question.towerH}/d`} size="sm" barClass="bg-cyan-800" />
+                          <span className="text-slate-400">⇒</span>
+                          <span className="font-mono">d =</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-sans font-bold text-cyan-800">
+                          <span>塔高 {question.towerH}m •</span>
+                          <span className="font-serif font-black text-sm sm:text-base text-slate-800">水平船距 d =</span>
+                        </span>
+                      )}
                       <span className={`min-w-[72px] h-[30px] px-2 rounded-xl border-2 inline-flex items-center justify-center font-mono text-sm sm:text-base transition-colors ${
                         solvedAns
                           ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
@@ -19807,15 +19824,15 @@
                   {question.scene === 'jeep' && (
                     <>
                       {!targetFound ? (
-                        <span className="text-xs sm:text-sm font-sans font-bold text-cyan-800">前進 {question.walkDist}m • 高塔高度 h =</span>
+                        <span className="text-xs sm:text-sm font-sans font-bold text-cyan-800 whitespace-nowrap">前進 {question.walkDist}m • 塔高 h =</span>
                       ) : p1Step === 1 ? (
-                        <span className="text-xs sm:text-sm font-sans font-bold text-amber-800">外角 60° = 30° + 頂角 ⇒ 頂角 =</span>
+                        <span className="text-xs sm:text-sm font-sans font-bold text-amber-900 whitespace-nowrap">60° = 30° + 頂角 ⇒ 頂角 =</span>
                       ) : p1Step === 2 ? (
-                        <span className="text-xs sm:text-sm font-sans font-bold text-amber-800">外側 30° = 30°（等腰）⇒ 內側斜邊 =</span>
+                        <span className="text-xs sm:text-sm font-sans font-bold text-amber-900 whitespace-nowrap">30° = 30°（等腰）⇒ 斜邊 =</span>
                       ) : (
-                        <span className="text-xs sm:text-sm font-sans font-bold text-cyan-800">斜邊 {question.walkDist}m ⇒ h = {question.walkDist}·sin 60° =</span>
+                        <span className="text-sm sm:text-base font-mono font-black text-cyan-900 whitespace-nowrap">h = {question.walkDist} × sin 60° =</span>
                       )}
-                      <span className={`min-w-[72px] h-[30px] px-2 rounded-xl border-2 inline-flex items-center justify-center font-mono text-sm sm:text-base transition-colors ${
+                      <span className={`min-w-[70px] h-[30px] px-2 rounded-xl border-2 inline-flex items-center justify-center font-mono text-sm sm:text-base transition-colors ${
                         solvedAns
                           ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
                           : targetFound
@@ -19833,23 +19850,49 @@
                     </>
                   )}
                   {qPhase === 2 && (
-                    <>
-                      {targetFound && (
-                        <span className="text-xs sm:text-sm font-mono font-black text-indigo-800 bg-indigo-100/80 border border-indigo-200 px-2 py-0.5 rounded-lg">
-                          {question.eqHint}
+                    question.scene === 'sea_sine' ? (
+                      <div className="flex items-center justify-center flex-wrap gap-x-2 gap-y-1">
+                        {targetFound && (
+                          <div className="inline-flex items-center gap-1.5 text-indigo-900 bg-indigo-50/90 border border-indigo-200 px-2.5 py-0.5 rounded-xl">
+                            <FracText value={`BC/sin ${question.angA}°`} size="sm" barClass="bg-indigo-700" />
+                            <span className="text-slate-400">=</span>
+                            <FracText value={`${question.ab}/sin ${question.angC}°`} size="sm" barClass="bg-indigo-700" />
+                          </div>
+                        )}
+                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                          <span>{targetFound ? '⇒ BC =' : '求島距 BC ='}</span>
+                          <span className={`min-w-[72px] h-[30px] px-2 rounded-xl border-2 inline-flex items-center justify-center font-mono text-sm sm:text-base transition-colors ${
+                            solvedAns
+                              ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
+                              : targetFound
+                              ? 'border-amber-400 bg-amber-100 text-amber-900 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.55)]'
+                              : 'border-dashed border-slate-300 bg-white text-slate-400 font-sans text-xs'
+                          }`}>
+                            {solvedAns ? <><SqrtText text={solvedAns} /><span className="text-xs ml-0.5">m</span></> : targetFound ? '? m' : '先選定理'}
+                          </span>
                         </span>
-                      )}
-                      <span>{question.scene === 'sea_sine' ? '⇒ BC =' : '⇒ AB ='}</span>
-                      <span className={`min-w-[72px] h-[30px] px-2 rounded-xl border-2 inline-flex items-center justify-center font-mono text-sm sm:text-base transition-colors ${
-                        solvedAns
-                          ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
-                          : targetFound
-                          ? 'border-amber-400 bg-amber-100 text-amber-900 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.55)]'
-                          : 'border-dashed border-slate-300 bg-white text-slate-400 font-sans text-xs'
-                      }`}>
-                        {solvedAns ? <><SqrtText text={solvedAns} /><span className="text-xs ml-0.5">m</span></> : targetFound ? '? m' : '先選定理'}
-                      </span>
-                    </>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center gap-1 w-full">
+                        {targetFound && (
+                          <div className="text-xs sm:text-sm font-mono font-black text-indigo-900 bg-indigo-50/90 border border-indigo-200 px-2.5 py-0.5 rounded-lg whitespace-nowrap">
+                            {question.eqHint}
+                          </div>
+                        )}
+                        <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                          <span>{targetFound ? '⇒ AB =' : '求兩島距 AB ='}</span>
+                          <span className={`min-w-[72px] h-[30px] px-2 rounded-xl border-2 inline-flex items-center justify-center font-mono text-sm sm:text-base transition-colors ${
+                            solvedAns
+                              ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
+                              : targetFound
+                              ? 'border-amber-400 bg-amber-100 text-amber-900 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.55)]'
+                              : 'border-dashed border-slate-300 bg-white text-slate-400 font-sans text-xs'
+                          }`}>
+                            {solvedAns ? <><SqrtText text={solvedAns} /><span className="text-xs ml-0.5">m</span></> : targetFound ? '? m' : '先選定理'}
+                          </span>
+                        </div>
+                      </div>
+                    )
                   )}
                 </div>
 
@@ -19887,9 +19930,11 @@
                       {/* 水平視線虛線（明確定義俯角基準） */}
                       <line x1="50" y1="38" x2="328" y2="38" stroke="#94a3b8" strokeWidth="1.6" strokeDasharray="5 4" opacity="0.7" />
 
-                      {/* 探照燈寬幅金色光錐 */}
+                      {/* 探照燈寬幅金色光錐（與俯角扇形嚴格共線） */}
                       <polygon
-                        points={`50,38 ${Math.max(62, beamHitX - 22)},186 ${Math.min(340, beamHitX + 22)},186`}
+                        points={targetFound
+                          ? `50,38 ${Math.max(62, question.boatX - 22)},186 ${Math.min(340, question.boatX + 22)},186`
+                          : `50,38 ${(beamEndX - coneSpreadX).toFixed(1)},${(beamEndY - coneSpreadY).toFixed(1)} ${(beamEndX + coneSpreadX).toFixed(1)},${(beamEndY + coneSpreadY).toFixed(1)}`}
                         fill={targetFound ? 'rgba(52,211,153,0.18)' : 'rgba(253,224,71,0.22)'}
                       />
 
@@ -19924,16 +19969,20 @@
                             );
                           })()}
                           <g transform={`translate(${(50 + question.boatX) / 2}, 208)`}>
-                            <rect x="-44" y="-11" width="88" height="22" rx="8" fill="#064e3b" stroke="#34d399" strokeWidth="1.6" />
-                            <text x="0" y="4" fill="#a7f3d0" fontSize="12.5" fontWeight="900" textAnchor="middle" className="font-mono">
-                              {solvedAns ? `d = ${solvedAns}m` : '水平距 d = ?'}
-                            </text>
+                            <rect x="-46" y="-11" width="92" height="22" rx="8" fill="#064e3b" stroke="#34d399" strokeWidth="1.6" />
+                            {solvedAns ? (
+                              <Lv14SvgSqrtLabel x={0} y={0.5} anchor="middle" baseline="middle" fill="#a7f3d0" stroke="none" text={`d = ${solvedAns} m`} fontSize={12.5} />
+                            ) : (
+                              <text x="0" y="4" fill="#a7f3d0" fontSize="12.5" fontWeight="900" textAnchor="middle" className="font-mono">
+                                水平距 d = ?
+                              </text>
+                            )}
                           </g>
                         </g>
                       )}
 
                       {/* 探照燈斜邊光束主線 */}
-                      <line x1="50" y1="38" x2={targetFound ? question.boatX : beamHitX} y2="186" stroke={targetFound ? '#34d399' : '#fde047'} strokeWidth="2.8" strokeDasharray={targetFound ? undefined : '6 3'} />
+                      <line x1="50" y1="38" x2={targetFound ? question.boatX : beamEndX} y2={targetFound ? 186 : beamEndY} stroke={targetFound ? '#34d399' : '#fde047'} strokeWidth="2.8" strokeDasharray={targetFound ? undefined : '6 3'} />
 
                       {/* 俯角扇形 */}
                       <path
@@ -19981,9 +20030,13 @@
                       <line x1="290" y1="32" x2="290" y2="186" stroke={solvedAns ? '#34d399' : '#38bdf8'} strokeWidth="5.2" strokeLinecap="round" />
                       <polyline points="277,186 277,173 290,173" fill="none" stroke="#38bdf8" strokeWidth="2.2" />
                       <circle cx="290" cy="32" r="5" fill="#fde047" />
-                      <text x="316" y="114" fill={solvedAns ? '#6ee7b7' : '#7dd3fc'} fontSize="14.5" fontWeight="900" textAnchor="middle" className="font-mono">
-                        {solvedAns ? `${solvedAns}m` : 'h = ?'}
-                      </text>
+                      {solvedAns ? (
+                        <Lv14SvgSqrtLabel x={315} y={110} anchor="middle" baseline="middle" fill="#6ee7b7" stroke="none" text={`${solvedAns}m`} fontSize={14} />
+                      ) : (
+                        <text x="316" y="114" fill="#7dd3fc" fontSize="14.5" fontWeight="900" textAnchor="middle" className="font-mono">
+                          h = ?
+                        </text>
+                      )}
 
                       {/* 起點精準 30°（x=24）淡虛線與 60° 定位點（x=201） */}
                       <line x1="24" y1="186" x2="290" y2="32" stroke="#94a3b8" strokeWidth="1.8" strokeDasharray="5 4" />
@@ -20084,7 +20137,11 @@
                           <text x="170" y="212" fill="#fde047" fontSize="14.5" fontWeight="900" textAnchor="middle" className="font-mono">{question.ab}m</text>
                           <text x="96" y="176" fill="#7dd3fc" fontSize="14" fontWeight="900" className="font-mono">{question.angA}°</text>
                           <text x="184" y="78" fill="#fde047" fontSize="14" fontWeight="900" textAnchor="middle" className="font-mono">{question.angC}°</text>
-                          <text x="266" y="106" fill={solvedAns ? '#6ee7b7' : '#7dd3fc'} fontSize="15" fontWeight="900" textAnchor="middle" className="font-mono">{solvedAns ? `${solvedAns}m` : 'BC = ?'}</text>
+                          {solvedAns ? (
+                            <Lv14SvgSqrtLabel x={268} y={102} anchor="middle" baseline="middle" fill="#6ee7b7" stroke="none" text={`${solvedAns}m`} fontSize={14.5} />
+                          ) : (
+                            <text x="266" y="106" fill="#7dd3fc" fontSize="15" fontWeight="900" textAnchor="middle" className="font-mono">BC = ?</text>
+                          )}
                         </>
                       ) : (
                         <>
