@@ -563,7 +563,7 @@
 
   <script type="text/babel">
     const { useState, useEffect, useRef, useMemo, useCallback } = React;
-    const APP_VERSION = '測試版 v2026.11.26a';
+    const APP_VERSION = '測試版 v2026.11.29a';
     const ENABLE_CREDITS = false; // 測試版暫時隱藏片尾致謝浮字與關於彈窗；正式版改為 true 即可一鍵回歸
 
     // ==================== 共用 SVG 圖示元件 ====================
@@ -3818,7 +3818,7 @@
       const flip = Math.random() > 0.5 ? 1 : -1;
       const rotDeg = phase === 2 ? Math.floor(Math.random() * 360) : 0;
       const rotRad = (rotDeg * Math.PI) / 180;
-      const scale = 335 / triple.hyp;
+      const scale = 360 / triple.hyp;
       const adjLen = triple.adj * scale;
       const oppLen = triple.opp * scale;
 
@@ -3961,7 +3961,7 @@
       const flip = Math.random() > 0.5 ? 1 : -1;
       const rotDeg = phase === 2 ? Math.floor(Math.random() * 360) : 0;
       const rotRad = (rotDeg * Math.PI) / 180;
-      const scale = 305 / triple.hyp;
+      const scale = 355 / triple.hyp;
       const adjLen = triple.adj * scale;
       const oppLen = triple.opp * scale;
 
@@ -4111,7 +4111,7 @@
       const stdOppText = deg === 45 ? '1' : (deg === 30 ? '1' : '√3');
       const stdHypText = deg === 45 ? '√2' : '2';
 
-      const scale = 300 / stdHyp;
+      const scale = 370 / stdHyp;
       const adjLen = stdAdj * scale;
       const oppLen = stdOpp * scale;
       const { P1: wP1, P2: wP2, P3: wP3 } = centerTriangleBoundingBox(
@@ -6719,7 +6719,7 @@
       const ansVal = targetSpecs[0].val;
       const [ansNum, ansDen] = [targetSpecs[0].num, targetSpecs[0].den];
 
-      const scale = 300 / t.hyp;
+      const scale = 370 / t.hyp;
       const w = t.adj * scale;
       const h = t.opp * scale;
       const flip = phase < 2 ? 1 : (Math.random() > 0.5 ? 1 : -1);
