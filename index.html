@@ -6550,7 +6550,7 @@
         </div>
       );
     };
-    const generateLevel6TripleQuestion = (phase, prevKey = '') => {
+    const generateLevel6TripleQuestion = (phase, prevKey = '', bagState = null) => {
       const triplePool = phase === 0 ? [
         { opp: 3, adj: 4, hyp: 5 },
         { opp: 4, adj: 3, hyp: 5 },
@@ -6568,15 +6568,38 @@
       ];
       const funcs = phase <= 1 ? ['sin', 'cos'] : ['sin', 'cos', 'tan'];
 
-      let t, givenFunc, targetFunc, key;
-      for (let guard = 0; guard < 12; guard++) {
-        t = triplePool[Math.floor(Math.random() * triplePool.length)];
-        givenFunc = funcs[Math.floor(Math.random() * funcs.length)];
-        const rem = ['sin', 'cos', 'tan'].filter(f => f !== givenFunc);
-        targetFunc = rem[Math.floor(Math.random() * rem.length)];
-        key = `${t.opp}_${t.adj}_${t.hyp}_${givenFunc}_${targetFunc}`;
-        if (key !== prevKey) break;
+      // 依斜邊家族（5 / 13 / 17 / 25）洗牌袋不放回抽樣，徹底避免連兩題同一組三邊比
+      const familyHyps = phase === 0 ? [5, 13] : [5, 13, 17, 25];
+      let chosenHyp;
+      if (bagState) {
+        const bagKey = phase === 0 ? 'p0FamBag' : 'advFamBag';
+        if (!bagState[bagKey] || bagState[bagKey].length === 0) {
+          bagState[bagKey] = shuffle([...familyHyps]);
+          if (bagState.lastHyp && bagState[bagKey][0] === bagState.lastHyp && bagState[bagKey].length > 1) {
+            const swapIdx = 1 + Math.floor(Math.random() * (bagState[bagKey].length - 1));
+            [bagState[bagKey][0], bagState[bagKey][swapIdx]] = [bagState[bagKey][swapIdx], bagState[bagKey][0]];
+          }
+        }
+        chosenHyp = bagState[bagKey].shift();
+        bagState.lastHyp = chosenHyp;
+      } else {
+        chosenHyp = familyHyps[Math.floor(Math.random() * familyHyps.length)];
       }
+
+      const famTriples = triplePool.filter(item => item.hyp === chosenHyp);
+      const t = famTriples[Math.floor(Math.random() * famTriples.length)];
+
+      // 已知函數同樣避免連續兩題重複
+      const availFuncs = bagState?.lastGivenFunc
+        ? funcs.filter(f => f !== bagState.lastGivenFunc)
+        : funcs;
+      const funcPool = availFuncs.length > 0 ? availFuncs : funcs;
+      const givenFunc = funcPool[Math.floor(Math.random() * funcPool.length)];
+      if (bagState) bagState.lastGivenFunc = givenFunc;
+
+      const rem = ['sin', 'cos', 'tan'].filter(f => f !== givenFunc);
+      const targetFunc = rem[0];
+      const key = `${t.opp}_${t.adj}_${t.hyp}_${givenFunc}`;
 
       const ratioStr = (f) =>
         f === 'sin' ? `${t.opp}/${t.hyp}` :
@@ -6734,6 +6757,7 @@
       const targetDenRef = useRef(null);
       const dragStartRef = useRef(null);
       const prevKeyRef = useRef('');
+      const bagRef = useRef({ p0FamBag: [], advFamBag: [], lastHyp: null, lastGivenFunc: null });
       const questionMissedRef = useRef(false);
       const confirmTimerRef = useRef(null);
       const pendingNextRef = useRef(null);
@@ -6785,7 +6809,7 @@
       const nextQuestion = (curProg) => {
         clearAutoFlyTimers();
         const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
-        const q = generateLevel6TripleQuestion(phase, prevKeyRef.current);
+        const q = generateLevel6TripleQuestion(phase, prevKeyRef.current, bagRef.current);
         prevKeyRef.current = q.key;
         questionMissedRef.current = false;
         setQuestion(q);
@@ -6804,6 +6828,7 @@
         clearTimeout(confirmTimerRef.current);
         pendingNextRef.current = null;
         prevKeyRef.current = '';
+        bagRef.current = { p0FamBag: [], advFamBag: [], lastHyp: null, lastGivenFunc: null };
         questionMissedRef.current = false;
         setFeedbackAnim('');
         const initProg = startSession();
@@ -7135,51 +7160,53 @@
                   </span>
                 </div>
 
-                {/* 繪圖區頂部：滿寬大字體「知一求二」雙比值直式分數填空列（對齊 Lv.15~17 規格） */}
-                <div data-coach="lv6-target-frac" className="bg-teal-50/90 border-b border-teal-200/90 px-2.5 py-2 shrink-0 flex items-center justify-center gap-3 sm:gap-6">
+                {/* 繪圖區頂部：滿寬大字體「知一求二」雙比值直式分數填空列（grid-cols-2 零位移＋每組獨立打勾 ✓） */}
+                <div data-coach="lv6-target-frac" className="bg-teal-50/90 border-b border-teal-200/90 px-2 py-2 shrink-0 grid grid-cols-2 divide-x divide-teal-200 items-center">
                   {question.targetSpecs.map((spec, idx) => {
                     const slotPair = targetSlots[idx] || { num: null, den: null };
                     const isPairDone = slotPair.num !== null && slotPair.den !== null;
                     return (
-                      <React.Fragment key={spec.func}>
-                        {idx === 1 && <div className="w-px h-11 bg-teal-200 shrink-0" />}
-                        <div className={`flex items-center gap-1.5 font-serif font-black text-base sm:text-lg transition-opacity ${ratioReady || isPairDone ? 'opacity-100' : 'opacity-65'}`}>
-                          <span className={isPairDone ? 'text-emerald-700' : 'text-teal-900'}>{spec.func} θ =</span>
-                          <div className="inline-flex flex-col items-center leading-none">
-                            {['num', 'den'].map((part, pIdx) => {
-                              const val = slotPair[part];
-                              const isFilled = val !== null;
-                              const isFocused = ratioReady && !solvedOpt && activeTargetSlot.idx === idx && activeTargetSlot.part === part && !isFilled;
-                              const isWrong = wrongSlotKey === `${idx}-${part}`;
-                              return (
-                                <React.Fragment key={part}>
-                                  {pIdx === 1 && <div className={`w-12 h-[2px] my-1 transition-colors ${isPairDone ? 'bg-emerald-500' : 'bg-slate-500'}`} />}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (!ratioReady || isFilled || solvedOpt) return;
-                                      audio.sfxClick();
-                                      setActiveTargetSlot({ idx, part });
-                                    }}
-                                    className={`min-w-[48px] h-[28px] px-2 rounded-lg border-2 font-black inline-flex items-center justify-center transition-all ${
-                                      isFilled
-                                        ? 'border-emerald-500 bg-emerald-100 text-emerald-900 text-base shadow-sm'
-                                        : isWrong
-                                        ? 'border-rose-500 bg-rose-100 text-rose-800 text-xs font-sans animate-shake'
-                                        : isFocused
-                                        ? 'border-amber-400 bg-amber-100 text-amber-900 text-xs font-sans animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.55)]'
-                                        : 'border-dashed border-slate-300 bg-white text-slate-400 text-xs font-sans'
-                                    }`}
-                                    aria-label={`${spec.func} ${part === 'num' ? '分子槽' : '分母槽'}`}
-                                  >
-                                    {isFilled ? val : (part === 'num' ? '分子' : '分母')}
-                                  </button>
-                                </React.Fragment>
-                              );
-                            })}
-                          </div>
+                      <div key={spec.func} className={`flex items-center justify-center gap-1.5 font-serif font-black text-base sm:text-lg transition-opacity ${ratioReady || isPairDone ? 'opacity-100' : 'opacity-65'}`}>
+                        <span className={isPairDone ? 'text-emerald-700' : 'text-teal-900'}>{spec.func} θ =</span>
+                        <div className="inline-flex flex-col items-center leading-none">
+                          {['num', 'den'].map((part, pIdx) => {
+                            const val = slotPair[part];
+                            const isFilled = val !== null;
+                            const isFocused = ratioReady && !solvedOpt && activeTargetSlot.idx === idx && activeTargetSlot.part === part && !isFilled;
+                            const isWrong = wrongSlotKey === `${idx}-${part}`;
+                            return (
+                              <React.Fragment key={part}>
+                                {pIdx === 1 && <div className={`w-12 h-[2px] my-1 transition-colors ${isPairDone ? 'bg-emerald-500' : 'bg-slate-500'}`} />}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!ratioReady || isFilled || solvedOpt) return;
+                                    audio.sfxClick();
+                                    setActiveTargetSlot({ idx, part });
+                                  }}
+                                  className={`w-[50px] h-[28px] px-1 rounded-lg border-2 font-black inline-flex items-center justify-center transition-colors ${
+                                    isFilled
+                                      ? 'border-emerald-500 bg-emerald-100 text-emerald-900 text-base shadow-sm'
+                                      : isWrong
+                                      ? 'border-rose-500 bg-rose-100 text-rose-800 text-xs font-sans animate-shake'
+                                      : isFocused
+                                      ? 'border-amber-400 bg-amber-100 text-amber-900 text-xs font-sans animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.55)]'
+                                      : 'border-dashed border-slate-300 bg-white text-slate-400 text-xs font-sans'
+                                  }`}
+                                  aria-label={`${spec.func} ${part === 'num' ? '分子槽' : '分母槽'}`}
+                                >
+                                  {isFilled ? val : (part === 'num' ? '分子' : '分母')}
+                                </button>
+                              </React.Fragment>
+                            );
+                          })}
                         </div>
-                      </React.Fragment>
+                        <span className="w-5 h-5 inline-flex items-center justify-center shrink-0">
+                          {isPairDone && (
+                            <span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[11px] font-sans font-black inline-flex items-center justify-center shadow-sm animate-jelly">✓</span>
+                          )}
+                        </span>
+                      </div>
                     );
                   })}
                 </div>
@@ -8932,11 +8959,15 @@
         setIsLockedSuccess(true);
         setFeedbackAnim('animate-correct');
         const { completed, nextProgress } = recordCorrect({ wasMissed: questionMissedRef.current, delayEndMs: null });
+        const summaryPairs = (question?.targetSpecs || [])
+          .map(sp => `${sp.func} θ = ${getSimplifiedForSpec(sp)}`)
+          .join('，');
         setConceptTip({
           tone: 'success',
           canSkip: true,
           skipLabel: completed ? '輕點查看結算 ▸' : '輕點繼續 ▸',
-          text: completed ? '全關挑戰完成！' : '定義正確！',
+          node: summaryPairs ? <SqrtText text={summaryPairs} className="font-serif font-black" /> : undefined,
+          text: summaryPairs ? undefined : (completed ? '全關挑戰完成！' : '定義正確！'),
           id: Date.now()
         });
         pendingNextRef.current = () => {
@@ -9324,60 +9355,55 @@
                   </div>
                 </div>
 
-                {/* 繪圖區頂部：滿寬大字體雙比值公式填空列（對齊 Lv.15~17 規格） */}
-                <div data-coach="lv10-ratio-box" className="bg-cyan-50/90 border-b border-cyan-200/90 px-2 py-2 shrink-0 flex items-center justify-center gap-2.5 sm:gap-5">
+                {/* 繪圖區頂部：滿寬大字體雙比值公式填空列（grid-cols-2 固定寬度零位移＋每組獨立打勾 ✓） */}
+                <div data-coach="lv10-ratio-box" className="bg-cyan-50/90 border-b border-cyan-200/90 px-2 py-2 shrink-0 grid grid-cols-2 divide-x divide-cyan-200 items-center">
                   {(question.targetSpecs || []).map((spec, idx) => {
                     const pair = ratioSlots[idx] || { num: null, den: null, solved: false };
                     const isWrong = wrongRatioIdx === idx;
-                    const simpVal = isLockedSuccess ? getSimplifiedForSpec(spec) : null;
                     return (
-                      <React.Fragment key={spec.func}>
-                        {idx === 1 && <div className="w-px h-11 bg-cyan-200 shrink-0" />}
-                        <div className={`flex items-center gap-1.5 font-serif font-black text-sm sm:text-base transition-opacity ${stage === 'ratio' || pair.solved ? 'opacity-100' : 'opacity-60'}`}>
-                          <span className={pair.solved ? 'text-emerald-700' : 'text-indigo-950'}>{spec.func} θ =</span>
-                          <div className="inline-flex flex-col items-center leading-none">
-                            {['num', 'den'].map((part, pIdx) => {
-                              const kVal = pair[part];
-                              const isFocused = stage === 'ratio' && !pair.solved && !isLockedSuccess && activeRatioSlot.idx === idx && activeRatioSlot.part === part && !kVal;
-                              return (
-                                <React.Fragment key={part}>
-                                  {pIdx === 1 && <div className={`w-full min-w-[54px] h-[2px] my-1 transition-colors ${pair.solved ? 'bg-emerald-500' : 'bg-slate-500'}`} />}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (stage !== 'ratio' || pair.solved || isLockedSuccess) return;
-                                      audio.sfxClick();
-                                      if (kVal) {
-                                        setRatioSlots(prev => prev.map((s, i) => i === idx ? { ...s, [part]: null } : s));
-                                      }
-                                      setActiveRatioSlot({ idx, part });
-                                    }}
-                                    className={`min-w-[54px] h-[26px] px-1.5 rounded-lg border-2 font-black inline-flex items-center justify-center text-xs transition-all ${
-                                      pair.solved
-                                        ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
-                                        : isWrong
-                                        ? 'border-rose-500 bg-rose-100 text-rose-800 animate-shake'
-                                        : kVal
-                                        ? 'border-cyan-500 bg-cyan-100 text-cyan-900'
-                                        : isFocused
-                                        ? 'border-amber-400 bg-amber-100 text-amber-900 font-sans animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.55)]'
-                                        : 'border-dashed border-slate-300 bg-white text-slate-400 font-sans'
-                                    }`}
-                                  >
-                                    {kVal ? (isPureSym ? kVal : <SqrtText text={`${kVal}(${getDisplayVal(kVal)})`} />) : (part === 'num' ? '分子' : '分母')}
-                                  </button>
-                                </React.Fragment>
-                              );
-                            })}
-                          </div>
-                          {simpVal && (
-                            <span className="text-emerald-700 font-black inline-flex items-center gap-0.5 text-xs sm:text-sm animate-jelly">
-                              <span>=</span>
-                              <FracText value={simpVal} size="xs" barClass="bg-emerald-700" />
-                            </span>
-                          )}
+                      <div key={spec.func} className={`flex items-center justify-center gap-1.5 font-serif font-black text-sm sm:text-base transition-opacity ${stage === 'ratio' || pair.solved ? 'opacity-100' : 'opacity-60'}`}>
+                        <span className={pair.solved ? 'text-emerald-700' : 'text-indigo-950'}>{spec.func} θ =</span>
+                        <div className="inline-flex flex-col items-center leading-none">
+                          {['num', 'den'].map((part, pIdx) => {
+                            const kVal = pair[part];
+                            const isFocused = stage === 'ratio' && !pair.solved && !isLockedSuccess && activeRatioSlot.idx === idx && activeRatioSlot.part === part && !kVal;
+                            return (
+                              <React.Fragment key={part}>
+                                {pIdx === 1 && <div className={`w-[66px] h-[2px] my-1 transition-colors ${pair.solved ? 'bg-emerald-500' : 'bg-slate-500'}`} />}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (stage !== 'ratio' || pair.solved || isLockedSuccess) return;
+                                    audio.sfxClick();
+                                    if (kVal) {
+                                      setRatioSlots(prev => prev.map((s, i) => i === idx ? { ...s, [part]: null } : s));
+                                    }
+                                    setActiveRatioSlot({ idx, part });
+                                  }}
+                                  className={`w-[66px] h-[26px] px-1 rounded-lg border-2 font-black inline-flex items-center justify-center text-xs whitespace-nowrap transition-colors ${
+                                    pair.solved
+                                      ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
+                                      : isWrong
+                                      ? 'border-rose-500 bg-rose-100 text-rose-800 animate-shake'
+                                      : kVal
+                                      ? 'border-cyan-500 bg-cyan-100 text-cyan-900'
+                                      : isFocused
+                                      ? 'border-amber-400 bg-amber-100 text-amber-900 font-sans animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.55)]'
+                                      : 'border-dashed border-slate-300 bg-white text-slate-400 font-sans'
+                                  }`}
+                                >
+                                  {kVal ? (isPureSym ? kVal : <SqrtText text={`${kVal}(${getDisplayVal(kVal)})`} />) : (part === 'num' ? '分子' : '分母')}
+                                </button>
+                              </React.Fragment>
+                            );
+                          })}
                         </div>
-                      </React.Fragment>
+                        <span className="w-5 h-5 inline-flex items-center justify-center shrink-0">
+                          {pair.solved && (
+                            <span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[11px] font-sans font-black inline-flex items-center justify-center shadow-sm animate-jelly">✓</span>
+                          )}
+                        </span>
+                      </div>
                     );
                   })}
                 </div>
@@ -10026,11 +10052,15 @@
         setIsLockedSuccess(true);
         setFeedbackAnim('animate-correct');
         const { completed, nextProgress } = recordCorrect({ wasMissed: false, delayEndMs: null });
+        const summaryPairs = (question?.targetSpecs || [])
+          .map(sp => `${sp.func} ${question.targetAngle}° = ${sp.exactValText}`)
+          .join('，');
         setConceptTip({
           tone: 'success',
           canSkip: true,
           skipLabel: completed ? '輕點查看結算 ▸' : '輕點繼續 ▸',
-          text: completed ? '全關挑戰完成！' : '定義正確！',
+          node: summaryPairs ? <SqrtText text={summaryPairs} className="font-serif font-black" /> : undefined,
+          text: summaryPairs ? undefined : (completed ? '全關挑戰完成！' : '定義正確！'),
           id: Date.now()
         });
         pendingNextRef.current = () => {
@@ -10216,59 +10246,55 @@
                   </div>
                 </div>
 
-                {/* 繪圖區頂部：滿寬大字體雙比值公式填空列（對齊 Lv.15~17 規格） */}
-                <div data-coach="lv11-ratio-box" className="bg-violet-50/90 border-b border-violet-200/90 px-2 py-2 shrink-0 flex items-center justify-center gap-2.5 sm:gap-5">
+                {/* 繪圖區頂部：滿寬大字體雙比值公式填空列（grid-cols-2 固定寬度零位移＋每組獨立打勾 ✓） */}
+                <div data-coach="lv11-ratio-box" className="bg-violet-50/90 border-b border-violet-200/90 px-2 py-2 shrink-0 grid grid-cols-2 divide-x divide-violet-200 items-center">
                   {(question.targetSpecs || []).map((spec, idx) => {
                     const pair = ratioSlots[idx] || { num: null, den: null, solved: false };
                     const isWrong = wrongRatioIdx === idx;
                     return (
-                      <React.Fragment key={spec.func}>
-                        {idx === 1 && <div className="w-px h-11 bg-violet-200 shrink-0" />}
-                        <div className={`flex items-center gap-1.5 font-serif font-black text-sm sm:text-base transition-opacity ${stage === 'define' || pair.solved ? 'opacity-100' : 'opacity-60'}`}>
-                          <span className={pair.solved ? 'text-emerald-700' : 'text-indigo-950'}>{spec.func} {question.targetAngle}° =</span>
-                          <div className="inline-flex flex-col items-center leading-none">
-                            {['num', 'den'].map((part, pIdx) => {
-                              const kVal = pair[part];
-                              const isFocused = stage === 'define' && !pair.solved && !isLockedSuccess && activeRatioSlot.idx === idx && activeRatioSlot.part === part && !kVal;
-                              return (
-                                <React.Fragment key={part}>
-                                  {pIdx === 1 && <div className={`w-full min-w-[54px] h-[2px] my-1 transition-colors ${pair.solved ? 'bg-emerald-500' : 'bg-slate-500'}`} />}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (stage !== 'define' || pair.solved || isLockedSuccess) return;
-                                      audio.sfxClick();
-                                      if (kVal) {
-                                        setRatioSlots(prev => prev.map((s, i) => i === idx ? { ...s, [part]: null } : s));
-                                      }
-                                      setActiveRatioSlot({ idx, part });
-                                    }}
-                                    className={`min-w-[54px] h-[26px] px-1.5 rounded-lg border-2 font-black inline-flex items-center justify-center text-xs transition-all ${
-                                      pair.solved
-                                        ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
-                                        : isWrong
-                                        ? 'border-rose-500 bg-rose-100 text-rose-800 animate-shake'
-                                        : kVal
-                                        ? 'border-violet-500 bg-violet-100 text-violet-900'
-                                        : isFocused
-                                        ? 'border-amber-400 bg-amber-100 text-amber-900 font-sans animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.55)]'
-                                        : 'border-dashed border-slate-300 bg-white text-slate-400 font-sans'
-                                    }`}
-                                  >
-                                    {kVal ? <SqrtText text={`${kVal}(${getDisplayVal(kVal)})`} /> : (part === 'num' ? '分子' : '分母')}
-                                  </button>
-                                </React.Fragment>
-                              );
-                            })}
-                          </div>
-                          {isLockedSuccess && spec.exactValText && (
-                            <span className="text-emerald-700 font-black inline-flex items-center gap-0.5 text-xs sm:text-sm animate-jelly">
-                              <span>=</span>
-                              <FracText value={spec.exactValText} size="xs" barClass="bg-emerald-700" />
-                            </span>
-                          )}
+                      <div key={spec.func} className={`flex items-center justify-center gap-1.5 font-serif font-black text-sm sm:text-base transition-opacity ${stage === 'define' || pair.solved ? 'opacity-100' : 'opacity-60'}`}>
+                        <span className={pair.solved ? 'text-emerald-700' : 'text-indigo-950'}>{spec.func} {question.targetAngle}° =</span>
+                        <div className="inline-flex flex-col items-center leading-none">
+                          {['num', 'den'].map((part, pIdx) => {
+                            const kVal = pair[part];
+                            const isFocused = stage === 'define' && !pair.solved && !isLockedSuccess && activeRatioSlot.idx === idx && activeRatioSlot.part === part && !kVal;
+                            return (
+                              <React.Fragment key={part}>
+                                {pIdx === 1 && <div className={`w-[66px] h-[2px] my-1 transition-colors ${pair.solved ? 'bg-emerald-500' : 'bg-slate-500'}`} />}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (stage !== 'define' || pair.solved || isLockedSuccess) return;
+                                    audio.sfxClick();
+                                    if (kVal) {
+                                      setRatioSlots(prev => prev.map((s, i) => i === idx ? { ...s, [part]: null } : s));
+                                    }
+                                    setActiveRatioSlot({ idx, part });
+                                  }}
+                                  className={`w-[66px] h-[26px] px-1 rounded-lg border-2 font-black inline-flex items-center justify-center text-xs whitespace-nowrap transition-colors ${
+                                    pair.solved
+                                      ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
+                                      : isWrong
+                                      ? 'border-rose-500 bg-rose-100 text-rose-800 animate-shake'
+                                      : kVal
+                                      ? 'border-violet-500 bg-violet-100 text-violet-900'
+                                      : isFocused
+                                      ? 'border-amber-400 bg-amber-100 text-amber-900 font-sans animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.55)]'
+                                      : 'border-dashed border-slate-300 bg-white text-slate-400 font-sans'
+                                  }`}
+                                >
+                                  {kVal ? <SqrtText text={`${kVal}(${getDisplayVal(kVal)})`} /> : (part === 'num' ? '分子' : '分母')}
+                                </button>
+                              </React.Fragment>
+                            );
+                          })}
                         </div>
-                      </React.Fragment>
+                        <span className="w-5 h-5 inline-flex items-center justify-center shrink-0">
+                          {pair.solved && (
+                            <span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[11px] font-sans font-black inline-flex items-center justify-center shadow-sm animate-jelly">✓</span>
+                          )}
+                        </span>
+                      </div>
                     );
                   })}
                 </div>
@@ -16586,8 +16612,8 @@
                       <span className="text-emerald-700">Δ =</span>
                       <FracText value="1/2" size="sm" />
                       <span>× {question.a} × {question.b} × sin</span>
-                      <span className="px-1.5 py-0.5 rounded-lg bg-amber-100 border border-amber-400 text-amber-900 font-mono">{armDeg}°</span>
-                      <span className="text-emerald-700 font-mono">≈ {p0AreaVal.toFixed(1)}</span>
+                      <span className="w-[54px] py-0.5 rounded-lg bg-amber-100 border border-amber-400 text-amber-900 font-mono tabular-nums text-center inline-block">{armDeg}°</span>
+                      <span className="w-[68px] text-emerald-700 font-mono tabular-nums text-left inline-block">≈ {p0AreaVal.toFixed(1)}</span>
                     </div>
                   ) : (
                     <div className="flex items-center justify-center flex-wrap gap-1.5 font-serif font-black text-base sm:text-lg text-slate-800">
@@ -18742,7 +18768,7 @@
                       <div className="flex items-center justify-center flex-wrap gap-1 font-serif font-black text-sm sm:text-base text-amber-950 leading-none">
                         <span className="text-amber-700 italic">c²</span>
                         <span>= {question.a}² + {question.b}²</span>
-                        <span className={`px-1.5 py-0.5 rounded-lg font-mono text-xs sm:text-sm border ${
+                        <span className={`w-[96px] py-0.5 rounded-lg font-mono tabular-nums text-center text-xs sm:text-sm border inline-block ${
                           armDeg === 90
                             ? 'bg-emerald-100 border-emerald-500 text-emerald-800'
                             : armDeg > 90
@@ -18751,7 +18777,7 @@
                         }`}>
                           {armDeg === 90 ? '− 0（畢氏！）' : p0CorrTerm > 0 ? `+ ${Math.abs(p0CorrTerm).toFixed(1)}` : `− ${Math.abs(p0CorrTerm).toFixed(1)}`}
                         </span>
-                        <span className="text-amber-800 font-mono text-xs sm:text-sm">⇒ c ≈ {Math.abs(p0C - Math.round(p0C)) < 0.02 ? Math.round(p0C) : p0C.toFixed(1)}</span>
+                        <span className="w-[74px] text-amber-800 font-mono tabular-nums text-left text-xs sm:text-sm inline-block">⇒ c ≈ {Math.abs(p0C - Math.round(p0C)) < 0.02 ? Math.round(p0C) : p0C.toFixed(1)}</span>
                       </div>
                     </div>
                   ) : isSideMode ? (
