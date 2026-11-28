@@ -7401,13 +7401,13 @@
                   </svg>
                 </div>
 
-                {/* 固定高度底部操作槽（h-[58px] shrink-0）：不遮擋三角形且各階段切換 0px 零位移 */}
-                <div className="h-[58px] shrink-0 mx-2 mb-2 flex items-center">
+                {/* 統一貼底滿寬深色機台條（對齊 Lv.2/3/15~18，不遮圖且階段切換 0px 零位移） */}
+                <div className="bg-slate-900 border-t-2 border-slate-800 px-2.5 py-2 shrink-0">
                   {needFillMissing ? (
                     <div
                       data-coach="lv6-opts"
                       onClick={(e) => e.stopPropagation()}
-                      className="w-full h-full bg-slate-900/95 border border-white/15 rounded-2xl p-1.5 flex items-center justify-center gap-1.5 shadow-xl"
+                      className="h-[46px] flex items-center justify-center gap-1.5"
                     >
                       {question.numOptions.map((numVal) => (
                         <button
@@ -7423,10 +7423,8 @@
                   ) : (
                     <div
                       onClick={solvedOpt ? handleConfirmSkip : undefined}
-                      className={`w-full h-full rounded-2xl border px-3 flex items-center justify-center text-xs sm:text-sm font-black transition-colors ${
-                        solvedOpt
-                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800 cursor-pointer'
-                          : 'bg-slate-50 border-slate-200 text-slate-600'
+                      className={`h-[46px] flex items-center justify-center text-xs sm:text-sm font-bold transition-colors ${
+                        solvedOpt ? 'text-emerald-300 cursor-pointer' : 'text-slate-300'
                       }`}
                     >
                       {solvedOpt
@@ -9656,10 +9654,10 @@
                   </svg>
                 </div>
 
-                {/* 固定高度底部操作槽（h-[58px] shrink-0）：不遮擋第三、四象限且各階段切換 0px 零位移 */}
-                <div className="h-[58px] shrink-0 mx-2 mb-2 flex items-center">
+                {/* 統一貼底滿寬深色機台條（對齊 Lv.2/3/15~18，不遮圖且階段切換 0px 零位移） */}
+                <div className="bg-slate-900 border-t-2 border-slate-800 px-2.5 py-2 shrink-0">
                   {stage === 'pickR' ? (
-                    <div data-coach="lv10-r-opts" className="w-full h-full bg-slate-900/95 border border-white/15 rounded-2xl p-1.5 grid grid-cols-4 gap-1.5 shadow-xl">
+                    <div data-coach="lv10-r-opts" className="h-[46px] grid grid-cols-4 gap-2">
                       {question.rOptions.map((opt) => (
                         <button
                           key={opt.label}
@@ -9674,10 +9672,8 @@
                   ) : (
                     <div
                       onClick={isLockedSuccess ? handleConfirmSkip : undefined}
-                      className={`w-full h-full rounded-2xl border px-3 flex items-center justify-center text-xs sm:text-sm font-black transition-colors ${
-                        isLockedSuccess
-                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800 cursor-pointer'
-                          : 'bg-slate-50 border-slate-200 text-slate-600'
+                      className={`h-[46px] flex items-center justify-center text-xs sm:text-sm font-bold transition-colors ${
+                        isLockedSuccess ? 'text-emerald-300 cursor-pointer' : 'text-slate-300'
                       }`}
                     >
                       {isLockedSuccess
@@ -10643,13 +10639,13 @@
                   </svg>
                 </div>
 
-                {/* 固定高度底部操作槽（h-[58px] shrink-0）：不遮擋第三、四象限且各階段切換 0px 零位移 */}
-                <div className="h-[58px] shrink-0 mx-2 mb-2 flex items-center">
+                {/* 統一貼底滿寬深色機台條（對齊 Lv.2/3/15~18，不遮圖且階段切換 0px 零位移） */}
+                <div className="bg-slate-900 border-t-2 border-slate-800 px-2.5 py-2 shrink-0">
                   {stage === 'assign' ? (
                     <div
                       data-coach="lv11-num-pool"
                       onClick={(e) => e.stopPropagation()}
-                      className="w-full h-full bg-slate-900/95 border border-white/15 rounded-2xl p-1.5 flex items-center justify-center gap-1.5 shadow-xl"
+                      className="h-[46px] flex items-center justify-center gap-1.5"
                     >
                       {LV11_NUM_CAPSULES.map((val) => (
                         <button
@@ -10665,10 +10661,8 @@
                   ) : (
                     <div
                       onClick={isLockedSuccess ? handleConfirmSkip : undefined}
-                      className={`w-full h-full rounded-2xl border px-3 flex items-center justify-center text-xs sm:text-sm font-black transition-colors ${
-                        isLockedSuccess
-                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800 cursor-pointer'
-                          : 'bg-slate-50 border-slate-200 text-slate-600'
+                      className={`h-[46px] flex items-center justify-center text-xs sm:text-sm font-bold transition-colors ${
+                        isLockedSuccess ? 'text-emerald-300 cursor-pointer' : 'text-slate-300'
                       }`}
                     >
                       {isLockedSuccess
@@ -17091,6 +17085,14 @@
                   </div>
                 )}
 
+                {qPhase === 1 && (
+                  <div className="bg-slate-900 border-t-2 border-slate-800 px-2.5 py-2.5 shrink-0">
+                    <div className={`h-[46px] flex items-center justify-center text-xs sm:text-sm font-bold ${isSolved ? 'text-emerald-300' : 'text-slate-300'}`}>
+                      {isSolved ? '✓ 公式填入完成！輕點畫面繼續 ▸' : '👆 點選圖上「兩條夾邊與夾角」完成面積公式（順序不限）'}
+                    </div>
+                  </div>
+                )}
+
                 {qPhase === 2 && (
                   <div data-coach="lv15-opts" className="bg-slate-900 border-t-2 border-slate-800 px-2.5 py-2.5 shrink-0">
                     {!needCalc ? (
@@ -18238,6 +18240,14 @@
                     </button>
                   </div>
                 )}
+                {qPhase === 1 && (
+                  <div className="bg-slate-900 border-t-2 border-slate-800 px-2.5 py-2.5 shrink-0">
+                    <div className={`h-[46px] flex items-center justify-center text-xs sm:text-sm font-bold ${isSolved ? 'text-emerald-300' : 'text-slate-300'}`}>
+                      {isSolved ? '✓ 正弦定理列式完成！輕點畫面繼續 ▸' : '👆 點選圖上互為正對的「對邊」與「對角」（順序不限）'}
+                    </div>
+                  </div>
+                )}
+
                 {qPhase === 2 && (
                   <div data-coach="lv16-opts" className="bg-slate-900 border-t-2 border-slate-800 px-2.5 py-2.5 shrink-0">
                     {!needCalc ? (
@@ -19331,12 +19341,12 @@
                 ) : question.needCalc ? (
                   <div className="bg-slate-900 border-t-2 border-slate-800 px-2.5 py-2 shrink-0">
                     {!formulaDone ? (
-                      <div className="h-[46px] rounded-xl bg-slate-800/90 border border-slate-700 flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-amber-200">
+                      <div className="h-[66px] rounded-xl bg-slate-800/80 border border-slate-700/80 flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-slate-300">
                         <span>{isSideMode ? '👆 點選圖中的「兩條鄰邊」與「夾角」（順序不限）完成餘弦公式' : '👆 點選圖中的「兩鄰邊」與「θ 的對邊（放減號後）」完成餘弦公式'}</span>
                       </div>
                     ) : (
-                      <div data-coach="lv17-opts" className="flex flex-col gap-1.5">
-                        <div className="flex items-center justify-between px-1 text-[11px] font-bold text-amber-200">
+                      <div data-coach="lv17-opts" className="h-[66px] flex flex-col justify-between">
+                        <div className="flex items-center justify-between px-1 text-[11px] font-bold text-amber-200 leading-none">
                           <span>{isSideMode ? '選出邊長 x = ?' : '選出 cos θ = ?'}</span>
                           <span className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/40 font-mono">{question.cosHint}</span>
                         </div>
@@ -19347,7 +19357,7 @@
                               type="button"
                               disabled={Boolean(solvedAns)}
                               onClick={(e) => { e.stopPropagation(); handlePickCalcOpt(opt); }}
-                              className={`h-[44px] rounded-xl font-serif font-black text-base shadow flex items-center justify-center transition-all ${
+                              className={`h-[42px] rounded-xl font-serif font-black text-base shadow flex items-center justify-center transition-all ${
                                 solvedAns === opt
                                   ? 'bg-emerald-400 border-b-[3px] border-emerald-700 text-emerald-950 scale-105'
                                   : wrongOpt === opt
@@ -19363,14 +19373,16 @@
                     )}
                   </div>
                 ) : (
-                  <div className="bg-amber-50/90 border-t-2 border-amber-200 px-3 py-2 shrink-0 flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-amber-900">
-                    {solvedAns ? (
-                      <span className="text-emerald-700">✓ 公式填入完全正確！輕點畫面繼續下一題</span>
-                    ) : isSideMode ? (
-                      <span>👆 點擊圖中的「兩條鄰邊」與「夾角」填入上方公式（順序不限・免計算）</span>
-                    ) : (
-                      <span>👆 點擊「兩鄰邊」與「θ 的對邊（自動放減號後）」（順序不限・免計算）</span>
-                    )}
+                  <div className="bg-slate-900 border-t-2 border-slate-800 px-3 py-2.5 shrink-0">
+                    <div className={`h-[46px] flex items-center justify-center gap-2 text-xs sm:text-sm font-bold ${solvedAns ? 'text-emerald-300' : 'text-slate-300'}`}>
+                      {solvedAns ? (
+                        <span>✓ 公式填入完全正確！輕點畫面繼續下一題</span>
+                      ) : isSideMode ? (
+                        <span>👆 點擊圖中的「兩條鄰邊」與「夾角」填入上方公式（順序不限・免計算）</span>
+                      ) : (
+                        <span>👆 點擊「兩鄰邊」與「θ 的對邊（自動放減號後）」（順序不限・免計算）</span>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
