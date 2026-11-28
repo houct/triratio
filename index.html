@@ -4353,22 +4353,22 @@
       };
     };
 
-    // ==================== 第 11 關隨機題目生成器：星象羅盤師（P0 II/III/IV異象限 → P1 X/Y象限角 → P2 綜合零重複） ====================
-    const generateLevel7Question = (phase, bagState = null, forceAxis = false) => {
+    // ==================== 第 10 關隨機題目生成器：星象羅盤師（P0 特殊角給 r → P1 特殊角給 x/y 反推 r → P2 純象限角非零預給） ====================
+    const generateLevel7Question = (phase, bagState = null) => {
       const quadSpecialMap = {
         2: [120, 135, 150],
         3: [210, 225, 240],
         4: [300, 315, 330]
       };
-      const allNonQ1Special = [120, 135, 150, 210, 225, 240, 300, 315, 330];
       const xAxisAngles = [0, 180];
       const yAxisAngles = [90, 270];
-      const allAxisAngles = [0, 90, 180, 270];
       const funcList = ['sin', 'cos', 'tan'];
 
       const usedSet = new Set(bagState?.usedAngles || []);
       let targetAngle;
+      let preGivenKey = 'r';
       if (phase === 0) {
+        // P0：II/III/IV 異象限特殊角，固定預給 r
         const usedQuads = new Set(bagState?.p0Quads || []);
         let availQuads = [2, 3, 4].filter(q => !usedQuads.has(q));
         if (availQuads.length === 0) availQuads = [2, 3, 4];
@@ -4376,22 +4376,44 @@
         const cands = quadSpecialMap[pickedQuad].filter(a => !usedSet.has(a));
         const pool = cands.length > 0 ? cands : quadSpecialMap[pickedQuad];
         targetAngle = pool[Math.floor(Math.random() * pool.length)];
+        preGivenKey = 'r';
         if (bagState) bagState.p0Quads = [...(bagState.p0Quads || []), pickedQuad];
       } else if (phase === 1) {
-        if (bagState && (!bagState.p1Axes || bagState.p1Axes.length === 0)) {
-          bagState.p1Axes = Math.random() < 0.5 ? ['x', 'y'] : ['y', 'x'];
+        // P1：未出過之 II/III/IV 異象限特殊角，隨機預給 x 或 y 反推 r（兩題剛好各給 x、y 一次）
+        const usedQuads = new Set(bagState?.p1Quads || []);
+        let availQuads = [2, 3, 4].filter(q => !usedQuads.has(q));
+        if (availQuads.length === 0) availQuads = [2, 3, 4];
+        const pickedQuad = availQuads[Math.floor(Math.random() * availQuads.length)];
+        const cands = quadSpecialMap[pickedQuad].filter(a => !usedSet.has(a));
+        const pool = cands.length > 0 ? cands : quadSpecialMap[pickedQuad];
+        targetAngle = pool[Math.floor(Math.random() * pool.length)];
+        if (bagState) {
+          bagState.p1Quads = [...(bagState.p1Quads || []), pickedQuad];
+          if (!bagState.p1GivenBag || bagState.p1GivenBag.length === 0) {
+            bagState.p1GivenBag = Math.random() < 0.5 ? ['x', 'y'] : ['y', 'x'];
+          }
+          preGivenKey = bagState.p1GivenBag.shift();
+        } else {
+          preGivenKey = Math.random() < 0.5 ? 'x' : 'y';
         }
-        const axisType = bagState ? bagState.p1Axes.shift() : (Math.random() < 0.5 ? 'x' : 'y');
+      } else {
+        // P2：純象限角壓軸（1 題 X 軸 + 1 題 Y 軸；1 題預給 r，1 題預給非零坐標，絕不預給 0）
+        if (bagState && (!bagState.p2Axes || bagState.p2Axes.length === 0)) {
+          bagState.p2Axes = Math.random() < 0.5 ? ['x', 'y'] : ['y', 'x'];
+        }
+        const axisType = bagState ? bagState.p2Axes.shift() : (Math.random() < 0.5 ? 'x' : 'y');
         const axisPool = axisType === 'x' ? xAxisAngles : yAxisAngles;
         const cands = axisPool.filter(a => !usedSet.has(a));
         const pool = cands.length > 0 ? cands : axisPool;
         targetAngle = pool[Math.floor(Math.random() * pool.length)];
-      } else {
-        const unusedSpecial = allNonQ1Special.filter(a => !usedSet.has(a));
-        const unusedAxis = allAxisAngles.filter(a => !usedSet.has(a));
-        const unusedPool = [...unusedSpecial, ...unusedAxis];
-        const pool = unusedPool.length > 0 ? unusedPool : [...allNonQ1Special, ...allAxisAngles];
-        targetAngle = pool[Math.floor(Math.random() * pool.length)];
+        let mode = Math.random() < 0.5 ? 'r' : 'coord';
+        if (bagState) {
+          if (!bagState.p2GivenModes || bagState.p2GivenModes.length === 0) {
+            bagState.p2GivenModes = Math.random() < 0.5 ? ['r', 'coord'] : ['coord', 'r'];
+          }
+          mode = bagState.p2GivenModes.shift();
+        }
+        preGivenKey = mode === 'r' ? 'r' : axisType;
       }
       if (bagState) {
         bagState.lastAngle = targetAngle;
@@ -4403,11 +4425,11 @@
       const isTanUndefined = principal === 90 || principal === 270;
       const allowedFuncs = isTanUndefined ? ['sin', 'cos'] : funcList;
       let targetFunc;
-      if (phase === 1) {
-        const p1Funcs = allowedFuncs.filter(f => f !== bagState?.lastP1Func);
-        const fPool = p1Funcs.length > 0 ? p1Funcs : allowedFuncs;
+      if (phase === 2) {
+        const p2Funcs = allowedFuncs.filter(f => f !== bagState?.lastP2Func);
+        const fPool = p2Funcs.length > 0 ? p2Funcs : allowedFuncs;
         targetFunc = fPool[Math.floor(Math.random() * fPool.length)];
-        if (bagState) bagState.lastP1Func = targetFunc;
+        if (bagState) bagState.lastP2Func = targetFunc;
       } else if (bagState) {
         if (!bagState.funcBag || bagState.funcBag.length === 0) {
           bagState.funcBag = [...funcList].sort(() => Math.random() - 0.5);
@@ -4484,7 +4506,7 @@
         : `先確認該象限的 x、y 正負號，再依 ${refAngle}° 直角三角形邊長比填入對應數值`;
 
       return {
-        phase, targetAngle, principal, isAxis, refAngle, targetFunc: targetSpecs[0].func, locationLabel,
+        phase, targetAngle, principal, isAxis, refAngle, targetFunc: targetSpecs[0].func, locationLabel, preGivenKey,
         xStr, yStr, rStr, xNum, yNum, rNum,
         ptP, ptFootX, ptFootY, rightAngleSquareX,
         correctNumeratorKey, correctDenominatorKey, exactValText, targetSpecs,
@@ -9852,15 +9874,15 @@
       const nextQuestion = (curProg) => {
         clearAutoRotate();
         const phase = curProg >= starsThreshold[1] ? 2 : curProg >= starsThreshold[0] ? 1 : 0;
-        const forceAxis = phase === 1 && curProg === starsThreshold[1] - 1 && !bagRef.current.p1AxisDone;
-        const q = generateLevel7Question(phase, bagRef.current, forceAxis);
-        if (phase === 1 && q.isAxis) bagRef.current.p1AxisDone = true;
+        const q = generateLevel7Question(phase, bagRef.current);
         setQuestion(q);
         setStage('rotate');
         setCurrentAngle(0);
         exactAngleRef.current = 0;
         lastTickAngleRef.current = 0;
-        const initialAssigned = phase > 0 ? { x: null, y: null, r: q.rStr } : { x: null, y: null, r: null };
+        const preKey = q.preGivenKey || 'r';
+        const preVal = preKey === 'x' ? q.xStr : preKey === 'y' ? q.yStr : q.rStr;
+        const initialAssigned = { x: null, y: null, r: null, [preKey]: preVal };
         setAssignedVals(initialAssigned);
         currentAssignOrderRef.current = [];
         const firstEmpty = preferredAssignOrderRef.current.find(k => !initialAssigned[k]) || 'x';
@@ -9879,7 +9901,7 @@
 
       const startGame = (order = pickOrder) => {
         setPickOrder(order);
-        bagRef.current = { usedAngles: [], p0Quads: [], p1Axes: [], funcBag: [], lastAngle: undefined, lastP1Func: null };
+        bagRef.current = { usedAngles: [], p0Quads: [], p1Quads: [], p1GivenBag: [], p2Axes: [], p2GivenModes: [], funcBag: [], lastAngle: undefined, lastP2Func: null };
         setFeedbackAnim('');
         setRatioSlots([
           { num: null, den: null, solved: false },
@@ -10220,7 +10242,7 @@
               />
 
               <div className={`flex-1 min-h-0 bg-white rounded-3xl border-3 border-indigo-950 shadow-xl flex flex-col overflow-hidden transition-all duration-150 ${isLockedSuccess ? 'ring-4 ring-emerald-400/75' : ''}`}>
-                <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['第 II/III/IV 象限特殊角 • 轉終邊 → 填 x, y, r → 定義', '象限角專練（含 0°）• 自動轉角與 r → 填 x, y → 定義', '廣義角綜合驗收 • 自動轉角與 r → 填 x, y → 定義']} />
+                <StagePhaseStrip phase={progress >= starsThreshold[1] ? 2 : progress >= starsThreshold[0] ? 1 : 0} labels={['特殊角正推 • 轉終邊 → 預給 r 填 x, y → 雙比值', '特殊角反推 • 自動轉角 → 預給 x/y 推 r → 雙比值', '純象限角壓軸 • 自動轉角 → 填坐標與動徑 → 雙比值']} />
                 <div data-coach="lv11-target" className="bg-gradient-to-r from-violet-600 to-indigo-700 min-h-[50px] py-1.5 px-3 flex justify-between items-center gap-2 text-white border-b-2 border-indigo-950 shrink-0">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-base sm:text-lg font-serif font-black shrink-0">θ = {question.targetAngle}°</span>
@@ -10228,7 +10250,7 @@
                       {stage === 'rotate'
                         ? (isAutoRotating ? '✨ 自動定位終邊…' : '拖曳終邊至目標角度')
                         : stage === 'assign'
-                        ? (question.phase > 0 ? '點選下方數字填入 x, y' : '點選下方數字填入 x, y, r')
+                        ? `點選下方數字填入 ${['x', 'y', 'r'].filter(k => k !== (question.preGivenKey || 'r')).join(', ')}`
                         : isLockedSuccess
                         ? '雙比值定義完成！'
                         : '點擊圖上 x, y, r 填入兩組比值！'}
@@ -10536,7 +10558,7 @@
                       onClick={(e) => e.stopPropagation()}
                       className="absolute bottom-2 left-2 right-2 z-20 bg-slate-900/92 backdrop-blur-sm border border-white/15 rounded-2xl p-1.5 flex items-center justify-center gap-1.5 shadow-xl"
                     >
-                      {(question.phase > 0 ? ['-√3', '-1', '0', '1', '√3'] : LV11_NUM_CAPSULES).map((val) => (
+                      {LV11_NUM_CAPSULES.map((val) => (
                         <button
                           key={val}
                           type="button"
