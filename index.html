@@ -535,7 +535,7 @@
     })();
   </script>
 
-  <div id="root" class="w-full sm:max-w-md h-[100dvh] flex flex-col relative overflow-hidden bg-sky-400/20 sm:shadow-2xl"></div>
+  <div id="root" class="w-full h-[100dvh] flex flex-col items-center relative overflow-hidden"></div>
 
   <!-- 移至載入畫面之後再依序載入外部引擎，確保 0.05s 內先出星夜載入畫面 -->
   <script src="https://cdn.tailwindcss.com" onload="window.__bootStep && window.__bootStep(22, '正在鋪設星夜畫布…')"></script>
@@ -7199,7 +7199,7 @@
                             stroke={strokeCol}
                             strokeWidth="3.5"
                             strokeDasharray={(isPlaced || showMissingVal) ? 'none' : '5 4'}
-                            className={isMissingTarget && !isOverMissing ? 'animate-light-breath' : ''}
+                            className={isMissingTarget ? 'animate-light-breath' : ''}
                           />
                           {displayLabel && (
                             <text x={e.pt.x} y={e.pt.y + 1} fill={textCol} fontSize="19" fontWeight="900" textAnchor="middle" dominantBaseline="middle" className="font-serif">
@@ -27019,7 +27019,7 @@
       }, [focusedShrineObj, userProgress.seenStoryFlags, dismissShrine1Guide, dismissShrine2Guide]);
 
       return (
-        <div className="flex-1 w-full rounded-none sm:rounded-3xl border-y-2 sm:border-4 border-indigo-950 overflow-hidden relative z-10 shadow-2xl">
+        <div className="flex-1 w-full rounded-none border-t-2 sm:border-t-0 border-indigo-950 overflow-hidden relative z-10 shadow-2xl">
           <div ref={mountRef} className="w-full h-full relative" style={{ touchAction: 'none' }} />
           {showConfetti && <ConfettiOverlay />}
 
@@ -27468,7 +27468,7 @@
               </div>
             </div>
           ) : focusedNodeId === 19 ? (
-            <div className="absolute bottom-0 pb-safe left-0 right-0 sm:bottom-3 sm:left-3 sm:right-3 z-30 rounded-t-3xl sm:rounded-2xl overflow-hidden animate-jelly text-amber-50 bg-gradient-to-b from-[#172040] via-[#0f172e] to-[#080d1d] border-t-2 sm:border-2 border-amber-400/75 shadow-[0_-12px_36px_rgba(15,23,42,0.75)]">
+            <div className="absolute bottom-0 pb-safe left-0 right-0 sm:bottom-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[min(92vw,480px)] z-30 rounded-t-3xl sm:rounded-2xl overflow-hidden animate-jelly text-amber-50 bg-gradient-to-b from-[#172040] via-[#0f172e] to-[#080d1d] border-t-2 sm:border-2 border-amber-400/75 shadow-[0_-12px_36px_rgba(15,23,42,0.75)]">
               <div className="h-1.5 w-full bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400" />
               <div className="relative p-3.5">
                 <div className="flex items-start justify-between gap-2 mb-3">
@@ -27536,7 +27536,7 @@
               </div>
             </div>
           ) : focusedShrineObj ? (
-            <div className={`absolute bottom-0 pb-safe left-0 right-0 sm:bottom-3 sm:left-3 sm:right-3 z-30 rounded-t-3xl sm:rounded-2xl overflow-hidden animate-jelly text-amber-950 bg-gradient-to-b from-[#f6ebd2] via-[#efe0bc] to-[#e4ce9c] border-t-2 sm:border-2 border-amber-800/75 shadow-[inset_0_0_28px_rgba(120,53,15,0.2),0_-12px_36px_rgba(15,23,42,0.45)] ${shrineTheme.spine}`}>
+            <div className={`absolute bottom-0 pb-safe left-0 right-0 sm:bottom-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[min(92vw,480px)] z-30 rounded-t-3xl sm:rounded-2xl overflow-hidden animate-jelly text-amber-950 bg-gradient-to-b from-[#f6ebd2] via-[#efe0bc] to-[#e4ce9c] border-t-2 sm:border-2 border-amber-800/75 shadow-[inset_0_0_28px_rgba(120,53,15,0.2),0_-12px_36px_rgba(15,23,42,0.45)] ${shrineTheme.spine}`}>
               <div className="h-2 w-full bg-gradient-to-r from-amber-900 via-amber-700 to-amber-900" />
               <div className="relative p-3.5 overflow-hidden">
                 <div className="pointer-events-none select-none absolute -right-1 top-1 text-6xl opacity-10">{shrineTheme.watermark}</div>
@@ -27590,7 +27590,7 @@
               </div>
             </div>
           ) : (
-            <div className={`absolute bottom-0 pb-safe left-0 right-0 sm:bottom-3 sm:left-3 sm:right-3 z-30 rounded-t-3xl sm:rounded-2xl overflow-visible animate-jelly text-slate-800 ${drawerTheme.shell}`}>
+            <div className={`absolute bottom-0 pb-safe left-0 right-0 sm:bottom-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[min(92vw,480px)] z-30 rounded-t-3xl sm:rounded-2xl overflow-visible animate-jelly text-slate-800 ${drawerTheme.shell}`}>
               <div className={`h-2 w-full rounded-t-3xl sm:rounded-t-2xl bg-gradient-to-r ${drawerTheme.topBar}`} />
               <div className={`relative overflow-hidden ${drawerTheme.headerWrap}`}>
                 <div className="pointer-events-none select-none absolute -right-1 top-1 text-6xl opacity-10">{drawerTheme.watermark}</div>
@@ -28028,7 +28028,7 @@
 
       return (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 animate-jelly">
-          <div className="bg-gradient-to-b from-[#f7edd6] via-[#f1e2c1] to-[#e7d2a4] rounded-3xl border-4 border-purple-900/75 p-4 w-full max-w-sm h-[660px] max-h-[92dvh] shadow-[inset_0_0_32px_rgba(88,28,135,0.16),0_24px_50px_rgba(15,23,42,0.55)] relative flex flex-col justify-between gap-2">
+          <div className="bg-gradient-to-b from-[#f7edd6] via-[#f1e2c1] to-[#e7d2a4] rounded-3xl border-4 border-purple-900/75 p-4 w-full max-w-sm sm:max-w-md md:max-w-lg h-[660px] md:h-[720px] max-h-[92dvh] shadow-[inset_0_0_32px_rgba(88,28,135,0.16),0_24px_50px_rgba(15,23,42,0.55)] relative flex flex-col justify-between gap-2">
             {/* Header */}
             <div className="flex items-center justify-between border-b-2 border-purple-900/20 pb-2 shrink-0">
               <div className="flex items-center gap-2">
@@ -29288,11 +29288,19 @@
 
       return (
         <GameModeContext.Provider value={gameModeCtxVal}>
-        <div className={`w-full h-[100dvh] sm:max-w-md flex flex-col justify-between pt-safe ${currentStage === 'map' || currentStage === 'title' ? 'pb-0 sm:pb-safe' : 'pb-safe'} px-0 sm:px-3 overflow-hidden`}>
+        <div className={`w-full h-[100dvh] flex flex-col justify-between pt-safe overflow-hidden ${
+          currentStage === 'map'
+            ? 'max-w-none pb-0 px-0'
+            : currentStage === 'title'
+            ? 'max-w-none pb-0 sm:pb-safe px-0 sm:px-4'
+            : 'sm:max-w-[min(94vw,680px,calc(100dvh*0.72))] mx-auto pb-safe px-0 sm:px-3 bg-sky-400/15 sm:shadow-2xl'
+        }`}>
           
           {/* 頂部 Header（主畫面與電影拼圖過場時隱藏） */}
           {currentStage !== 'title' && !isPuzzleCinematicPlaying && (
-          <header className="w-full bg-white/95 backdrop-blur-md border-b-3 sm:border-3 border-indigo-950 rounded-none sm:rounded-2xl p-2 px-3 shadow-xl flex justify-between items-center z-40 shrink-0 gap-2">
+          <header className={`w-full bg-white/95 backdrop-blur-md border-b-3 sm:border-3 border-indigo-950 rounded-none sm:rounded-2xl p-2 px-3 shadow-xl flex justify-between items-center z-40 shrink-0 gap-2 ${
+            currentStage === 'map' ? 'sm:max-w-2xl sm:mx-auto sm:mt-2' : ''
+          }`}>
             {currentStage === 'playing' ? (
               <>
                 <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -29385,7 +29393,13 @@
           </header>
           )}
 
-          <main className={`w-full flex-1 min-h-0 flex flex-col overflow-hidden relative ${currentStage === 'playing' ? 'px-2.5 py-1.5' : 'my-0 sm:my-2'}`}>
+          <main className={`w-full flex-1 min-h-0 flex flex-col overflow-hidden relative ${
+            currentStage === 'playing'
+              ? 'px-2.5 py-1.5'
+              : currentStage === 'map'
+              ? 'my-0 sm:mt-2'
+              : 'my-0 sm:my-2'
+          }`}>
             {lockedNotice && (
               <div className="absolute top-3 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:max-w-[360px] z-50 bg-slate-950/95 text-amber-300 border-2 border-amber-400 px-3.5 py-2 rounded-2xl shadow-2xl text-xs font-black flex items-center justify-center text-center gap-1.5 leading-snug animate-jelly pointer-events-none">
                 <span className="shrink-0">✦</span><span>{lockedNotice}</span>
@@ -29504,7 +29518,7 @@
                 </div>
 
                 {/* 三份獨立冒險日誌槽位 */}
-                <div className="relative z-10 flex flex-col gap-4 sm:gap-5 my-auto py-3">
+                <div className="relative z-10 w-full max-w-md mx-auto flex flex-col gap-4 sm:gap-5 my-auto py-3">
                   {[1, 2, 3].map((slotId) => {
                     const slotData = saveStore.slots[slotId];
                     if (!slotData) {
@@ -29808,7 +29822,7 @@
 
             return (
               <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 animate-jelly">
-                <div className="bg-gradient-to-b from-[#f7edd6] via-[#f1e2c1] to-[#e7d2a4] rounded-3xl border-4 border-amber-800/80 p-4 w-full max-w-sm h-[660px] max-h-[92dvh] shadow-[inset_0_0_32px_rgba(120,53,15,0.18),0_24px_50px_rgba(15,23,42,0.55)] relative flex flex-col justify-between gap-2">
+                <div className="bg-gradient-to-b from-[#f7edd6] via-[#f1e2c1] to-[#e7d2a4] rounded-3xl border-4 border-amber-800/80 p-4 w-full max-w-sm sm:max-w-md md:max-w-lg h-[660px] md:h-[720px] max-h-[92dvh] shadow-[inset_0_0_32px_rgba(120,53,15,0.18),0_24px_50px_rgba(15,23,42,0.55)] relative flex flex-col justify-between gap-2">
                   <div className="flex items-center justify-between border-b-2 border-amber-800/20 pb-2 shrink-0">
                     <div className="flex items-center gap-2">
                       <span className="text-2xl animate-bounce">🧭</span>
@@ -30241,7 +30255,7 @@
           {/* 知識聖所 1：銳角三角比聖典 Modal（對應第一聖域 Lv.1～Lv.6 共 6 頁圖解） */}
           {showUnifiedShrine && (
             <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 animate-jelly">
-              <div className="bg-gradient-to-b from-[#f7edd6] via-[#f1e2c1] to-[#e7d2a4] rounded-3xl border-4 border-amber-800/80 p-4 w-full max-w-sm h-[660px] max-h-[92dvh] shadow-[inset_0_0_32px_rgba(120,53,15,0.18),0_24px_50px_rgba(15,23,42,0.55)] relative flex flex-col justify-between gap-2">
+              <div className="bg-gradient-to-b from-[#f7edd6] via-[#f1e2c1] to-[#e7d2a4] rounded-3xl border-4 border-amber-800/80 p-4 w-full max-w-sm sm:max-w-md md:max-w-lg h-[660px] md:h-[720px] max-h-[92dvh] shadow-[inset_0_0_32px_rgba(120,53,15,0.18),0_24px_50px_rgba(15,23,42,0.55)] relative flex flex-col justify-between gap-2">
                 <div className="flex items-center justify-between border-b-2 border-amber-800/20 pb-2 shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="text-2xl animate-bounce">📜</span>
